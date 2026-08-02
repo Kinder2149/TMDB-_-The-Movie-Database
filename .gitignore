@@ -1,0 +1,27 @@
+# Dépendances
+node_modules/
+
+# Build
+dist/
+
+# Secrets & variables d'environnement
+.env
+.env.local
+*.env
+
+# Base de données locale
+server/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Config locale Claude Code
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

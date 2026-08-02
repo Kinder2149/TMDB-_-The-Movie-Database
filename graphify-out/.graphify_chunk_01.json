@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {"id": "api_client", "label": "Client API module (api.js)", "file_type": "code", "source_file": "client/src/api.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "app_component", "label": "App root component", "file_type": "code", "source_file": "client/src/App.jsx", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "seriesdetail_component", "label": "SeriesDetail component", "file_type": "code", "source_file": "client/src/components/SeriesDetail.jsx", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "viteconfig_proxy", "label": "Vite dev proxy (/api -> back)", "file_type": "code", "source_file": "client/vite.config.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "index_server", "label": "Express server entrypoint", "file_type": "code", "source_file": "server/src/index.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "route_search", "label": "Search route (/api/search)", "file_type": "code", "source_file": "server/src/routes/search.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "route_suivi", "label": "Suivi route (/api/suivi)", "file_type": "code", "source_file": "server/src/routes/suivi.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "route_series", "label": "Series route (/api/tv)", "file_type": "code", "source_file": "server/src/routes/series.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "service_tmdb", "label": "TMDB service", "file_type": "code", "source_file": "server/src/services/tmdb.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "repo_suivi", "label": "Suivi repository", "file_type": "code", "source_file": "server/src/db/suivi.repo.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "repo_episodes", "label": "Episodes repository", "file_type": "code", "source_file": "server/src/db/episodes.repo.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "database_sqlite", "label": "SQLite database layer", "file_type": "code", "source_file": "server/src/db/database.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "tmdb_external_api", "label": "TMDB external API", "file_type": "code", "source_file": "server/src/services/tmdb.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "table_suivi", "label": "Table suivi (SQLite)", "file_type": "code", "source_file": "server/src/db/database.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "table_episodes_vus", "label": "Table episodes_vus (SQLite)", "file_type": "code", "source_file": "server/src/db/database.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "shape_media_item", "label": "Media item shape (id/mediaType/title/year/posterUrl)", "file_type": "code", "source_file": "server/src/services/tmdb.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "shape_progress", "label": "Progress shape (total/watched/next)", "file_type": "code", "source_file": "server/src/routes/series.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "ctx_projet", "label": "PROJET_CONTEXTE (Suivi Films & Séries)", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "concept_boucle_v1", "label": "Boucle V1 (chercher, ajouter, marquer, progression, listes)", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "concept_deux_listes", "label": "Deux listes (À voir / Vu-En cours)", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "concept_3_couches", "label": "Architecture 3 couches (UI/Logique/Données)", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "rationale_tmdb_source", "label": "TMDB seule source (streaming n'expose pas les données)", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "rationale_cle_back", "label": "Clé TMDB reste côté back, jamais côté UI", "file_type": "document", "source_file": "server/src/services/tmdb.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "rationale_local_v1", "label": "V1 local, un seul PC, aucun compte", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "rationale_no_future", "label": "Aucune structure créée pour le futur", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "rationale_stockage_minimal", "label": "Stocker seulement ce que TMDB ne redonne pas à volonté", "file_type": "document", "source_file": "server/src/db/database.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "rationale_masque_saison0", "label": "Masquer saison 0 et saisons vides", "file_type": "document", "source_file": "server/src/services/tmdb.js", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "concept_v2", "label": "V2 (en ligne, comptes, PostgreSQL) — non construit", "file_type": "document", "source_file": "PROJET_CONTEXTE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}
+  ],
+  "edges": [
+    {"source": "api_client", "target": "route_search", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/src/api.js", "source_location": "line 3 fetch /api/search", "weight": 1.0},
+    {"source": "api_client", "target": "route_suivi", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/src/api.js", "source_location": "fetch /api/suivi", "weight": 1.0},
+    {"source": "api_client", "target": "route_series", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/src/api.js", "source_location": "fetch /api/tv", "weight": 1.0},
+    {"source": "viteconfig_proxy", "target": "index_server", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/vite.config.js", "source_location": "proxy /api -> localhost:3001", "weight": 1.0},
+    {"source": "api_client", "target": "viteconfig_proxy", "relation": "references", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "client/vite.config.js", "source_location": null, "weight": 1.0},
+
+    {"source": "route_search", "target": "service_tmdb", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/routes/search.js", "source_location": "searchMulti", "weight": 1.0},
+    {"source": "route_series", "target": "service_tmdb", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/routes/series.js", "source_location": "getSeasons/getEpisodes", "weight": 1.0},
+    {"source": "route_series", "target": "repo_episodes", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/routes/series.js", "source_location": "markEpisode/listWatchedEpisodes", "weight": 1.0},
+    {"source": "route_suivi", "target": "repo_suivi", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/routes/suivi.js", "source_location": "listSuivi/addToSuivi", "weight": 1.0},
+    {"source": "service_tmdb", "target": "tmdb_external_api", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/services/tmdb.js", "source_location": "fetch api.themoviedb.org", "weight": 1.0},
+    {"source": "repo_suivi", "target": "table_suivi", "relation": "shares_data_with", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/suivi.repo.js", "source_location": "SQL suivi", "weight": 1.0},
+    {"source": "repo_episodes", "target": "table_episodes_vus", "relation": "shares_data_with", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/episodes.repo.js", "source_location": "SQL episodes_vus", "weight": 1.0},
+    {"source": "repo_suivi", "target": "database_sqlite", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/suivi.repo.js", "source_location": "getDb()", "weight": 1.0},
+    {"source": "repo_episodes", "target": "database_sqlite", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/episodes.repo.js", "source_location": "getDb()", "weight": 1.0},
+    {"source": "database_sqlite", "target": "table_suivi", "relation": "implements", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/database.js", "source_location": "CREATE TABLE suivi", "weight": 1.0},
+    {"source": "database_sqlite", "target": "table_episodes_vus", "relation": "implements", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/database.js", "source_location": "CREATE TABLE episodes_vus", "weight": 1.0},
+
+    {"source": "app_component", "target": "api_client", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/src/App.jsx", "source_location": "searchTitles/getSuivi", "weight": 1.0},
+    {"source": "seriesdetail_component", "target": "api_client", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/src/components/SeriesDetail.jsx", "source_location": "getSeasons/markEpisode", "weight": 1.0},
+
+    {"source": "service_tmdb", "target": "shape_media_item", "relation": "implements", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/services/tmdb.js", "source_location": "searchMulti map", "weight": 1.0},
+    {"source": "api_client", "target": "shape_media_item", "relation": "shares_data_with", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "client/src/api.js", "source_location": null, "weight": 1.0},
+    {"source": "app_component", "target": "shape_media_item", "relation": "shares_data_with", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "client/src/App.jsx", "source_location": "keyOf mediaType-id", "weight": 1.0},
+    {"source": "repo_suivi", "target": "shape_media_item", "relation": "shares_data_with", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "server/src/db/suivi.repo.js", "source_location": "listSuivi select aliases", "weight": 1.0},
+    {"source": "route_series", "target": "shape_progress", "relation": "implements", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/routes/series.js", "source_location": "progress res.json", "weight": 1.0},
+    {"source": "seriesdetail_component", "target": "shape_progress", "relation": "shares_data_with", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "client/src/components/SeriesDetail.jsx", "source_location": "progress total/watched/next", "weight": 1.0},
+
+    {"source": "repo_suivi", "target": "concept_deux_listes", "relation": "implements", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "server/src/db/suivi.repo.js", "source_location": "listStatus a_voir/vu_encours", "weight": 1.0},
+    {"source": "route_series", "target": "concept_boucle_v1", "relation": "implements", "confidence": "INFERRED", "confidence_score": 0.75, "source_file": "server/src/routes/series.js", "source_location": "progress + next episode", "weight": 1.0},
+
+    {"source": "ctx_projet", "target": "concept_boucle_v1", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "PROJET_CONTEXTE.md", "source_location": "Périmètre V1", "weight": 1.0},
+    {"source": "ctx_projet", "target": "concept_3_couches", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "PROJET_CONTEXTE.md", "source_location": "Architecture", "weight": 1.0},
+    {"source": "ctx_projet", "target": "concept_deux_listes", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "PROJET_CONTEXTE.md", "source_location": "Deux listes", "weight": 1.0},
+    {"source": "ctx_projet", "target": "concept_v2", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "PROJET_CONTEXTE.md", "source_location": "Ce qui change en V2", "weight": 1.0},
+
+    {"source": "rationale_tmdb_source", "target": "service_tmdb", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "PROJET_CONTEXTE.md", "source_location": "Source des données", "weight": 1.0},
+    {"source": "rationale_cle_back", "target": "service_tmdb", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/services/tmdb.js", "source_location": "La clé reste dans cette couche", "weight": 1.0},
+    {"source": "rationale_cle_back", "target": "viteconfig_proxy", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "client/vite.config.js", "source_location": "L'UI n'appelle jamais TMDB directement", "weight": 1.0},
+    {"source": "rationale_local_v1", "target": "database_sqlite", "relation": "rationale_for", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "PROJET_CONTEXTE.md", "source_location": "tout en local", "weight": 1.0},
+    {"source": "rationale_no_future", "target": "concept_3_couches", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "PROJET_CONTEXTE.md", "source_location": "Aucune structure pour le futur", "weight": 1.0},
+    {"source": "rationale_stockage_minimal", "target": "database_sqlite", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/db/database.js", "source_location": "On ne stocke QUE ce que TMDB ne peut pas redonner", "weight": 1.0},
+    {"source": "rationale_stockage_minimal", "target": "rationale_tmdb_source", "relation": "conceptually_related_to", "confidence": "INFERRED", "confidence_score": 0.7, "source_file": "server/src/db/database.js", "source_location": null, "weight": 1.0},
+    {"source": "rationale_masque_saison0", "target": "service_tmdb", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/services/tmdb.js", "source_location": "getSeasons filter season 0", "weight": 1.0},
+    {"source": "database_sqlite", "target": "concept_v2", "relation": "conceptually_related_to", "confidence": "INFERRED", "confidence_score": 0.65, "source_file": "PROJET_CONTEXTE.md", "source_location": "Migration vers PostgreSQL en V2", "weight": 1.0},
+
+    {"source": "index_server", "target": "concept_3_couches", "relation": "implements", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "server/src/index.js", "source_location": "commentaires Couche Données/Logique", "weight": 1.0},
+    {"source": "repo_suivi", "target": "repo_episodes", "relation": "semantically_similar_to", "confidence": "INFERRED", "confidence_score": 0.7, "source_file": "server/src/db/episodes.repo.js", "source_location": "deux repos data-layer même pattern getDb/prepare", "weight": 1.0}
+  ],
+  "hyperedges": [
+    {"id": "three_layers", "label": "Architecture 3 couches UI/Logique/Données", "nodes": ["app_component", "index_server", "database_sqlite"], "relation": "form", "confidence": "EXTRACTED", "confidence_score": 0.9, "source_file": "PROJET_CONTEXTE.md"},
+    {"id": "suivi_flow", "label": "Flux suivi : recherche -> ajout -> marquer vu -> deux listes", "nodes": ["route_search", "route_suivi", "repo_suivi", "concept_deux_listes", "app_component"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "PROJET_CONTEXTE.md"},
+    {"id": "episode_tracking_flow", "label": "Suivi épisodes série : saisons -> cocher épisodes -> progression/prochain", "nodes": ["seriesdetail_component", "route_series", "service_tmdb", "repo_episodes", "shape_progress"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "server/src/routes/series.js"}
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
