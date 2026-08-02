@@ -3,12 +3,18 @@ import SearchBar from './components/SearchBar.jsx';
 import MovieCard from './components/MovieCard.jsx';
 import SeriesDetail from './components/SeriesDetail.jsx';
 import Lists from './components/Lists.jsx';
+import ProfileSelector from './components/ProfileSelector.jsx';
 import {
   searchTitles,
   getSuivi,
   addToSuivi,
   removeFromSuivi,
   setWatched,
+  getProfiles,
+  createProfile,
+  renameProfile,
+  getActiveProfileId,
+  setActiveProfileId,
 } from './api.js';
 
 const keyOf = (item) => `${item.mediaType}-${item.id}`;
@@ -22,6 +28,10 @@ export default function App() {
   // Suivi complet : clé -> item (avec status et listStatus).
   const [suivi, setSuivi] = useState(() => new Map());
   const [openSeries, setOpenSeries] = useState(null);
+  // Profils : la liste et l'id actif. Tant qu'aucun profil n'est prêt, on ne
+  // lance aucune requête de suivi (elles exigent l'en-tête X-Profile-Id).
+  const [profiles, setProfiles] = useState([]);
+  const [activeProfile, setActiveProfile] = useState(getActiveProfileId());
 
   function loadSuivi() {
     getSuivi()
@@ -29,9 +39,51 @@ export default function App() {
       .catch(() => {});
   }
 
+  // Au démarrage : charger les profils et fixer le profil actif.
+  // Si l'id mémorisé (localStorage) n'existe plus, on prend le premier profil.
   useEffect(() => {
-    loadSuivi();
+    getProfiles()
+      .then((list) => {
+        setProfiles(list);
+        const stored = getActiveProfileId();
+        const chosen = list.find((p) => p.id === stored) || list[0];
+        if (chosen) {
+          setActiveProfileId(chosen.id);
+          setActiveProfile(chosen.id);
+        }
+      })
+      .catch((e) => setError(e.message));
   }, []);
+
+  // Recharger le suivi dès qu'un profil actif est disponible / change.
+  useEffect(() => {
+    if (activeProfile) loadSuivi();
+  }, [activeProfile]);
+
+  function handleSelectProfile(id) {
+    setActiveProfileId(id);
+    setActiveProfile(id);
+    setOpenSeries(null); // le panneau série appartenait à l'ancien profil
+  }
+
+  async function handleCreateProfile(name) {
+    try {
+      const created = await createProfile(name);
+      setProfiles((prev) => [...prev, created]);
+      handleSelectProfile(created.id);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleRenameProfile(id, name) {
+    try {
+      await renameProfile(id, name);
+      setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   async function handleSearch(query) {
     setStatus('loading');
@@ -87,7 +139,16 @@ export default function App() {
 
   return (
     <main className="app">
-      <h1>Suivi Films &amp; Séries</h1>
+      <header className="app__head">
+        <h1>Suivi Films &amp; Séries</h1>
+        <ProfileSelector
+          profiles={profiles}
+          activeId={activeProfile}
+          onSelect={handleSelectProfile}
+          onCreate={handleCreateProfile}
+          onRename={handleRenameProfile}
+        />
+      </header>
 
       <nav className="nav">
         <button

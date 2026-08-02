@@ -1,4 +1,55 @@
 // Seul point de contact entre l'UI et le back. L'UI ne connaît que /api.
+
+// --- Profil actif ---
+// L'UI garde en mémoire (et dans localStorage) l'id du profil actif, et l'envoie
+// au back via l'en-tête X-Profile-Id sur toutes les requêtes de suivi.
+// En V2, cet id viendra d'un compte connecté ; le back ne changera pas.
+const PROFILE_KEY = 'activeProfileId';
+let activeProfileId = localStorage.getItem(PROFILE_KEY) || null;
+
+export function getActiveProfileId() {
+  return activeProfileId;
+}
+
+export function setActiveProfileId(id) {
+  activeProfileId = id;
+  if (id) localStorage.setItem(PROFILE_KEY, id);
+  else localStorage.removeItem(PROFILE_KEY);
+}
+
+// fetch qui injecte l'en-tête du profil actif (pour les routes scopées).
+function profileFetch(url, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (activeProfileId) headers['X-Profile-Id'] = activeProfileId;
+  return fetch(url, { ...opts, headers });
+}
+
+// --- Profils ---
+export async function getProfiles() {
+  const response = await fetch('/api/profiles');
+  if (!response.ok) throw new Error('Impossible de charger les profils.');
+  return (await response.json()).profiles;
+}
+
+export async function createProfile(name) {
+  const response = await fetch('/api/profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error('La création du profil a échoué.');
+  return response.json(); // { id, name }
+}
+
+export async function renameProfile(id, name) {
+  const response = await fetch(`/api/profiles/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error('Le renommage du profil a échoué.');
+}
+
 export async function searchTitles(query) {
   const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
   if (!response.ok) {
@@ -11,14 +62,14 @@ export async function searchTitles(query) {
 
 // Récupère la liste du suivi (pour marquer les résultats déjà ajoutés).
 export async function getSuivi() {
-  const response = await fetch('/api/suivi');
+  const response = await profileFetch('/api/suivi');
   if (!response.ok) throw new Error('Impossible de charger le suivi.');
   const data = await response.json();
   return data.items;
 }
 
 export async function addToSuivi(item) {
-  const response = await fetch('/api/suivi', {
+  const response = await profileFetch('/api/suivi', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(item),
@@ -27,7 +78,7 @@ export async function addToSuivi(item) {
 }
 
 export async function removeFromSuivi(mediaType, id) {
-  const response = await fetch(`/api/suivi/${mediaType}/${id}`, {
+  const response = await profileFetch(`/api/suivi/${mediaType}/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Le retrait du suivi a échoué.');
@@ -35,7 +86,7 @@ export async function removeFromSuivi(mediaType, id) {
 
 // Change l'état d'un film : status = 'vu' ou 'a_voir'.
 export async function setWatched(mediaType, id, status) {
-  const response = await fetch(`/api/suivi/${mediaType}/${id}`, {
+  const response = await profileFetch(`/api/suivi/${mediaType}/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -46,26 +97,26 @@ export async function setWatched(mediaType, id, status) {
 // --- Séries : saisons et épisodes ---
 
 export async function getSeasons(seriesId) {
-  const response = await fetch(`/api/tv/${seriesId}/seasons`);
+  const response = await profileFetch(`/api/tv/${seriesId}/seasons`);
   if (!response.ok) throw new Error('Impossible de charger les saisons.');
   return (await response.json()).seasons;
 }
 
 export async function getSeasonEpisodes(seriesId, season) {
-  const response = await fetch(`/api/tv/${seriesId}/season/${season}`);
+  const response = await profileFetch(`/api/tv/${seriesId}/season/${season}`);
   if (!response.ok) throw new Error('Impossible de charger les épisodes.');
   return (await response.json()).episodes;
 }
 
 // Progression d'une série : { total, watched, next }.
 export async function getProgress(seriesId) {
-  const response = await fetch(`/api/tv/${seriesId}/progress`);
+  const response = await profileFetch(`/api/tv/${seriesId}/progress`);
   if (!response.ok) throw new Error('Impossible de charger la progression.');
   return response.json();
 }
 
 export async function markEpisode(seriesId, season, episode) {
-  const response = await fetch(
+  const response = await profileFetch(
     `/api/tv/${seriesId}/season/${season}/episode/${episode}`,
     { method: 'POST' }
   );
@@ -73,7 +124,7 @@ export async function markEpisode(seriesId, season, episode) {
 }
 
 export async function unmarkEpisode(seriesId, season, episode) {
-  const response = await fetch(
+  const response = await profileFetch(
     `/api/tv/${seriesId}/season/${season}/episode/${episode}`,
     { method: 'DELETE' }
   );
@@ -81,7 +132,7 @@ export async function unmarkEpisode(seriesId, season, episode) {
 }
 
 export async function markWholeSeason(seriesId, season, episodeNumbers) {
-  const response = await fetch(`/api/tv/${seriesId}/season/${season}`, {
+  const response = await profileFetch(`/api/tv/${seriesId}/season/${season}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ episodes: episodeNumbers }),
@@ -90,7 +141,7 @@ export async function markWholeSeason(seriesId, season, episodeNumbers) {
 }
 
 export async function unmarkWholeSeason(seriesId, season) {
-  const response = await fetch(`/api/tv/${seriesId}/season/${season}`, {
+  const response = await profileFetch(`/api/tv/${seriesId}/season/${season}`, {
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Le retrait de la saison a échoué.');

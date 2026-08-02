@@ -15,6 +15,51 @@ body {
 
 h1 { font-size: 1.5rem; }
 
+/* En-tête : titre + sélecteur de profil */
+.app__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Sélecteur de profil */
+.profile-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.profile-selector__label {
+  color: #9aa0a6;
+  font-size: 0.85rem;
+}
+.profile-selector__select {
+  background: #1c1f26;
+  color: #fff;
+  border: 1px solid #2a2e37;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.95rem;
+}
+.profile-selector__rename {
+  background: transparent;
+  color: #9aa0a6;
+  border: 1px solid #2a2e37;
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.profile-selector__rename:hover:not(:disabled) {
+  color: #fff;
+  border-color: #3a3f4b;
+}
+.profile-selector__rename:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Navigation Recherche / Mes listes */
 .nav {
   display: flex;

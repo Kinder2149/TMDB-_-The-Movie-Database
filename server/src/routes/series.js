@@ -28,7 +28,7 @@ router.get('/:id/season/:n', async (req, res) => {
   try {
     const episodes = await getEpisodes(seriesId, season);
     const watched = new Set(
-      listWatchedEpisodes(seriesId)
+      listWatchedEpisodes(req.profileId, seriesId)
         .filter((e) => e.season === season)
         .map((e) => e.episode)
     );
@@ -51,7 +51,7 @@ router.get('/:id/progress', async (req, res) => {
     const seasons = [...(await getSeasons(seriesId))].sort(
       (a, b) => a.seasonNumber - b.seasonNumber
     );
-    const watched = listWatchedEpisodes(seriesId);
+    const watched = listWatchedEpisodes(req.profileId, seriesId);
 
     const total = seasons.reduce((sum, s) => sum + s.episodeCount, 0);
     const watchedCount = watched.length;
@@ -93,12 +93,22 @@ router.get('/:id/progress', async (req, res) => {
 
 // POST/DELETE /api/tv/:id/season/:n/episode/:e — cocher / décocher un épisode.
 router.post('/:id/season/:n/episode/:e', (req, res) => {
-  markEpisode(Number(req.params.id), Number(req.params.n), Number(req.params.e));
+  markEpisode(
+    req.profileId,
+    Number(req.params.id),
+    Number(req.params.n),
+    Number(req.params.e)
+  );
   res.status(201).json({ ok: true });
 });
 
 router.delete('/:id/season/:n/episode/:e', (req, res) => {
-  unmarkEpisode(Number(req.params.id), Number(req.params.n), Number(req.params.e));
+  unmarkEpisode(
+    req.profileId,
+    Number(req.params.id),
+    Number(req.params.n),
+    Number(req.params.e)
+  );
   res.json({ ok: true });
 });
 
@@ -108,13 +118,18 @@ router.post('/:id/season/:n', (req, res) => {
   if (!Array.isArray(episodes)) {
     return res.status(400).json({ error: 'Liste d\'épisodes attendue.' });
   }
-  markSeason(Number(req.params.id), Number(req.params.n), episodes.map(Number));
+  markSeason(
+    req.profileId,
+    Number(req.params.id),
+    Number(req.params.n),
+    episodes.map(Number)
+  );
   res.json({ ok: true });
 });
 
 // DELETE /api/tv/:id/season/:n — décocher toute la saison.
 router.delete('/:id/season/:n', (req, res) => {
-  unmarkSeason(Number(req.params.id), Number(req.params.n));
+  unmarkSeason(req.profileId, Number(req.params.id), Number(req.params.n));
   res.json({ ok: true });
 });
 

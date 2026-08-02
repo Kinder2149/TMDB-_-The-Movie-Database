@@ -11,7 +11,7 @@ const router = Router();
 // GET /api/suivi — la liste de ce qui est suivi (sert à marquer les
 // résultats de recherche déjà ajoutés).
 router.get('/', (req, res) => {
-  res.json({ items: listSuivi() });
+  res.json({ items: listSuivi(req.profileId) });
 });
 
 // POST /api/suivi — ajouter un élément au suivi.
@@ -20,7 +20,7 @@ router.post('/', (req, res) => {
   if (!id || !mediaType || !title) {
     return res.status(400).json({ error: 'Champs requis manquants.' });
   }
-  addToSuivi({
+  addToSuivi(req.profileId, {
     id,
     mediaType,
     title,
@@ -44,7 +44,7 @@ router.patch('/:mediaType/:id', (req, res) => {
     return res.status(400).json({ error: 'Statut invalide.' });
   }
 
-  const changed = setStatus(Number(id), mediaType, status);
+  const changed = setStatus(req.profileId, Number(id), mediaType, status);
   if (!changed) {
     return res.status(404).json({ error: 'Film absent du suivi.' });
   }
@@ -54,7 +54,7 @@ router.patch('/:mediaType/:id', (req, res) => {
 // DELETE /api/suivi/:mediaType/:id — retirer un élément du suivi.
 router.delete('/:mediaType/:id', (req, res) => {
   const { mediaType, id } = req.params;
-  removeFromSuivi(Number(id), mediaType);
+  removeFromSuivi(req.profileId, Number(id), mediaType);
   res.json({ ok: true });
 });
 

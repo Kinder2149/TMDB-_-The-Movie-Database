@@ -14,9 +14,21 @@ Stack figée pour la V1. Toute déviation doit être signalée et validée avant
 
 ## Couche Données
 - **SQLite** en V1 : un simple fichier local, aucun serveur de base de données à lancer.
-- Stocke uniquement le suivi de l'utilisateur (ce qui est ajouté, l'état vu/pas vu par épisode, les listes). Les métadonnées viennent de TMDB, pas de la base.
+- Stocke uniquement le suivi de l'utilisateur (ce qui est ajouté, l'état vu/pas vu par épisode, les listes) **rattaché à un profil**. Les métadonnées viennent de TMDB, pas de la base.
 - **PostgreSQL prévu en V2** (mise en ligne) — non installé en V1.
 - Écart assumé : on n'utilise pas PostgreSQL en V1 malgré l'habitude, pour rester local et simple.
+
+## Déviation validée : gestion de profils (V1 locale, prête pour V2)
+Signalée et validée conformément à la règle « toute déviation doit être validée ».
+- Table `profiles (id UUID, name, created_at)`. Les tables `suivi` et `episodes_vus`
+  portent une colonne `profile_id` **dans leur clé primaire** (données scopées par profil).
+- L'**id de profil est un UUID portable** : il pourra suivre le profil jusqu'à un compte
+  en ligne en V2 sans re-migration.
+- L'UI envoie le profil actif via l'en-tête HTTP **`X-Profile-Id`** ; le back scope toutes
+  ses requêtes avec. En V2, cet id viendra de la session/token — **le back ne change pas**.
+- Migration automatique des bases d'avant les profils : le suivi existant est rattaché à un
+  profil « Mon profil » par défaut (aucune perte).
+- Reporté : export/import d'un profil, suppression de profil, auth réelle.
 
 ## Source externe
 - **API TMDB**, paramètre langue `fr-FR`.

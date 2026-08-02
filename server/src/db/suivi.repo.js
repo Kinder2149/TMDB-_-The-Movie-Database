@@ -1,12 +1,14 @@
 import { getDb } from './database.js';
 
 // Accès à la table de suivi (couche Données). Aucune logique métier ici.
+// Toutes les fonctions sont *scopées par profil* (profileId en 1er paramètre) :
+// une donnée de suivi appartient toujours à un profil.
 
 // listStatus classe chaque titre dans une des deux listes V1 :
 //  - 'a_voir'      → liste « À voir »
 //  - 'vu_encours'  → liste « Vu / En cours »
 // Film : selon status. Série : selon qu'au moins un épisode est vu.
-export function listSuivi() {
+export function listSuivi(profileId) {
   return getDb()
     .prepare(
       `SELECT
@@ -21,35 +23,39 @@ export function listSuivi() {
              CASE WHEN s.status = 'vu' THEN 'vu_encours' ELSE 'a_voir' END
            ELSE
              CASE WHEN EXISTS (
-               SELECT 1 FROM episodes_vus e WHERE e.series_id = s.tmdb_id
+               SELECT 1 FROM episodes_vus e
+               WHERE e.series_id = s.tmdb_id AND e.profile_id = s.profile_id
              ) THEN 'vu_encours' ELSE 'a_voir' END
          END AS listStatus
        FROM suivi s
+       WHERE s.profile_id = ?
        ORDER BY s.added_at DESC`
     )
-    .all();
+    .all(profileId);
 }
 
 // Change l'état vu/à voir d'un film. Renvoie true si une ligne a été modifiée.
-export function setStatus(id, mediaType, status) {
+export function setStatus(profileId, id, mediaType, status) {
   const info = getDb()
-    .prepare('UPDATE suivi SET status = ? WHERE tmdb_id = ? AND media_type = ?')
-    .run(status, id, mediaType);
+    .prepare(
+      'UPDATE suivi SET status = ? WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?'
+    )
+    .run(status, profileId, id, mediaType);
   return info.changes > 0;
 }
 
 // Idempotent : ré-ajouter un élément déjà suivi ne crée pas de doublon.
-export function addToSuivi(item) {
+export function addToSuivi(profileId, item) {
   getDb()
     .prepare(
-      `INSERT OR IGNORE INTO suivi (tmdb_id, media_type, title, year, poster_url)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT OR IGNORE INTO suivi (profile_id, tmdb_id, media_type, title, year, poster_url)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .run(item.id, item.mediaType, item.title, item.year, item.posterUrl);
+    .run(profileId, item.id, item.mediaType, item.title, item.year, item.posterUrl);
 }
 
-export function removeFromSuivi(id, mediaType) {
+export function removeFromSuivi(profileId, id, mediaType) {
   getDb()
-    .prepare('DELETE FROM suivi WHERE tmdb_id = ? AND media_type = ?')
-    .run(id, mediaType);
+    .prepare('DELETE FROM suivi WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?')
+    .run(profileId, id, mediaType);
 }
