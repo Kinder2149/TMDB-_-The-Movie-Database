@@ -449,15 +449,21 @@ export default function App() {
 
           {searchMode === 'genre' ? (
             <div className="genre-picker">
-              {availableGenres.map((g) => (
-                <button
-                  key={g.name}
-                  className={`chip ${selectedGenre?.name === g.name ? 'on' : ''}`}
-                  onClick={() => selectGenre(g)}
-                >
-                  {g.name}
-                </button>
-              ))}
+              {genres.map((g) => {
+                const available = availableGenres.includes(g);
+                return (
+                  <button
+                    key={g.name}
+                    className={`chip ${selectedGenre?.name === g.name ? 'on' : ''} ${
+                      available ? '' : 'chip--disabled'
+                    }`}
+                    disabled={!available}
+                    onClick={() => selectGenre(g)}
+                  >
+                    {g.name}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <SearchBar

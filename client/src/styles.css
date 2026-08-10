@@ -134,6 +134,7 @@ button { font-family: inherit; }
   color: var(--text); border-color: var(--gold);
   background: color-mix(in srgb, var(--gold) 14%, transparent); font-weight: 600;
 }
+.chip--disabled { opacity: .35; cursor: not-allowed; }
 .filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
 
 /* Sélecteur de mode de recherche */
