@@ -31,12 +31,14 @@ Maquette de référence : maquette V2 (4 écrans, thèmes clair + sombre).
 4. **Quoi regarder ce soir ?** — entonnoir de décision : **Reprendre** (séries en cours + prochain épisode) → **À voir** (films et séries séparés) → **Suggestions personnalisées**.
 
 ## Chantiers V2 (à faire une tranche à la fois, testée avant la suivante)
-1. **Refonte visuelle** — appliquer la direction validée à l'app existante (thème, navigation, cartes).
-2. **Page détail riche** — `append_to_response=credits,videos` + `/watch/providers` (streaming FR).
-3. **Listes approfondies** — passer de 2 listes auto à **4 statuts** (dont « Abandonné », « En cours » explicite) **+ listes custom** (nouvelle table de listes). Retouche du modèle de données, scopée par profil.
-4. **Recherche affinée** — recherche instantanée ; par acteur (`/search/person`) ; par genre (`/discover`).
-5. **Suggestions** — `/recommendations` + `/similar` agrégés depuis la liste « Vu » du profil.
-6. **Page « Quoi regarder ce soir ? »** — assemble en cours + à voir + suggestions.
+1. **Refonte visuelle** ✅ terminé — thème clair/sombre appliqué (palette dorée, titres serif), navigation et cartes à jour dans `styles.css`/`App.jsx`.
+2. **Page détail riche** ✅ terminé — `append_to_response=credits,videos,watch/providers` côté serveur (`tmdb.js`), `Detail.jsx` affiche cast, bande-annonce, streaming FR, progression/saisons pour les séries.
+3. **Listes approfondies** ✅ terminé — 4 statuts (`status.js`) + listes personnalisées avec table dédiée (`listes.repo.js`/`listes.js`), UI dans `Lists.jsx`.
+4. **Recherche affinée** ✅ terminé — recherche instantanée (debounce), mode acteur (`/search/person`), mode genre (`/discover`), pagination.
+5. **Suggestions** ✅ terminé — `suggestions.js` agrège `/recommendations` depuis les items « vu »/« en cours » du profil. Décision (2026-08-10) : `/recommendations` seul suffit, `/similar` n'est pas ajouté.
+6. **Page « Quoi regarder ce soir ? »** ✅ terminé — `Tonight.jsx` assemble réellement Reprendre (prochain épisode) + À voir (films/séries séparés) + Suggestions, pas un stub.
+
+**Constat (2026-08-10)** : les 6 chantiers étaient en réalité déjà largement construits au moment du commit `a224865` (« V2 : refonte visuelle, fiche détail, 4 statuts + listes custom, page Ce soir ») — le travail a été mené en parallèle plutôt qu'une tranche testée à la fois comme prévu.
 
 ## Décisions figées
 - On **relève volontairement** le plafond V1 « 20 modules / rien pour le futur » : il protégeait la V1, la V2 assume plus de modules (proprement).
@@ -50,8 +52,8 @@ Maquette de référence : maquette V2 (4 écrans, thèmes clair + sombre).
 - Fonctions sociales.
 
 ## Prochaine étape
-Découper le **chantier 1 (refonte visuelle)** en tranches — c'est le point de départ validé,
-car il conditionne où vivront le détail, les listes et les suggestions.
+Les 6 chantiers sont terminés (voir état réel ci-dessus). Place au chantier suivant hors de ce plan
+(mise en ligne, ou nouveau besoin à cadrer).
 
 ## Audit de reprise (2026-08-06)
 **Constat :** du travail V2 est **en cours et non commité** — `git status` montre `Detail.jsx`, `Tonight.jsx`, `status.js`, `server/src/db/listes.repo.js`, `server/src/routes/browse.js` ajoutés (non trackés) et `SeriesDetail.jsx` supprimé, plus des modifications sur `App.jsx`, `api.js`, `Lists.jsx`, `MovieCard.jsx`, `SearchBar.jsx`, plusieurs fichiers serveur. Cela correspond visiblement aux chantiers 2 (page détail), 3 (listes) et 6 (« Quoi regarder ce soir ? » — `Tonight.jsx`) amorcés en parallèle, sans qu'aucun ne soit marqué terminé ici. Pas de `CHANGELOG.md` dans le projet pour tracer ce qui a été réellement livré.
