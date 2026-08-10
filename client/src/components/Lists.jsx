@@ -16,6 +16,7 @@ export default function Lists({
   const [selected, setSelected] = useState({ type: 'status', value: 'a_voir' });
   const [listItems, setListItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [mediaFilter, setMediaFilter] = useState('all');
 
   // Charger les éléments quand une liste perso est sélectionnée.
   useEffect(() => {
@@ -48,8 +49,11 @@ export default function Lists({
       ? STATUSES.find((s) => s.value === selected.value).label
       : selectedListe?.name || '';
 
-  const films = mainItems.filter((i) => i.mediaType === 'movie');
-  const series = mainItems.filter((i) => i.mediaType === 'tv');
+  const filteredItems =
+    mediaFilter === 'all' ? mainItems : mainItems.filter((i) => i.mediaType === mediaFilter);
+
+  const films = filteredItems.filter((i) => i.mediaType === 'movie');
+  const series = filteredItems.filter((i) => i.mediaType === 'tv');
 
   const renderGrid = (list) => (
     <div className="grid">
@@ -118,8 +122,23 @@ export default function Lists({
       <div className="lists-main">
         <div className="lists-main__head">
           <h2 className="lists__title">
-            {title} <span className="lists__count">{mainItems.length}</span>
+            {title} <span className="lists__count">{filteredItems.length}</span>
           </h2>
+          <div className="media-filter">
+            {[
+              { value: 'all', label: 'Tout' },
+              { value: 'movie', label: 'Films' },
+              { value: 'tv', label: 'Séries' },
+            ].map((f) => (
+              <button
+                key={f.value}
+                className={`media-filter__btn ${mediaFilter === f.value ? 'active' : ''}`}
+                onClick={() => setMediaFilter(f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           {selectedListe && (
             <button
               className="btn btn--ghost"
@@ -136,8 +155,8 @@ export default function Lists({
 
         {loadingItems ? (
           <p className="hint">Chargement…</p>
-        ) : mainItems.length === 0 ? (
-          <p className="hint">Liste vide.</p>
+        ) : filteredItems.length === 0 ? (
+          <p className="hint">{mainItems.length === 0 ? 'Liste vide.' : 'Aucun résultat pour ce filtre.'}</p>
         ) : (
           <>
             {films.length > 0 && (

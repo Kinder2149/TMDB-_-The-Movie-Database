@@ -308,9 +308,17 @@ button { font-family: inherit; }
 }
 
 .lists-main { padding: .2rem 0 0 1.3rem; }
-.lists-main__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.lists-main__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .lists__title { font-family: var(--serif); font-size: 1.3rem; margin: .3rem 0 .9rem; }
 .lists__count { color: var(--muted); font-size: .9rem; font-weight: 400; }
+
+.media-filter { display: flex; gap: .35rem; margin-left: auto; }
+.media-filter__btn {
+  padding: .35rem .8rem; border-radius: 999px; cursor: pointer; font-size: .82rem;
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+}
+.media-filter__btn:hover { border-color: var(--gold); color: var(--text); }
+.media-filter__btn.active { background: var(--gold); border-color: var(--gold); color: #16140b; font-weight: 600; }
 
 /* Puces de liste dans la fiche */
 .liste-toggles { display: flex; flex-wrap: wrap; gap: .4rem; }
