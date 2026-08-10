@@ -122,8 +122,24 @@ export default function App() {
   }, []);
 
   // En mode genre, changer le filtre Films/Séries relance la découverte.
+  // Si le genre sélectionné n'existe pas pour le nouveau filtre (ex. « Action »
+  // en filtre Séries), on désélectionne plutôt que d'afficher une liste vide.
   useEffect(() => {
-    if (searchMode === 'genre' && selectedGenre) runDiscover(selectedGenre, mediaFilter);
+    if (searchMode !== 'genre' || !selectedGenre) return;
+    const stillValid =
+      mediaFilter === 'movie'
+        ? !!selectedGenre.movieId
+        : mediaFilter === 'tv'
+        ? !!selectedGenre.tvId
+        : true;
+    if (!stillValid) {
+      setSelectedGenre(null);
+      setResults([]);
+      setHasSearched(false);
+      setStatus('idle');
+      return;
+    }
+    runDiscover(selectedGenre, mediaFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaFilter]);
 
@@ -323,6 +339,16 @@ export default function App() {
       ? results
       : results.filter((r) => r.mediaType === mediaFilter);
 
+  // Certains genres TMDB n'existent que côté films ou que côté séries
+  // (ex. « Action » n'a pas d'équivalent séries, qui a « Action & Aventure »).
+  // On ne propose que les genres valides pour le filtre Films/Séries actif,
+  // sinon le clic donnerait toujours une liste vide.
+  const availableGenres = genres.filter((g) => {
+    if (mediaFilter === 'movie') return !!g.movieId;
+    if (mediaFilter === 'tv') return !!g.tvId;
+    return !!(g.movieId || g.tvId);
+  });
+
   // Écran de recherche à vide (titre / acteur, avant toute frappe) : on propose
   // les tendances plutôt qu'un écran vide.
   const isDefault = searchMode !== 'genre' && !hasSearched;
@@ -423,7 +449,7 @@ export default function App() {
 
           {searchMode === 'genre' ? (
             <div className="genre-picker">
-              {genres.map((g) => (
+              {availableGenres.map((g) => (
                 <button
                   key={g.name}
                   className={`chip ${selectedGenre?.name === g.name ? 'on' : ''}`}
