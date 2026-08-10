@@ -4,18 +4,10 @@ import { getProgress } from '../api.js';
 
 // Page « Quoi regarder ce soir ? » : reprendre les séries en cours,
 // puis à voir (films / séries), puis suggestions.
-export default function Tonight({
-  items,
-  suggestions,
-  suggestionsLoading,
-  onRefreshSuggestions,
-  cardProps,
-}) {
+export default function Tonight({ items, cardProps }) {
   const enCours = items.filter((i) => i.mediaType === 'tv' && i.status === 'en_cours');
   const aVoirFilms = items.filter((i) => i.mediaType === 'movie' && i.status === 'a_voir');
   const aVoirSeries = items.filter((i) => i.mediaType === 'tv' && i.status === 'a_voir');
-  const sugFilms = suggestions.filter((i) => i.mediaType === 'movie');
-  const sugSeries = suggestions.filter((i) => i.mediaType === 'tv');
 
   // Prochain épisode de chaque série en cours.
   const [progress, setProgress] = useState({});
@@ -57,10 +49,7 @@ export default function Tonight({
   );
 
   const nothing =
-    enCours.length === 0 &&
-    aVoirFilms.length === 0 &&
-    aVoirSeries.length === 0 &&
-    suggestions.length === 0;
+    enCours.length === 0 && aVoirFilms.length === 0 && aVoirSeries.length === 0;
 
   return (
     <div className="tonight">
@@ -134,42 +123,6 @@ export default function Tonight({
           {grid(aVoirSeries)}
         </section>
       )}
-
-      <section className="tonight__section">
-        <h3 className="tonight__title">
-          Suggestions pour toi
-          <button
-            className="btn btn--ghost tonight__refresh"
-            onClick={onRefreshSuggestions}
-            disabled={suggestionsLoading}
-          >
-            ↻ Actualiser
-          </button>
-        </h3>
-        {suggestionsLoading ? (
-          <p className="hint">Recherche de suggestions…</p>
-        ) : suggestions.length === 0 ? (
-          <p className="hint">
-            Marque des titres comme vus ou en cours pour recevoir des
-            suggestions.
-          </p>
-        ) : (
-          <>
-            {sugFilms.length > 0 && (
-              <div className="media-section">
-                <h4 className="subhead">Films</h4>
-                {grid(sugFilms)}
-              </div>
-            )}
-            {sugSeries.length > 0 && (
-              <div className="media-section">
-                <h4 className="subhead">Séries</h4>
-                {grid(sugSeries)}
-              </div>
-            )}
-          </>
-        )}
-      </section>
     </div>
   );
 }

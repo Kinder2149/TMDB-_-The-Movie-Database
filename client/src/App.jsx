@@ -4,6 +4,7 @@ import MovieCard from './components/MovieCard.jsx';
 import Detail from './components/Detail.jsx';
 import Lists from './components/Lists.jsx';
 import Tonight from './components/Tonight.jsx';
+import Suggestions from './components/Suggestions.jsx';
 import ProfileSelector from './components/ProfileSelector.jsx';
 import {
   searchTitles,
@@ -350,7 +351,6 @@ export default function App() {
             onClick={() => {
               setView('tonight');
               loadSuivi();
-              loadSuggestions();
             }}
           >
             Ce soir
@@ -363,6 +363,16 @@ export default function App() {
             }}
           >
             Mes listes
+          </button>
+          <button
+            className={view === 'suggestions' ? 'is-active' : ''}
+            onClick={() => {
+              setView('suggestions');
+              loadSuivi();
+              loadSuggestions();
+            }}
+          >
+            Suggestions
           </button>
         </nav>
 
@@ -544,7 +554,11 @@ export default function App() {
       )}
 
       {view === 'tonight' && (
-        <Tonight
+        <Tonight items={Array.from(suivi.values())} cardProps={cardProps} />
+      )}
+
+      {view === 'suggestions' && (
+        <Suggestions
           items={Array.from(suivi.values())}
           suggestions={suggestions}
           suggestionsLoading={suggestionsLoading}
