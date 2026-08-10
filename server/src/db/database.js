@@ -61,6 +61,31 @@ export function initDb() {
     );
   `);
 
+  // Listes personnalisées + leurs éléments. Un élément de liste référence
+  // toujours une ligne du suivi (ajouter à une liste = suivre) : cascade.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS listes (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    );
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS liste_items (
+      liste_id   INTEGER NOT NULL,
+      profile_id TEXT    NOT NULL,
+      tmdb_id    INTEGER NOT NULL,
+      media_type TEXT    NOT NULL,
+      added_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (liste_id, tmdb_id, media_type),
+      FOREIGN KEY (liste_id) REFERENCES listes(id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, tmdb_id, media_type)
+        REFERENCES suivi(profile_id, tmdb_id, media_type) ON DELETE CASCADE
+    );
+  `);
+
   // Migration : ajoute la colonne "status" aux bases créées avant la tranche 3
   // (les titres déjà suivis prennent la valeur par défaut 'a_voir').
   // Note : ne s'applique qu'aux bases qui ont DÉJÀ la colonne profile_id

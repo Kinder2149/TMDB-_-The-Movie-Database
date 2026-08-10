@@ -1,22 +1,31 @@
+import { STATUSES, STATUS_LABEL } from '../status.js';
+
 export default function MovieCard({
   item,
   isFollowed,
-  watchStatus,
+  status,
   onToggleFollow,
-  onToggleWatched,
-  onOpenSeries,
+  onSetStatus,
+  onOpenDetail,
 }) {
   const isMovie = item.mediaType === 'movie';
-  const isWatched = watchStatus === 'vu';
   const typeLabel = isMovie ? 'film' : 'série';
+  const current = status || 'a_voir';
 
   return (
     <article className="card">
-      {item.posterUrl ? (
-        <img src={item.posterUrl} alt={item.title} loading="lazy" />
-      ) : (
-        <div className="card__no-poster">Pas d'affiche</div>
-      )}
+      <button
+        type="button"
+        className="card__open"
+        onClick={() => onOpenDetail(item)}
+        title="Voir la fiche"
+      >
+        {item.posterUrl ? (
+          <img src={item.posterUrl} alt={item.title} loading="lazy" />
+        ) : (
+          <div className="card__no-poster">Pas d'affiche</div>
+        )}
+      </button>
       <div className="card__body">
         <h2 className="card__title">{item.title}</h2>
         <p className="card__meta">
@@ -24,27 +33,32 @@ export default function MovieCard({
           {item.year && <span> · {item.year}</span>}
         </p>
 
-        {/* Film suivi : marquage vu / à voir (tranche 3). */}
-        {isFollowed && isMovie && (
-          <button
-            type="button"
-            className={`card__watched ${isWatched ? 'is-watched' : ''}`}
-            onClick={() => onToggleWatched(item)}
-          >
-            {isWatched ? '✓ Vu' : 'Marquer vu'}
-          </button>
+        {item.reason && (
+          <p className="why">
+            Parce que tu as aimé <b>{item.reason}</b>
+          </p>
         )}
 
-        {/* Série suivie : accès aux épisodes (tranche 3). */}
-        {isFollowed && !isMovie && (
-          <button
-            type="button"
-            className="card__episodes"
-            onClick={() => onOpenSeries(item)}
-          >
-            Épisodes
-          </button>
-        )}
+        {/* Statut. Film : choix libre. Série : dérivé (abandon via la fiche). */}
+        {isFollowed &&
+          (isMovie ? (
+            <select
+              className={`card__status status--${current}`}
+              value={current}
+              onChange={(e) => onSetStatus(item, e.target.value)}
+              aria-label="Statut"
+            >
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className={`status-badge status--${current}`}>
+              {STATUS_LABEL[current]}
+            </span>
+          ))}
 
         <button
           type="button"

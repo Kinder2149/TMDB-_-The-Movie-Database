@@ -4,10 +4,9 @@ import { getDb } from './database.js';
 // Toutes les fonctions sont *scopées par profil* (profileId en 1er paramètre) :
 // une donnée de suivi appartient toujours à un profil.
 
-// listStatus classe chaque titre dans une des deux listes V1 :
-//  - 'a_voir'      → liste « À voir »
-//  - 'vu_encours'  → liste « Vu / En cours »
-// Film : selon status. Série : selon qu'au moins un épisode est vu.
+// Chaque titre porte un statut parmi : 'a_voir' | 'en_cours' | 'vu' | 'abandonne'.
+// Films : choisi par l'utilisateur. Séries : dérivé des épisodes par l'UI
+// (sauf 'abandonne', manuel). La classification en listes lit ce statut.
 export function listSuivi(profileId) {
   return getDb()
     .prepare(
@@ -17,16 +16,7 @@ export function listSuivi(profileId) {
          s.title,
          s.year,
          s.poster_url AS posterUrl,
-         s.status,
-         CASE
-           WHEN s.media_type = 'movie' THEN
-             CASE WHEN s.status = 'vu' THEN 'vu_encours' ELSE 'a_voir' END
-           ELSE
-             CASE WHEN EXISTS (
-               SELECT 1 FROM episodes_vus e
-               WHERE e.series_id = s.tmdb_id AND e.profile_id = s.profile_id
-             ) THEN 'vu_encours' ELSE 'a_voir' END
-         END AS listStatus
+         s.status
        FROM suivi s
        WHERE s.profile_id = ?
        ORDER BY s.added_at DESC`

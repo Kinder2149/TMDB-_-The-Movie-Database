@@ -1,26 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-export default function SearchBar({ onSearch, disabled }) {
+// Recherche instantanée : on lance la recherche au fil de la frappe (avec un
+// court délai). Change aussi de mode (titre / acteur) sans re-taper.
+export default function SearchBar({ onSearch, mode = 'title', placeholder }) {
   const [value, setValue] = useState('');
 
-  function handleSubmit(e) {
-    e.preventDefault();
+  useEffect(() => {
     const query = value.trim();
-    if (query) onSearch(query);
-  }
+    const timer = setTimeout(() => onSearch(query), 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, mode]);
 
   return (
-    <form className="search-bar" onSubmit={handleSubmit}>
+    <div className="search-bar">
+      <span className="search-bar__icon" aria-hidden="true">🔍</span>
       <input
         type="text"
-        placeholder="Chercher un film ou une série…"
+        placeholder={placeholder || 'Chercher…'}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         aria-label="Recherche"
+        autoFocus
       />
-      <button type="submit" disabled={disabled}>
-        Rechercher
-      </button>
-    </form>
+    </div>
   );
 }

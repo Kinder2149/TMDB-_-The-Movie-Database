@@ -50,6 +50,52 @@ export async function renameProfile(id, name) {
   if (!response.ok) throw new Error('Le renommage du profil a échoué.');
 }
 
+// Fiche détaillée d'un film ou d'une série (infos + acteurs). Données TMDB.
+export async function getDetails(mediaType, id) {
+  const response = await fetch(`/api/details/${mediaType}/${id}`);
+  if (!response.ok) throw new Error('Impossible de charger la fiche.');
+  return response.json();
+}
+
+// Recherche par acteur : renvoie { person, results (filmographie) }.
+export async function searchByActor(query) {
+  const response = await fetch(`/api/search/person?q=${encodeURIComponent(query)}`);
+  if (!response.ok) throw new Error('La recherche par acteur a échoué.');
+  return response.json();
+}
+
+// Suggestions personnalisées (d'après le suivi du profil).
+export async function getSuggestions() {
+  const r = await profileFetch('/api/suggestions');
+  if (!r.ok) throw new Error('Impossible de charger les suggestions.');
+  return (await r.json()).results;
+}
+
+// Liste des genres : [{ name, movieId, tvId }].
+export async function getGenres() {
+  const response = await fetch('/api/browse/genres');
+  if (!response.ok) throw new Error('Impossible de charger les genres.');
+  return (await response.json()).genres;
+}
+
+// Titres d'un genre (films et/ou séries selon les ids fournis).
+export async function discoverGenre({ movieGenre, tvGenre, page = 1 }) {
+  const params = new URLSearchParams();
+  if (movieGenre) params.set('movieGenre', movieGenre);
+  if (tvGenre) params.set('tvGenre', tvGenre);
+  params.set('page', page);
+  const response = await fetch(`/api/browse/discover?${params.toString()}`);
+  if (!response.ok) throw new Error('La navigation par genre a échoué.');
+  return (await response.json()).results;
+}
+
+// Tendances de la semaine (films + séries) : proposées quand le champ est vide.
+export async function getTrending() {
+  const response = await fetch('/api/browse/trending');
+  if (!response.ok) throw new Error('Impossible de charger les tendances.');
+  return (await response.json()).results;
+}
+
 export async function searchTitles(query) {
   const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
   if (!response.ok) {
@@ -84,8 +130,8 @@ export async function removeFromSuivi(mediaType, id) {
   if (!response.ok) throw new Error('Le retrait du suivi a échoué.');
 }
 
-// Change l'état d'un film : status = 'vu' ou 'a_voir'.
-export async function setWatched(mediaType, id, status) {
+// Change le statut d'un titre : 'a_voir' | 'en_cours' | 'vu' | 'abandonne'.
+export async function setStatus(mediaType, id, status) {
   const response = await profileFetch(`/api/suivi/${mediaType}/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -145,4 +191,56 @@ export async function unmarkWholeSeason(seriesId, season) {
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Le retrait de la saison a échoué.');
+}
+
+// --- Listes personnalisées ---
+
+export async function getListes() {
+  const r = await profileFetch('/api/listes');
+  if (!r.ok) throw new Error('Impossible de charger les listes.');
+  return (await r.json()).listes;
+}
+
+export async function createListe(name) {
+  const r = await profileFetch('/api/listes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!r.ok) throw new Error('La création de la liste a échoué.');
+  return r.json(); // { id, name, count }
+}
+
+export async function deleteListe(id) {
+  const r = await profileFetch(`/api/listes/${id}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error('La suppression de la liste a échoué.');
+}
+
+export async function getListeItems(id) {
+  const r = await profileFetch(`/api/listes/${id}/items`);
+  if (!r.ok) throw new Error('Impossible de charger la liste.');
+  return (await r.json()).items;
+}
+
+export async function addToListe(id, item) {
+  const r = await profileFetch(`/api/listes/${id}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item),
+  });
+  if (!r.ok) throw new Error("L'ajout à la liste a échoué.");
+}
+
+export async function removeFromListe(id, mediaType, tmdbId) {
+  const r = await profileFetch(`/api/listes/${id}/items/${mediaType}/${tmdbId}`, {
+    method: 'DELETE',
+  });
+  if (!r.ok) throw new Error('Le retrait de la liste a échoué.');
+}
+
+// Ids des listes contenant un titre (pour la fiche).
+export async function getItemListes(mediaType, id) {
+  const r = await profileFetch(`/api/listes/for/${mediaType}/${id}`);
+  if (!r.ok) throw new Error('Impossible de charger les listes du titre.');
+  return (await r.json()).listeIds;
 }

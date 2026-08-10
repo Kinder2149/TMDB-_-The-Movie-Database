@@ -30,23 +30,19 @@ router.post('/', (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-// PATCH /api/suivi/:mediaType/:id — changer l'état vu/à voir (films seulement).
+// PATCH /api/suivi/:mediaType/:id — changer le statut (films et séries).
+const STATUSES = ['a_voir', 'en_cours', 'vu', 'abandonne'];
 router.patch('/:mediaType/:id', (req, res) => {
   const { mediaType, id } = req.params;
   const { status } = req.body || {};
 
-  if (mediaType !== 'movie') {
-    return res.status(400).json({
-      error: "Le marquage vu/à voir n'est disponible que pour les films.",
-    });
-  }
-  if (status !== 'vu' && status !== 'a_voir') {
+  if (!STATUSES.includes(status)) {
     return res.status(400).json({ error: 'Statut invalide.' });
   }
 
   const changed = setStatus(req.profileId, Number(id), mediaType, status);
   if (!changed) {
-    return res.status(404).json({ error: 'Film absent du suivi.' });
+    return res.status(404).json({ error: 'Titre absent du suivi.' });
   }
   res.json({ ok: true });
 });
