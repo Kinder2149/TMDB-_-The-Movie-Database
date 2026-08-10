@@ -1,0 +1,14 @@
+services:
+  suivi-films-series:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: suivi-films-series
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - PORT=3001
+    volumes:
+      - ./server/data:/app/server/data

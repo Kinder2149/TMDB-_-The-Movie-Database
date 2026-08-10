@@ -1,0 +1,32 @@
+{
+  "id": "/?app=suivi-films-series",
+  "name": "Suivi Films & Séries",
+  "short_name": "Suivi",
+  "description": "Suivi personnel de films et séries (TMDB)",
+  "start_url": "/?app=suivi-films-series",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0F1018",
+  "theme_color": "#0F1018",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -16,3 +16,10 @@ createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
+// Requis par Chrome pour proposer l'installation PWA (écran d'accueil / bouton "Installer").
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initDb } from './db/database.js';
 import { requireProfile } from './middleware/requireProfile.js';
 import searchRouter from './routes/search.js';
@@ -36,6 +39,17 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.listen(PORT, () => {
+// Sert le client buildé (présent uniquement en production Docker — voir Dockerfile).
+// En dev, le client tourne séparément via Vite (npm run dev côté client) : ce dossier n'existe pas.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CLIENT_DIST = join(__dirname, '..', '..', 'client-dist');
+if (existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+  app.get('*', (req, res) => {
+    res.sendFile(join(CLIENT_DIST, 'index.html'));
+  });
+}
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Back (API) démarré sur http://localhost:${PORT}`);
 });
