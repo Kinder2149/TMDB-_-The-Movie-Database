@@ -40,7 +40,7 @@ export function listItems(profileId, listeId) {
   return getDb()
     .prepare(
       `SELECT s.tmdb_id AS id, s.media_type AS mediaType, s.title, s.year,
-              s.poster_url AS posterUrl, s.status
+              s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status
        FROM liste_items li
        JOIN suivi s
          ON s.profile_id = li.profile_id

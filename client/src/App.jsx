@@ -5,6 +5,7 @@ import Detail from './components/Detail.jsx';
 import Lists from './components/Lists.jsx';
 import Tonight from './components/Tonight.jsx';
 import Suggestions from './components/Suggestions.jsx';
+import Upcoming from './components/Upcoming.jsx';
 import ProfileSelector from './components/ProfileSelector.jsx';
 import {
   searchTitles,
@@ -400,6 +401,15 @@ export default function App() {
           >
             Suggestions
           </button>
+          <button
+            className={view === 'upcoming' ? 'is-active' : ''}
+            onClick={() => {
+              setView('upcoming');
+              loadSuivi();
+            }}
+          >
+            Sorties à venir
+          </button>
         </nav>
 
         <div className="appbar__right">
@@ -597,6 +607,10 @@ export default function App() {
           onRefreshSuggestions={loadSuggestions}
           cardProps={cardProps}
         />
+      )}
+
+      {view === 'upcoming' && (
+        <Upcoming items={Array.from(suivi.values())} cardProps={cardProps} />
       )}
       </main>
 

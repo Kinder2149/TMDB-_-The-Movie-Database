@@ -16,3 +16,18 @@ export function deriveSeriesStatus(progress) {
   if (progress.total && progress.watched >= progress.total) return 'vu';
   return 'en_cours';
 }
+
+// Un titre est « pas encore sorti » si sa date de sortie est dans le futur.
+// Purement dérivé de la date à l'affichage : dès qu'elle est dépassée, le
+// titre repasse automatiquement dans « à voir » classique, sans rien à faire.
+export function isUpcoming(item) {
+  if (!item.releaseDate) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return item.releaseDate > today;
+}
+
+export function formatReleaseDate(releaseDate) {
+  if (!releaseDate) return null;
+  const [y, m, d] = releaseDate.split('-');
+  return `${d}/${m}/${y}`;
+}

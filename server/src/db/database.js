@@ -40,6 +40,7 @@ export function initDb() {
       media_type TEXT    NOT NULL,           -- 'movie' | 'tv'
       title      TEXT    NOT NULL,
       year       TEXT,
+      release_date TEXT,                     -- date de sortie complète (JJ pas encore sorti)
       poster_url TEXT,
       status     TEXT    NOT NULL DEFAULT 'a_voir',  -- films : 'a_voir' | 'vu'
       added_at   TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -95,6 +96,14 @@ export function initDb() {
   const hasStatus = suiviCols.some((c) => c.name === 'status');
   if (hasProfileId && !hasStatus) {
     db.exec("ALTER TABLE suivi ADD COLUMN status TEXT NOT NULL DEFAULT 'a_voir'");
+  }
+
+  // Migration : date de sortie complète (pour distinguer les titres pas encore
+  // sortis). Les titres déjà en base avant cette colonne restent à NULL, donc
+  // traités comme déjà sortis (comportement sûr par défaut).
+  const hasReleaseDate = suiviCols.some((c) => c.name === 'release_date');
+  if (hasProfileId && !hasReleaseDate) {
+    db.exec('ALTER TABLE suivi ADD COLUMN release_date TEXT');
   }
 
   // Migration des bases d'avant les profils : rattache le suivi existant à un

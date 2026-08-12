@@ -15,6 +15,7 @@ export function listSuivi(profileId) {
          s.media_type AS mediaType,
          s.title,
          s.year,
+         s.release_date AS releaseDate,
          s.poster_url AS posterUrl,
          s.status
        FROM suivi s
@@ -38,10 +39,18 @@ export function setStatus(profileId, id, mediaType, status) {
 export function addToSuivi(profileId, item) {
   getDb()
     .prepare(
-      `INSERT OR IGNORE INTO suivi (profile_id, tmdb_id, media_type, title, year, poster_url)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT OR IGNORE INTO suivi (profile_id, tmdb_id, media_type, title, year, release_date, poster_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(profileId, item.id, item.mediaType, item.title, item.year, item.posterUrl);
+    .run(
+      profileId,
+      item.id,
+      item.mediaType,
+      item.title,
+      item.year,
+      item.releaseDate ?? null,
+      item.posterUrl
+    );
 }
 
 export function removeFromSuivi(profileId, id, mediaType) {

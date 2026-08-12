@@ -228,6 +228,9 @@ button { font-family: inherit; }
   font-family: var(--serif); font-size: 1.15rem; margin: 0 0 .9rem;
   display: flex; align-items: center; gap: .5rem;
 }
+.upcoming-item__date {
+  margin: .35rem 0 0; font-size: .8rem; color: var(--gold); text-align: center;
+}
 .resume-row { display: flex; flex-wrap: wrap; gap: 1rem; }
 .resume {
   display: flex; gap: .9rem; flex: 1 1 320px; min-width: 280px;

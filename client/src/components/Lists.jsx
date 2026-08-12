@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import MovieCard from './MovieCard.jsx';
-import { STATUSES } from '../status.js';
+import { STATUSES, isUpcoming } from '../status.js';
 import { getListeItems } from '../api.js';
 
 // Mes listes : barre latérale (statuts + listes perso) + contenu à droite.
@@ -35,11 +35,19 @@ export default function Lists({
     }
   }, [listes, selected]);
 
-  const statusCount = (v) => items.filter((i) => (i.status || 'a_voir') === v).length;
+  // Les titres pas encore sortis vivent dans l'onglet « Sorties à venir »,
+  // pas dans « À voir » (ils y reviennent automatiquement une fois sortis).
+  const statusCount = (v) =>
+    items.filter((i) => (i.status || 'a_voir') === v && !(v === 'a_voir' && isUpcoming(i)))
+      .length;
 
   const mainItems =
     selected.type === 'status'
-      ? items.filter((i) => (i.status || 'a_voir') === selected.value)
+      ? items.filter(
+          (i) =>
+            (i.status || 'a_voir') === selected.value &&
+            !(selected.value === 'a_voir' && isUpcoming(i))
+        )
       : listItems;
 
   const selectedListe =

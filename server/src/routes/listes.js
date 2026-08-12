@@ -38,7 +38,7 @@ router.get('/:id/items', (req, res) => {
 
 // POST /api/listes/:id/items — ajouter un titre (l'ajoute aussi au suivi).
 router.post('/:id/items', (req, res) => {
-  const { id, mediaType, title, year, posterUrl } = req.body || {};
+  const { id, mediaType, title, year, releaseDate, posterUrl } = req.body || {};
   if (!id || !mediaType || !title) {
     return res.status(400).json({ error: 'Champs requis manquants.' });
   }
@@ -48,6 +48,7 @@ router.post('/:id/items', (req, res) => {
     mediaType,
     title,
     year: year ?? null,
+    releaseDate: releaseDate ?? null,
     posterUrl: posterUrl ?? null,
   });
   addItem(req.profileId, Number(req.params.id), Number(id), mediaType);

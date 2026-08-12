@@ -34,6 +34,7 @@ export async function searchMulti(query) {
         type: isMovie ? 'film' : 'série',
         title: isMovie ? item.title : item.name,
         year: date ? date.slice(0, 4) : null,
+        releaseDate: date || null,
         posterUrl: item.poster_path
           ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
           : null,
@@ -55,6 +56,7 @@ export async function getTrending() {
         type: isMovie ? 'film' : 'série',
         title: isMovie ? item.title : item.name,
         year: date ? date.slice(0, 4) : null,
+        releaseDate: date || null,
         posterUrl: item.poster_path
           ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
           : null,
@@ -92,6 +94,7 @@ export async function searchByActor(query) {
         type: isMovie ? 'film' : 'série',
         title: isMovie ? c.title : c.name,
         year: date ? date.slice(0, 4) : null,
+        releaseDate: date || null,
         posterUrl: c.poster_path
           ? `https://image.tmdb.org/t/p/w342${c.poster_path}`
           : null,
@@ -166,6 +169,7 @@ export async function discoverByGenre({ movieGenreId, tvGenreId, page = 1 }) {
         type: isMovie ? 'film' : 'série',
         title: isMovie ? c.title : c.name,
         year: date ? date.slice(0, 4) : null,
+        releaseDate: date || null,
         posterUrl: c.poster_path
           ? `https://image.tmdb.org/t/p/w342${c.poster_path}`
           : null,
@@ -192,6 +196,7 @@ export async function getRecommendations(mediaType, id) {
       type: isMovie ? 'film' : 'série',
       title: isMovie ? c.title : c.name,
       year: date ? date.slice(0, 4) : null,
+      releaseDate: date || null,
       posterUrl: c.poster_path
         ? `https://image.tmdb.org/t/p/w342${c.poster_path}`
         : null,
@@ -259,6 +264,7 @@ export async function getDetails(mediaType, id) {
   return {
     title: isMovie ? data.title : data.name,
     year: date ? date.slice(0, 4) : null,
+    releaseDate: date || null,
     genres: (data.genres || []).map((g) => g.name),
     overview: data.overview || '',
     posterUrl: data.poster_path

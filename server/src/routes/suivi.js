@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
 
 // POST /api/suivi — ajouter un élément au suivi.
 router.post('/', (req, res) => {
-  const { id, mediaType, title, year, posterUrl } = req.body || {};
+  const { id, mediaType, title, year, releaseDate, posterUrl } = req.body || {};
   if (!id || !mediaType || !title) {
     return res.status(400).json({ error: 'Champs requis manquants.' });
   }
@@ -25,6 +25,7 @@ router.post('/', (req, res) => {
     mediaType,
     title,
     year: year ?? null,
+    releaseDate: releaseDate ?? null,
     posterUrl: posterUrl ?? null,
   });
   res.status(201).json({ ok: true });
