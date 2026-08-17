@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Le proxy renvoie les appels /api vers le back Express.
-// L'UI n'appelle donc jamais TMDB directement : la clé reste côté back.
+// Le catalogue (recherche, tendances, genres, fiches, saisons) part désormais
+// directement vers TMDB depuis l'app — plus aucun serveur (tranche 1, PLAN_ANDROID).
+// Le proxy /api ne sert plus qu'au suivi/profils/listes, qui passeront sur la
+// base embarquée en tranche 2. Il disparaîtra à ce moment-là.
 export default defineConfig({
   plugins: [react()],
   server: {

@@ -1,4 +1,12 @@
-// Seul point de contact entre l'UI et le back. L'UI ne connaît que /api.
+// Seul point de contact entre l'UI et le back. L'UI ne connaît que cette API.
+//
+// Migration vers l'app autonome (PLAN_ANDROID) : les fonctions changent
+// d'intérieur, jamais de signature — l'UI n'a rien à savoir.
+//   - Catalogue (recherche, tendances, genres, acteurs, fiches, saisons)
+//     → tranche 1 : appelle TMDB directement, plus aucun serveur.
+//   - Suivi, profils, listes, épisodes cochés
+//     → encore /api, passeront sur la base embarquée en tranche 2.
+import * as tmdb from './tmdb.js';
 
 // --- Profil actif ---
 // L'UI garde en mémoire (et dans localStorage) l'id du profil actif, et l'envoie
@@ -50,18 +58,16 @@ export async function renameProfile(id, name) {
   if (!response.ok) throw new Error('Le renommage du profil a échoué.');
 }
 
+// --- Catalogue (TMDB en direct, sans serveur) ---
+
 // Fiche détaillée d'un film ou d'une série (infos + acteurs). Données TMDB.
 export async function getDetails(mediaType, id) {
-  const response = await fetch(`/api/details/${mediaType}/${id}`);
-  if (!response.ok) throw new Error('Impossible de charger la fiche.');
-  return response.json();
+  return tmdb.getDetails(mediaType, id);
 }
 
 // Recherche par acteur : renvoie { person, results (filmographie) }.
 export async function searchByActor(query) {
-  const response = await fetch(`/api/search/person?q=${encodeURIComponent(query)}`);
-  if (!response.ok) throw new Error('La recherche par acteur a échoué.');
-  return response.json();
+  return tmdb.searchByActor(query);
 }
 
 // Suggestions personnalisées (d'après le suivi du profil).
@@ -73,37 +79,25 @@ export async function getSuggestions() {
 
 // Liste des genres : [{ name, movieId, tvId }].
 export async function getGenres() {
-  const response = await fetch('/api/browse/genres');
-  if (!response.ok) throw new Error('Impossible de charger les genres.');
-  return (await response.json()).genres;
+  return tmdb.getGenres();
 }
 
 // Titres d'un genre (films et/ou séries selon les ids fournis).
 export async function discoverGenre({ movieGenre, tvGenre, page = 1 }) {
-  const params = new URLSearchParams();
-  if (movieGenre) params.set('movieGenre', movieGenre);
-  if (tvGenre) params.set('tvGenre', tvGenre);
-  params.set('page', page);
-  const response = await fetch(`/api/browse/discover?${params.toString()}`);
-  if (!response.ok) throw new Error('La navigation par genre a échoué.');
-  return (await response.json()).results;
+  return tmdb.discoverByGenre({
+    movieGenreId: movieGenre,
+    tvGenreId: tvGenre,
+    page,
+  });
 }
 
 // Tendances de la semaine (films + séries) : proposées quand le champ est vide.
 export async function getTrending() {
-  const response = await fetch('/api/browse/trending');
-  if (!response.ok) throw new Error('Impossible de charger les tendances.');
-  return (await response.json()).results;
+  return tmdb.getTrending();
 }
 
 export async function searchTitles(query) {
-  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || 'La recherche a échoué.');
-  }
-  const data = await response.json();
-  return data.results;
+  return tmdb.searchMulti(query);
 }
 
 // Récupère la liste du suivi (pour marquer les résultats déjà ajoutés).
@@ -142,10 +136,9 @@ export async function setStatus(mediaType, id, status) {
 
 // --- Séries : saisons et épisodes ---
 
+// Saisons : catalogue pur (aucun suivi) → TMDB en direct.
 export async function getSeasons(seriesId) {
-  const response = await profileFetch(`/api/tv/${seriesId}/seasons`);
-  if (!response.ok) throw new Error('Impossible de charger les saisons.');
-  return (await response.json()).seasons;
+  return tmdb.getSeasons(seriesId);
 }
 
 export async function getSeasonEpisodes(seriesId, season) {
