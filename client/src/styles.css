@@ -517,3 +517,35 @@ button { font-family: inherit; }
   opacity: .85;
 }
 .about__legal { margin: 0; font-size: .78rem; color: var(--muted); line-height: 1.45; }
+
+/* --- Écran « Sauvegarde » --- */
+.about .btn { margin-top: .4rem; }
+.backup__confirm {
+  margin-top: .8rem;
+  padding: .8rem;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--gold-soft);
+}
+.backup__confirm p { margin: 0 0 .6rem; font-size: .9rem; }
+.backup__actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.btn--danger {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.backup__note, .backup__error {
+  margin-top: 1rem;
+  padding: .6rem .8rem;
+  border-radius: var(--radius);
+  font-size: .88rem;
+}
+.backup__note {
+  background: color-mix(in srgb, var(--vu) 12%, transparent);
+  border: 1px solid var(--vu);
+}
+.backup__error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}

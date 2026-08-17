@@ -8,6 +8,7 @@ import Suggestions from './components/Suggestions.jsx';
 import Upcoming from './components/Upcoming.jsx';
 import ProfileSelector from './components/ProfileSelector.jsx';
 import About from './components/About.jsx';
+import Backup from './components/Backup.jsx';
 import {
   searchTitles,
   searchByActor,
@@ -52,6 +53,7 @@ export default function App() {
   const [suivi, setSuivi] = useState(() => new Map());
   const [openDetail, setOpenDetail] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   // Profils : la liste et l'id actif. Tant qu'aucun profil n'est prêt, on ne
   // lance aucune opération de suivi (elles sont toujours scopées par profil).
   const [profiles, setProfiles] = useState([]);
@@ -166,6 +168,19 @@ export default function App() {
     try {
       await renameProfile(id, name);
       setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Après restauration d'une sauvegarde : le profil restauré devient l'actif et
+  // tout ce qui est affiché est rechargé depuis la base (le contenu a changé).
+  async function handleRestored(id) {
+    try {
+      setProfiles(await getProfiles());
+      handleSelectProfile(id);
+      await loadSuivi();
+      loadListes();
     } catch (e) {
       setError(e.message);
     }
@@ -417,6 +432,16 @@ export default function App() {
         <div className="appbar__right">
           <button
             className="theme-toggle"
+            onClick={() => setShowBackup(true)}
+            title="Sauvegarde"
+            aria-label="Sauvegarde"
+          >
+            {/* Emoji volontaire : le symbole ⭳ (U+2B73) est absent des polices
+                Android et s'affichait en carré vide. */}
+            💾
+          </button>
+          <button
+            className="theme-toggle"
             onClick={() => setShowAbout(true)}
             title="À propos"
             aria-label="À propos"
@@ -636,6 +661,15 @@ export default function App() {
           onAddToListe={handleAddToListe}
           onRemoveFromListe={handleRemoveFromListe}
           onClose={closeDetail}
+        />
+      )}
+
+      {showBackup && activeProfile && (
+        <Backup
+          profileId={activeProfile}
+          profileName={profiles.find((p) => p.id === activeProfile)?.name || 'Mon profil'}
+          onRestored={handleRestored}
+          onClose={() => setShowBackup(false)}
         />
       )}
 

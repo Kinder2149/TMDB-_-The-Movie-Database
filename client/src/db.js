@@ -157,10 +157,13 @@ async function createNativeEngine() {
         lastId: res.changes?.lastId ?? null,
       };
     },
+    // `true` = une seule transaction pour tout le lot. Sans elle, chaque ligne
+    // est validée séparément : la restauration d'une grosse sauvegarde passait
+    // de quelques secondes à plus d'une minute.
     runMany: (statements) =>
       database.executeSet(
         statements.map(({ sql, params }) => ({ statement: sql, values: params })),
-        false
+        true
       ),
   };
 }

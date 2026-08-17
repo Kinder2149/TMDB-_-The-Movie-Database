@@ -141,13 +141,60 @@ npx --prefix client cap sync android
 cd client/android && ./gradlew assembleDebug
 ```
 
-### 4. Sauvegarde, export, récupération
+### 4. Sauvegarde, export, récupération ✅ terminé (2026-08-17)
 Rendu obligatoire par le « tout en local » :
 - sauvegarde complète + restauration,
 - export CSV compatible **Letterboxd / Trakt**,
 - **récupération du suivi actuel du PC** vers l'application.
 
 **Testable** : exporter, désinstaller, réinstaller, restaurer — tout est retrouvé.
+
+- `client/src/backup.js` (couche **Logique**) : export/restauration d'un profil, contrôle
+  du fichier, résumé lisible, conversion CSV.
+- `client/src/files.js` (couche **Données**) : sortir un fichier. Deux chemins, comme
+  pour la base — téléchargement sur PC, écriture + partage sur Android (un WebView ne
+  sait pas « télécharger »).
+- `client/src/components/Backup.jsx` : écran **« Sauvegarde »**, bouton ⭳ de l'en-tête.
+- `server/exporter-vers-app.js` : outil à usage unique qui lit `server/data/suivi.sqlite`
+  et écrit un fichier au format de l'application.
+
+**La restauration s'appuie sur l'UUID portable du profil** : elle réécrit le profil
+portant le même identifiant. Exporter → réinstaller → restaurer rend donc exactement
+l'état d'origine. C'est la justification d'origine de ce choix (`PROJET_CONTEXTE.md`),
+enfin utilisée.
+
+**Garde-fou** : une restauration **remplace** le contenu du profil. L'écran affiche
+d'abord un résumé de ce qui va être écrit (date, profil, nombre de titres, d'épisodes
+et de listes) et attend une confirmation explicite.
+
+**Vérifié sur les vraies données de Kinder** (432 titres, 4109 épisodes vus) :
+- export depuis la base du PC → restauration dans l'app : **432 titres et 4109 épisodes
+  retrouvés**, répartition des statuts identique (91 à voir, 291 vus, 40 abandonnés,
+  10 en cours) ;
+- **aller-retour export → restauration → export : résultat identique** ;
+- parcours réel dans l'écran (choix du fichier → résumé → confirmation) ;
+- CSV : 280 films exportés, 152 séries écartées et **annoncées** à l'utilisateur.
+
+> Les 432 titres donnent 90 en « À voir » à l'écran et non 91 : le 91ᵉ n'est pas encore
+> sorti et part dans l'onglet « Sorties à venir ». Comportement voulu, aucune perte.
+
+**Puis vérifié sur l'appareil** (émulateur API 36.1, installation neuve) : sélecteur de
+fichiers Android filtré sur `.json`, résumé, confirmation, **restauration des 432 titres
+et 4109 épisodes** (90 / 10 / 291 / 40 à l'écran, identiques au PC), et **export ouvrant
+le partage Android** vers Drive / Gmail / Quick Share.
+
+**Deux défauts trouvés sur l'appareil et corrigés :**
+1. *Lenteur* — la restauration prenait **plus d'une minute**. La couche native écrivait
+   les 4541 lignes **hors transaction**, donc validées une par une. Transaction activée :
+   **moins de 6 secondes**.
+2. *Bouton illisible* — le symbole ⭳ (U+2B73) est absent des polices Android et
+   s'affichait en carré vide. Remplacé par l'emoji 💾.
+
+> Aucun des deux ne se voyait sur PC : ils justifient à eux seuls de tester sur appareil
+> plutôt que de se fier au navigateur.
+
+⚠️ **Les fichiers de sauvegarde contiennent des données personnelles** : `suivi-*.json`
+et `suivi-*.csv` sont exclus du dépôt (`.gitignore`).
 
 ### 5. La publication
 Compte développeur (25 $ une fois), signature, fiche Play Store, politique de
@@ -185,5 +232,6 @@ Sans serveur, **une perte du téléphone sans sauvegarde = perte du suivi**. C'e
 précisément ce que la tranche 4 couvre — elle ne peut pas être reportée.
 
 ## Prochaine étape
-Tranche 4 — sauvegarde, export et récupération du suivi du PC. C'est la tranche qui rend
-le « tout en local » tenable : sans elle, perdre l'appareil = perdre le suivi.
+Tranche 5 — la publication. **Plus de code à écrire** : compte développeur, signature de
+l'application, fiche Play Store, politique de confidentialité, puis la phase de test
+fermé imposée par Google (12 testeurs, 14 jours). C'est là que le délai pèse.
