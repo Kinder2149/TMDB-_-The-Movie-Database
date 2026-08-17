@@ -52,8 +52,12 @@ Maquette de référence : maquette V2 (4 écrans, thèmes clair + sombre).
 - Fonctions sociales.
 
 ## Prochaine étape
-Les 6 chantiers sont terminés (voir état réel ci-dessus). Place au chantier suivant hors de ce plan
-(mise en ligne, ou nouveau besoin à cadrer).
+Les 6 chantiers sont terminés (voir état réel ci-dessus).
+
+**Décision 2026-08-17** : le chantier suivant n'est **pas** la mise en ligne, mais le passage en
+**application Android autonome** (aucun serveur) → voir `PLAN_ANDROID.md`. L'application Android
+devient l'usage unique ; la version PC n'est plus maintenue. Le code serveur reste dans le dépôt
+comme base d'une mise en ligne éventuelle, non planifiée à ce jour.
 
 ## Audit de reprise (2026-08-06)
 **Constat :** du travail V2 est **en cours et non commité** — `git status` montre `Detail.jsx`, `Tonight.jsx`, `status.js`, `server/src/db/listes.repo.js`, `server/src/routes/browse.js` ajoutés (non trackés) et `SeriesDetail.jsx` supprimé, plus des modifications sur `App.jsx`, `api.js`, `Lists.jsx`, `MovieCard.jsx`, `SearchBar.jsx`, plusieurs fichiers serveur. Cela correspond visiblement aux chantiers 2 (page détail), 3 (listes) et 6 (« Quoi regarder ce soir ? » — `Tonight.jsx`) amorcés en parallèle, sans qu'aucun ne soit marqué terminé ici. Pas de `CHANGELOG.md` dans le projet pour tracer ce qui a été réellement livré.
