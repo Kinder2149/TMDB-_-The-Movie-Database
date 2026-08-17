@@ -237,10 +237,22 @@ confidentialité, puis la phase de **test fermé imposée par Google (12 testeur
 - **Mentions obligatoires** : formulaire *Sécurité des données* → « aucune donnée
   collectée » ; attribution TMDB déjà présente dans l'app (écran « À propos »).
 
+#### Captures d'écran ✅ prêtes (2026-08-17)
+Cinq captures **1080 × 1920 (9:16)**, au format exigé par Google, prises sur émulateur
+en **thème sombre** (direction visuelle V2), avec un **profil de démonstration neutre** —
+aucune donnée personnelle de Kinder n'y figure.
+Ordre conseillé dans la fiche : « Quoi regarder ce soir ? » (la fonction qui distingue
+l'app) → fiche série → mes listes → recherche → suggestions.
+
+> Le profil de démo (19 titres grand public, 107 épisodes, 2 listes) est fabriqué depuis
+> TMDB pour que titres, années et affiches soient exacts. Une série est volontairement
+> laissée au milieu d'une saison, pour que « Prochain épisode » apparaisse à l'écran.
+
 #### Ce qui ne peut être fait que par Kinder (compte, paiement, secrets)
-1. Créer le **compte développeur Google Play** (25 $, une fois).
+1. ~~Créer le compte développeur Google Play~~ — **déjà en place**.
 2. **Créer la clé de signature** (`keytool`, voir le modèle) et remplir
    `signature.properties`. ⚠️ Clé perdue = plus aucune mise à jour possible.
+   Ses clés Android existantes sont dans `V:\DEV\keys\`.
 3. **Héberger la politique de confidentialité** à une adresse publique (GitHub Pages
    sur ce dépôt suffit) et coller l'URL dans la fiche.
 4. Réunir **12 testeurs** et lancer le test fermé — **c'est le compte à rebours de
@@ -254,10 +266,9 @@ cd client/android && ./gradlew bundleRelease
 ```
 → `client/android/app/build/outputs/bundle/release/app-release.aab`
 
-#### Reste à décider
-**Les captures d'écran de la fiche** (2 minimum). L'émulateur contient aujourd'hui la
-vraie bibliothèque de Kinder : ces captures seraient publiques. À trancher — assumer,
-ou créer un profil de démonstration neutre.
+#### Décision prise (2026-08-17)
+Captures réalisées avec un **profil de démonstration neutre**, pas avec la bibliothèque
+personnelle de Kinder.
 
 > Tranches 1 à 3 = cœur technique. Tranche 4 = courte mais indispensable.
 > Tranche 5 = administratif, c'est là que le délai Google pèse.
