@@ -196,11 +196,68 @@ le partage Android** vers Drive / Gmail / Quick Share.
 ⚠️ **Les fichiers de sauvegarde contiennent des données personnelles** : `suivi-*.json`
 et `suivi-*.csv` sont exclus du dépôt (`.gitignore`).
 
-### 5. La publication
+### 5. La publication — préparée le 2026-08-17, à exécuter
 Compte développeur (25 $ une fois), signature, fiche Play Store, politique de
 confidentialité, puis la phase de **test fermé imposée par Google (12 testeurs,
 14 jours consécutifs)** pour un compte personnel récent.
 **Testable** : l'application est installable depuis le Play Store.
+
+> **Plus une ligne de code applicatif.** Ce qui reste est administratif, et le chemin
+> critique n'est pas le travail mais **l'attente** : 14 jours de test fermé.
+
+#### Déjà prêt
+- **Signature branchée** (`client/android/app/build.gradle`) : la version publiée se
+  signe dès que `client/android/signature.properties` existe. Sans ce fichier, seule
+  la version de test se construit — comportement normal en développement (vérifié).
+  Modèle fourni : `signature.properties.exemple`. `signature.properties`, `*.jks` et
+  `*.keystore` sont **exclus du dépôt**.
+- **Politique de confidentialité** rédigée : `client/public/confidentialite.html`.
+  Page autonome, thème clair/sombre, exacte quant au fonctionnement réel de l'app
+  (aucune collecte, aucun compte, aucune publicité, aucun traceur).
+
+#### Textes de la fiche Play Store (prêts à coller)
+- **Nom** : Suivi Films & Séries
+- **Description courte** (80 car. max) :
+  `Suivez vos films et séries, épisode par épisode. Sans compte, sans publicité.`
+- **Description complète** :
+  > Gardez la trace de ce que vous avez vu, de ce que vous voulez voir, et d'où vous
+  > en êtes dans chaque série.
+  >
+  > • Cherchez un film ou une série par titre, par acteur ou par genre.
+  > • Cochez vos épisodes saison par saison et retrouvez le prochain à regarder.
+  > • Classez vos titres : à voir, en cours, vu, abandonné — et créez vos propres listes.
+  > • « Quoi regarder ce soir ? » vous propose de reprendre une série commencée,
+  >   de piocher dans vos envies, ou de vous laisser guider par des suggestions.
+  > • Voyez où chaque titre est disponible en streaming en France.
+  >
+  > Vos données restent sur votre téléphone. Aucun compte, aucune inscription, aucune
+  > publicité, aucun traceur. Une fonction de sauvegarde vous permet d'emporter votre
+  > suivi où vous voulez, ou de l'exporter vers Letterboxd ou Trakt.
+- **Catégorie** : Divertissement — **Classification** : Tout public
+- **Mentions obligatoires** : formulaire *Sécurité des données* → « aucune donnée
+  collectée » ; attribution TMDB déjà présente dans l'app (écran « À propos »).
+
+#### Ce qui ne peut être fait que par Kinder (compte, paiement, secrets)
+1. Créer le **compte développeur Google Play** (25 $, une fois).
+2. **Créer la clé de signature** (`keytool`, voir le modèle) et remplir
+   `signature.properties`. ⚠️ Clé perdue = plus aucune mise à jour possible.
+3. **Héberger la politique de confidentialité** à une adresse publique (GitHub Pages
+   sur ce dépôt suffit) et coller l'URL dans la fiche.
+4. Réunir **12 testeurs** et lancer le test fermé — **c'est le compte à rebours de
+   14 jours, à démarrer en premier.**
+
+#### Construire la version publiable (une fois la clé en place)
+```
+npm run build --prefix client
+npx --prefix client cap sync android
+cd client/android && ./gradlew bundleRelease
+```
+→ `client/android/app/build/outputs/bundle/release/app-release.aab`
+
+#### Reste à décider
+**Les captures d'écran de la fiche** (2 minimum). L'émulateur contient aujourd'hui la
+vraie bibliothèque de Kinder : ces captures seraient publiques. À trancher — assumer,
+ou créer un profil de démonstration neutre.
 
 > Tranches 1 à 3 = cœur technique. Tranche 4 = courte mais indispensable.
 > Tranche 5 = administratif, c'est là que le délai Google pèse.

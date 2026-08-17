@@ -1,0 +1,18 @@
+# Modèle. À copier en « signature.properties » (sans .exemple) et à remplir.
+#
+# Ce fichier-ci est un exemple sans secret, il peut rester dans le dépôt.
+# Le fichier rempli, lui, contient les mots de passe de votre clé de signature :
+# il est exclu du dépôt et ne doit JAMAIS y entrer.
+#
+# La clé se crée une seule fois, avec le JDK d'Android Studio :
+#   keytool -genkeypair -v -keystore suivi-films-series.jks \
+#           -keyalg RSA -keysize 2048 -validity 10000 -alias suivi
+#
+# ⚠️ Perdre cette clé = ne plus jamais pouvoir mettre l'application à jour
+# sur le Play Store. À sauvegarder au même titre que vos mots de passe.
+# (Les clés Android de Kinder sont regroupées dans V:\DEV\keys\.)
+
+storeFile=../../../keys/suivi-films-series.jks
+storePassword=
+keyAlias=suivi
+keyPassword=

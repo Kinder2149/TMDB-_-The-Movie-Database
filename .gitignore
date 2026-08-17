@@ -29,3 +29,8 @@ Thumbs.db
 # Sauvegardes de suivi (données personnelles) — jamais dans le dépôt
 suivi-*.json
 suivi-*.csv
+
+# Signature Android (mots de passe et clés) — jamais dans le dépôt
+signature.properties
+*.jks
+*.keystore

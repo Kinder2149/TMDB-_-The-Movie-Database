@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Signature de la version publiée (tranche 5, PLAN_ANDROID).
+// Les secrets vivent dans android/signature.properties, **jamais dans le dépôt**.
+// Fichier absent = seule la version de test se construit, ce qui est le cas normal
+// pendant le développement.
+def fichierSignature = rootProject.file('signature.properties')
+def signature = new Properties()
+if (fichierSignature.exists()) {
+    fichierSignature.withInputStream { signature.load(it) }
+}
+
 android {
     namespace = "com.kinder.suivifilmsseries"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +26,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (fichierSignature.exists()) {
+            release {
+                storeFile rootProject.file(signature['storeFile'])
+                storePassword signature['storePassword']
+                keyAlias signature['keyAlias']
+                keyPassword signature['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (fichierSignature.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
