@@ -4,15 +4,23 @@
 # Le fichier rempli, lui, contient les mots de passe de votre clé de signature :
 # il est exclu du dépôt et ne doit JAMAIS y entrer.
 #
-# La clé se crée une seule fois, avec le JDK d'Android Studio :
-#   keytool -genkeypair -v -keystore suivi-films-series.jks \
-#           -keyalg RSA -keysize 2048 -validity 10000 -alias suivi
+# La clé se crée une seule fois. Depuis le dossier client/android, avec le JDK
+# fourni par Android Studio :
+#
+#   "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" ^
+#     -genkeypair -v ^
+#     -keystore "V:\DEV\keys\suivi-films-series-upload.jks" ^
+#     -keyalg RSA -keysize 2048 -validity 10000 ^
+#     -alias suivi-upload
 #
 # ⚠️ Perdre cette clé = ne plus jamais pouvoir mettre l'application à jour
 # sur le Play Store. À sauvegarder au même titre que vos mots de passe.
 # (Les clés Android de Kinder sont regroupées dans V:\DEV\keys\.)
+#
+# storeFile accepte un chemin ABSOLU, avec des barres obliques normales.
+# Un chemin relatif partirait de client/android/ et prête à confusion.
 
-storeFile=../../../keys/suivi-films-series.jks
+storeFile=V:/DEV/keys/suivi-films-series-upload.jks
 storePassword=
-keyAlias=suivi
+keyAlias=suivi-upload
 keyPassword=

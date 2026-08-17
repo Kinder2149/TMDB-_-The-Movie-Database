@@ -29,6 +29,8 @@ android {
     signingConfigs {
         if (fichierSignature.exists()) {
             release {
+                // Chemin absolu accepté tel quel ; un chemin relatif partirait
+                // de client/android/.
                 storeFile rootProject.file(signature['storeFile'])
                 storePassword signature['storePassword']
                 keyAlias signature['keyAlias']
