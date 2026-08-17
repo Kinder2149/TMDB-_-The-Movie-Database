@@ -7,6 +7,7 @@ import Tonight from './components/Tonight.jsx';
 import Suggestions from './components/Suggestions.jsx';
 import Upcoming from './components/Upcoming.jsx';
 import ProfileSelector from './components/ProfileSelector.jsx';
+import About from './components/About.jsx';
 import {
   searchTitles,
   searchByActor,
@@ -50,8 +51,9 @@ export default function App() {
   // Suivi complet : clé -> item (avec status et listStatus).
   const [suivi, setSuivi] = useState(() => new Map());
   const [openDetail, setOpenDetail] = useState(null);
+  const [showAbout, setShowAbout] = useState(false);
   // Profils : la liste et l'id actif. Tant qu'aucun profil n'est prêt, on ne
-  // lance aucune requête de suivi (elles exigent l'en-tête X-Profile-Id).
+  // lance aucune opération de suivi (elles sont toujours scopées par profil).
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(getActiveProfileId());
   // Thème clair / sombre (posé sur <html> par main.jsx au démarrage).
@@ -415,6 +417,14 @@ export default function App() {
         <div className="appbar__right">
           <button
             className="theme-toggle"
+            onClick={() => setShowAbout(true)}
+            title="À propos"
+            aria-label="À propos"
+          >
+            ⓘ
+          </button>
+          <button
+            className="theme-toggle"
             onClick={toggleTheme}
             title="Basculer clair / sombre"
             aria-label="Basculer le thème"
@@ -628,6 +638,8 @@ export default function App() {
           onClose={closeDetail}
         />
       )}
+
+      {showAbout && <About onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

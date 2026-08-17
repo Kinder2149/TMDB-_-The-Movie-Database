@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône complète (fond + motif), utilisée par les anciens Android (< 8.0) qui
+     ne connaissent pas les icônes adaptatives. Les versions récentes passent par
+     mipmap-anydpi-v26/ic_launcher.xml. Reprise de client/public/icon.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Fond sombre à coins arrondis -->
+    <path
+        android:pathData="M96,0 H416 A96,96 0 0 1 512,96 V416 A96,96 0 0 1 416,512 H96 A96,96 0 0 1 0,416 V96 A96,96 0 0 1 96,0 Z"
+        android:fillColor="#0F1018" />
+
+    <!-- Écran -->
+    <path
+        android:pathData="M112,176 H400 A16,16 0 0 1 416,192 V400 A16,16 0 0 1 400,416 H112 A16,16 0 0 1 96,400 V192 A16,16 0 0 1 112,176 Z"
+        android:strokeColor="#D4AF37"
+        android:strokeWidth="22"
+        android:strokeLineJoin="round" />
+
+    <!-- Faisceaux du projecteur -->
+    <path
+        android:pathData="M96,176 L146,96 H206 L166,176 Z"
+        android:fillColor="#D4AF37" />
+    <path
+        android:pathData="M216,176 L266,96 H326 L286,176 Z"
+        android:fillColor="#D4AF37" />
+    <path
+        android:pathData="M336,176 L386,96 H416 L406,176 Z"
+        android:fillColor="#D4AF37" />
+
+    <!-- Bouton lecture -->
+    <path
+        android:pathData="M210,300 A46,46 0 1,0 302,300 A46,46 0 1,0 210,300 Z"
+        android:fillColor="#D4AF37" />
+    <path
+        android:pathData="M241,280 L286,300 L241,320 Z"
+        android:fillColor="#0F1018" />
+</vector>

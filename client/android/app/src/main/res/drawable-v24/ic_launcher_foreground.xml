@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône de l'application : reprise de client/public/icon.svg (projecteur doré,
+     direction visuelle V2). Vectorielle : nette à toutes les tailles d'écran,
+     et aucune image à maintenir.
+     Le groupe réduit le motif à 62 % pour tenir dans la zone sûre imposée par
+     Android aux icônes adaptatives (les bords sont rognés par le lanceur). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+
+        <!-- Écran -->
+        <path
+            android:pathData="M112,176 H400 A16,16 0 0 1 416,192 V400 A16,16 0 0 1 400,416 H112 A16,16 0 0 1 96,400 V192 A16,16 0 0 1 112,176 Z"
+            android:strokeColor="#D4AF37"
+            android:strokeWidth="22"
+            android:strokeLineJoin="round" />
+
+        <!-- Faisceaux du projecteur -->
+        <path
+            android:pathData="M96,176 L146,96 H206 L166,176 Z"
+            android:fillColor="#D4AF37" />
+        <path
+            android:pathData="M216,176 L266,96 H326 L286,176 Z"
+            android:fillColor="#D4AF37" />
+        <path
+            android:pathData="M336,176 L386,96 H416 L406,176 Z"
+            android:fillColor="#D4AF37" />
+
+        <!-- Bouton lecture -->
+        <path
+            android:pathData="M210,300 A46,46 0 1,0 302,300 A46,46 0 1,0 210,300 Z"
+            android:fillColor="#D4AF37" />
+        <path
+            android:pathData="M241,280 L286,300 L241,320 Z"
+            android:fillColor="#0F1018" />
+    </group>
+</vector>

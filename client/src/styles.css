@@ -488,3 +488,32 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* --- Écran « À propos » (mention TMDB obligatoire) --- */
+.about { padding-bottom: 1.4rem; }
+.about p { margin: .5rem 0; line-height: 1.5; }
+.about__lead { font-size: 1rem; }
+.about__title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  margin: 1.2rem 0 .3rem;
+  color: var(--gold);
+}
+.about__warn { color: var(--muted); font-size: .9rem; }
+.about__tmdb {
+  margin-top: 1.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: .8rem;
+}
+/* Volontairement discret : TMDB impose que leur marque soit moins en évidence
+   que celle de l'application. */
+.about__tmdb-logo {
+  flex: 0 0 auto;
+  width: 84px;
+  height: auto;
+  opacity: .85;
+}
+.about__legal { margin: 0; font-size: .78rem; color: var(--muted); line-height: 1.45; }

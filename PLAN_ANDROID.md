@@ -112,10 +112,34 @@ personnalisées, écran « Ce soir », statut de série recalculé à l'ouvertur
 PC. Le SQLite natif ne peut être testé qu'une fois la coquille Android en place — c'est
 le premier point à contrôler en tranche 3.
 
-### 3. La vraie application Android
+### 3. La vraie application Android ✅ terminé (2026-08-17)
 Emballage Capacitor : nom, icône, écran de démarrage, et écran « À propos » portant la
 mention TMDB obligatoire.
 **Testable** : installer l'app sur le téléphone et s'en servir réellement.
+
+- `client/capacitor.config.json` : identifiant `com.kinder.suivifilmsseries`,
+  nom « Suivi Films & Séries ». Projet Android dans `client/android/`.
+- **Icône et écran de démarrage entièrement vectoriels**, repris de
+  `client/public/icon.svg` (projecteur doré, direction visuelle V2) : nets à toutes
+  les tailles, aucune image à régénérer. Les PNG du gabarit Capacitor sont supprimés.
+- Nouvel écran **« À propos »** (`client/src/components/About.jsx`), ouvert par le
+  bouton ⓘ de l'en-tête : rappelle que les données restent sur l'appareil, invite à
+  la sauvegarde, et porte l'**attribution TMDB complète** — phrase exacte **et logo
+  officiel** (`client/public/tmdb-logo.svg`, récupéré sur
+  themoviedb.org/about/logos-attribution), affiché petit comme leurs conditions
+  l'exigent. **L'obligation d'attribution est donc entièrement remplie.**
+
+**✅ Le point en suspens de la tranche 2 est levé** : APK construit (13,4 Mo), installé
+sur émulateur Android (API 36.1). Vérifié à l'écran : catalogue TMDB, profil par défaut
+créé dans le **SQLite natif**, ajout au suivi, puis **arrêt forcé de l'application et
+relance → le titre suivi est toujours là**. La base embarquée fonctionne sur appareil.
+
+**Construire l'APK** (le SDK Android et le JDK d'Android Studio sont déjà sur le poste) :
+```
+npm run build --prefix client
+npx --prefix client cap sync android
+cd client/android && ./gradlew assembleDebug
+```
 
 ### 4. Sauvegarde, export, récupération
 Rendu obligatoire par le « tout en local » :
@@ -161,6 +185,5 @@ Sans serveur, **une perte du téléphone sans sauvegarde = perte du suivi**. C'e
 précisément ce que la tranche 4 couvre — elle ne peut pas être reportée.
 
 ## Prochaine étape
-Tranche 3 — la vraie application Android. **Premier contrôle à faire : que la base
-embarquée fonctionne aussi sur le SQLite natif du téléphone** (seul point de la tranche 2
-qui n'a pas pu être vérifié sur PC).
+Tranche 4 — sauvegarde, export et récupération du suivi du PC. C'est la tranche qui rend
+le « tout en local » tenable : sans elle, perdre l'appareil = perdre le suivi.

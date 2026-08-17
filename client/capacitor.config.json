@@ -1,0 +1,8 @@
+{
+  "appId": "com.kinder.suivifilmsseries",
+  "appName": "Suivi Films & Séries",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}
