@@ -160,10 +160,15 @@ export async function discoverByGenre({ movieGenreId, tvGenreId, page = 1 }) {
 }
 
 // Recommandations TMDB pour un titre (films OU séries selon le type source).
+// Garde la popularité (`_pop`) : les suggestions s'en servent pour départager
+// deux titres recommandés le même nombre de fois.
 export async function getRecommendations(mediaType, id) {
   const data = await tmdbGet(`/${mediaType}/${id}/recommendations`);
   // /movie/... renvoie des films, /tv/... des séries : media_type peut manquer.
-  return (data.results || []).map((c) => toCardItem(c, c.media_type || mediaType));
+  return (data.results || []).map((c) => ({
+    ...toCardItem(c, c.media_type || mediaType),
+    _pop: c.popularity || 0,
+  }));
 }
 
 // Saisons d'une série. On masque la saison 0 (« Épisodes spéciaux »,

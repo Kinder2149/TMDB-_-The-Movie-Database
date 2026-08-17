@@ -77,11 +77,40 @@ saisons, épisodes.
   progression, suggestions. **Ces écrans sont donc en erreur tant que la tranche 2 n'est
   pas faite** — c'est attendu, pas un bug.
 
-### 2. Les données dans l'appareil
+### 2. Les données dans l'appareil ✅ terminé (2026-08-17)
 Profils, suivi, épisodes cochés, listes personnalisées passent sur la base embarquée.
 Le serveur n'est plus utilisé du tout.
 **Testable** : ajouter un film, cocher un épisode, fermer, rouvrir — tout est là.
 ⚠️ Tranche sensible : c'est ici qu'une erreur silencieuse ferait perdre du suivi.
+
+- `server/src/db/database.js` → `client/src/db.js` (couche **Données**) : **schéma identique**,
+  mêmes tables, mêmes clés, mêmes cascades. Le code de migration disparaît (base neuve).
+- `server/src/db/*.repo.js` + `server/src/routes/*` → `client/src/store.js` (couche
+  **Logique**) : requêtes SQL reprises telles quelles, emballage HTTP supprimé.
+- `client/src/api.js` reste la couche **UI** : les 30 signatures sont inchangées.
+  → les 3 couches du projet sont préservées (UI / Logique / Données).
+- `requireProfile.js` supprimé de fait : plus de requêtes à contrôler.
+
+**Décision moteur (2026-08-17)** — deux moteurs derrière une seule porte
+(`query` / `run` / `runMany`), **même SQL des deux côtés** :
+- téléphone : SQLite natif via `@capacitor-community/sqlite` ;
+- PC : `sql.js` (le même SQLite compilé pour navigateur), rangé dans le stockage local.
+
+> Le mode navigateur officiel du plugin (`jeep-sqlite`) a été essayé et **abandonné** :
+> son composant ne s'initialise pas sous Vite (`componentOnReady()` ne répond jamais).
+> `sql.js` est le moteur que ce composant enveloppe — on l'utilise directement.
+> Capacitor est donc installé dès la tranche 2, en avance sur le plan initial :
+> construire un stockage provisoire pour le remplacer ensuite aurait fait deux fois
+> le travail risqué.
+
+**Vérifié, aucun serveur en marche** : profil par défaut créé (UUID), ajout au suivi,
+**persistance après rechargement**, 4 statuts comptés, liste personnalisée créée,
+saison entière cochée (10 ép.), progression **10/44 + prochain S2E01**, suggestions
+personnalisées, écran « Ce soir », statut de série recalculé à l'ouverture de la fiche.
+
+⚠️ **Non encore vérifié : le chemin téléphone.** Tout ci-dessus est validé sur le moteur
+PC. Le SQLite natif ne peut être testé qu'une fois la coquille Android en place — c'est
+le premier point à contrôler en tranche 3.
 
 ### 3. La vraie application Android
 Emballage Capacitor : nom, icône, écran de démarrage, et écran « À propos » portant la
@@ -132,5 +161,6 @@ Sans serveur, **une perte du téléphone sans sauvegarde = perte du suivi**. C'e
 précisément ce que la tranche 4 couvre — elle ne peut pas être reportée.
 
 ## Prochaine étape
-Tranche 2 — les données dans l'appareil (base embarquée). Tranche sensible : c'est le
-déménagement du suivi réel.
+Tranche 3 — la vraie application Android. **Premier contrôle à faire : que la base
+embarquée fonctionne aussi sur le SQLite natif du téléphone** (seul point de la tranche 2
+qui n'a pas pu être vérifié sur PC).

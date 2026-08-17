@@ -1,17 +1,17 @@
-// Seul point de contact entre l'UI et le back. L'UI ne connaît que cette API.
+// Seul point de contact entre l'UI et le reste de l'application.
 //
-// Migration vers l'app autonome (PLAN_ANDROID) : les fonctions changent
-// d'intérieur, jamais de signature — l'UI n'a rien à savoir.
-//   - Catalogue (recherche, tendances, genres, acteurs, fiches, saisons)
-//     → tranche 1 : appelle TMDB directement, plus aucun serveur.
-//   - Suivi, profils, listes, épisodes cochés
-//     → encore /api, passeront sur la base embarquée en tranche 2.
+// Passage en app autonome (PLAN_ANDROID, tranches 1 et 2) : ces fonctions ont
+// changé d'intérieur, jamais de signature — aucun écran n'a été modifié.
+//   - Catalogue  → `tmdb.js`  : TMDB en direct.
+//   - Suivi/profils/listes/épisodes → `store.js` : base embarquée.
+// Plus aucun serveur : il n'y a plus un seul appel réseau vers /api.
 import * as tmdb from './tmdb.js';
+import * as store from './store.js';
 
 // --- Profil actif ---
-// L'UI garde en mémoire (et dans localStorage) l'id du profil actif, et l'envoie
-// au back via l'en-tête X-Profile-Id sur toutes les requêtes de suivi.
-// En V2, cet id viendra d'un compte connecté ; le back ne changera pas.
+// L'UI garde en mémoire (et dans localStorage) l'id du profil actif.
+// C'est un UUID *portable* : il pourra suivre le profil ailleurs (sauvegarde,
+// restauration sur un autre appareil — tranche 4).
 const PROFILE_KEY = 'activeProfileId';
 let activeProfileId = localStorage.getItem(PROFILE_KEY) || null;
 
@@ -25,40 +25,28 @@ export function setActiveProfileId(id) {
   else localStorage.removeItem(PROFILE_KEY);
 }
 
-// fetch qui injecte l'en-tête du profil actif (pour les routes scopées).
-function profileFetch(url, opts = {}) {
-  const headers = { ...(opts.headers || {}) };
-  if (activeProfileId) headers['X-Profile-Id'] = activeProfileId;
-  return fetch(url, { ...opts, headers });
+// Les données de suivi appartiennent toujours à un profil : on refuse d'agir
+// sans profil actif (l'UI n'appelle ces fonctions qu'une fois le profil choisi).
+function requireProfile() {
+  if (!activeProfileId) throw new Error('Aucun profil actif.');
+  return activeProfileId;
 }
 
 // --- Profils ---
+
 export async function getProfiles() {
-  const response = await fetch('/api/profiles');
-  if (!response.ok) throw new Error('Impossible de charger les profils.');
-  return (await response.json()).profiles;
+  return store.listProfiles();
 }
 
 export async function createProfile(name) {
-  const response = await fetch('/api/profiles', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!response.ok) throw new Error('La création du profil a échoué.');
-  return response.json(); // { id, name }
+  return store.createProfile(name);
 }
 
 export async function renameProfile(id, name) {
-  const response = await fetch(`/api/profiles/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!response.ok) throw new Error('Le renommage du profil a échoué.');
+  return store.renameProfile(id, name);
 }
 
-// --- Catalogue (TMDB en direct, sans serveur) ---
+// --- Catalogue (TMDB en direct) ---
 
 // Fiche détaillée d'un film ou d'une série (infos + acteurs). Données TMDB.
 export async function getDetails(mediaType, id) {
@@ -68,13 +56,6 @@ export async function getDetails(mediaType, id) {
 // Recherche par acteur : renvoie { person, results (filmographie) }.
 export async function searchByActor(query) {
   return tmdb.searchByActor(query);
-}
-
-// Suggestions personnalisées (d'après le suivi du profil).
-export async function getSuggestions() {
-  const r = await profileFetch('/api/suggestions');
-  if (!r.ok) throw new Error('Impossible de charger les suggestions.');
-  return (await r.json()).results;
 }
 
 // Liste des genres : [{ name, movieId, tvId }].
@@ -100,140 +81,90 @@ export async function searchTitles(query) {
   return tmdb.searchMulti(query);
 }
 
-// Récupère la liste du suivi (pour marquer les résultats déjà ajoutés).
-export async function getSuivi() {
-  const response = await profileFetch('/api/suivi');
-  if (!response.ok) throw new Error('Impossible de charger le suivi.');
-  const data = await response.json();
-  return data.items;
-}
-
-export async function addToSuivi(item) {
-  const response = await profileFetch('/api/suivi', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
-  });
-  if (!response.ok) throw new Error("L'ajout au suivi a échoué.");
-}
-
-export async function removeFromSuivi(mediaType, id) {
-  const response = await profileFetch(`/api/suivi/${mediaType}/${id}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) throw new Error('Le retrait du suivi a échoué.');
-}
-
-// Change le statut d'un titre : 'a_voir' | 'en_cours' | 'vu' | 'abandonne'.
-export async function setStatus(mediaType, id, status) {
-  const response = await profileFetch(`/api/suivi/${mediaType}/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
-  });
-  if (!response.ok) throw new Error('Le changement de statut a échoué.');
-}
-
-// --- Séries : saisons et épisodes ---
-
-// Saisons : catalogue pur (aucun suivi) → TMDB en direct.
+// Saisons d'une série : catalogue pur (aucun suivi).
 export async function getSeasons(seriesId) {
   return tmdb.getSeasons(seriesId);
 }
 
+// --- Suggestions (base locale + TMDB) ---
+
+export async function getSuggestions() {
+  return store.getSuggestions(requireProfile());
+}
+
+// --- Suivi ---
+
+export async function getSuivi() {
+  return store.listSuivi(requireProfile());
+}
+
+export async function addToSuivi(item) {
+  return store.addToSuivi(requireProfile(), item);
+}
+
+export async function removeFromSuivi(mediaType, id) {
+  return store.removeFromSuivi(requireProfile(), mediaType, id);
+}
+
+// Change le statut d'un titre : 'a_voir' | 'en_cours' | 'vu' | 'abandonne'.
+export async function setStatus(mediaType, id, status) {
+  return store.setStatus(requireProfile(), mediaType, id, status);
+}
+
+// --- Séries : épisodes et progression ---
+
 export async function getSeasonEpisodes(seriesId, season) {
-  const response = await profileFetch(`/api/tv/${seriesId}/season/${season}`);
-  if (!response.ok) throw new Error('Impossible de charger les épisodes.');
-  return (await response.json()).episodes;
+  return store.getSeasonEpisodes(requireProfile(), seriesId, season);
 }
 
 // Progression d'une série : { total, watched, next }.
 export async function getProgress(seriesId) {
-  const response = await profileFetch(`/api/tv/${seriesId}/progress`);
-  if (!response.ok) throw new Error('Impossible de charger la progression.');
-  return response.json();
+  return store.getProgress(requireProfile(), seriesId);
 }
 
 export async function markEpisode(seriesId, season, episode) {
-  const response = await profileFetch(
-    `/api/tv/${seriesId}/season/${season}/episode/${episode}`,
-    { method: 'POST' }
-  );
-  if (!response.ok) throw new Error("Le marquage de l'épisode a échoué.");
+  return store.markEpisode(requireProfile(), seriesId, season, episode);
 }
 
 export async function unmarkEpisode(seriesId, season, episode) {
-  const response = await profileFetch(
-    `/api/tv/${seriesId}/season/${season}/episode/${episode}`,
-    { method: 'DELETE' }
-  );
-  if (!response.ok) throw new Error("Le retrait de l'épisode a échoué.");
+  return store.unmarkEpisode(requireProfile(), seriesId, season, episode);
 }
 
 export async function markWholeSeason(seriesId, season, episodeNumbers) {
-  const response = await profileFetch(`/api/tv/${seriesId}/season/${season}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ episodes: episodeNumbers }),
-  });
-  if (!response.ok) throw new Error('Le marquage de la saison a échoué.');
+  return store.markWholeSeason(requireProfile(), seriesId, season, episodeNumbers);
 }
 
 export async function unmarkWholeSeason(seriesId, season) {
-  const response = await profileFetch(`/api/tv/${seriesId}/season/${season}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) throw new Error('Le retrait de la saison a échoué.');
+  return store.unmarkWholeSeason(requireProfile(), seriesId, season);
 }
 
 // --- Listes personnalisées ---
 
 export async function getListes() {
-  const r = await profileFetch('/api/listes');
-  if (!r.ok) throw new Error('Impossible de charger les listes.');
-  return (await r.json()).listes;
+  return store.listListes(requireProfile());
 }
 
 export async function createListe(name) {
-  const r = await profileFetch('/api/listes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!r.ok) throw new Error('La création de la liste a échoué.');
-  return r.json(); // { id, name, count }
+  return store.createListe(requireProfile(), name);
 }
 
 export async function deleteListe(id) {
-  const r = await profileFetch(`/api/listes/${id}`, { method: 'DELETE' });
-  if (!r.ok) throw new Error('La suppression de la liste a échoué.');
+  return store.deleteListe(requireProfile(), id);
 }
 
 export async function getListeItems(id) {
-  const r = await profileFetch(`/api/listes/${id}/items`);
-  if (!r.ok) throw new Error('Impossible de charger la liste.');
-  return (await r.json()).items;
+  return store.getListeItems(requireProfile(), id);
 }
 
 export async function addToListe(id, item) {
-  const r = await profileFetch(`/api/listes/${id}/items`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
-  });
-  if (!r.ok) throw new Error("L'ajout à la liste a échoué.");
+  return store.addToListe(requireProfile(), id, item);
 }
 
 export async function removeFromListe(id, mediaType, tmdbId) {
-  const r = await profileFetch(`/api/listes/${id}/items/${mediaType}/${tmdbId}`, {
-    method: 'DELETE',
-  });
-  if (!r.ok) throw new Error('Le retrait de la liste a échoué.');
+  return store.removeFromListe(requireProfile(), id, mediaType, tmdbId);
 }
 
 // Ids des listes contenant un titre (pour la fiche).
 export async function getItemListes(mediaType, id) {
-  const r = await profileFetch(`/api/listes/for/${mediaType}/${id}`);
-  if (!r.ok) throw new Error('Impossible de charger les listes du titre.');
-  return (await r.json()).listeIds;
+  return store.getItemListes(requireProfile(), mediaType, id);
 }
