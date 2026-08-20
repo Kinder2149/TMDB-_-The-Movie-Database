@@ -1,10 +1,59 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import MovieCard from './MovieCard.jsx';
+import Icon from './Icon.jsx';
+import Upcoming from './Upcoming.jsx';
+import Suggestions from './Suggestions.jsx';
 import { getProgress } from '../api.js';
 
-// Page « Quoi regarder ce soir ? » : reprendre les séries en cours,
-// puis à voir (films / séries), puis suggestions.
-export default function Tonight({ items, cardProps }) {
+// Page « Quoi regarder ce soir ? », en deux sous-onglets :
+//   - « En attente »  : ce qui est déjà dans le suivi et reste à regarder
+//                       (séries en cours, pas encore sorti, à voir) ;
+//   - « Suggestions » : les recommandations calculées par l'application.
+// Les deux sous-onglets restent montés en permanence : chacun garde ainsi son
+// propre état de scroll, qu'on restaure au changement de sous-onglet.
+// Ils ne s'empilent pas dans la navigation : le retour d'Android remonte
+// directement à l'onglet précédent, sans les faire défiler un par un.
+export default function Tonight({
+  items,
+  cardProps,
+  suggestions,
+  suggestionsLoading,
+  onRefreshSuggestions,
+  subTab,
+  onSubTab,
+}) {
+  // Position de lecture de chaque sous-onglet (la page entière défile).
+  const scrollPos = useRef({ attente: 0, suggestions: 0 });
+
+  function switchTo(next) {
+    if (next === subTab) return;
+    scrollPos.current[subTab] = window.scrollY;
+    onSubTab(next);
+  }
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollPos.current[subTab] || 0);
+  }, [subTab]);
+
+  // Balayage horizontal d'un sous-onglet à l'autre. On ignore les gestes
+  // surtout verticaux : ils appartiennent au défilement de la page.
+  const touch = useRef(null);
+  const swipe = {
+    onTouchStart: (e) => {
+      const t = e.touches[0];
+      touch.current = { x: t.clientX, y: t.clientY };
+    },
+    onTouchEnd: (e) => {
+      if (!touch.current) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touch.current.x;
+      const dy = t.clientY - touch.current.y;
+      touch.current = null;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      switchTo(dx < 0 ? 'suggestions' : 'attente');
+    },
+  };
+
   const enCours = items.filter((i) => i.mediaType === 'tv' && i.status === 'en_cours');
   const aVoirFilms = items.filter((i) => i.mediaType === 'movie' && i.status === 'a_voir');
   const aVoirSeries = items.filter((i) => i.mediaType === 'tv' && i.status === 'a_voir');
@@ -52,13 +101,31 @@ export default function Tonight({ items, cardProps }) {
     enCours.length === 0 && aVoirFilms.length === 0 && aVoirSeries.length === 0;
 
   return (
-    <div className="tonight">
+    <div className="tonight" {...swipe}>
       <h2 className="tonight__hero">Quoi regarder ce soir ?</h2>
       <p className="tonight__sub">
         Reprends une série commencée, pioche dans ta liste « à voir », ou
         laisse-toi guider.
       </p>
 
+      <div className="seg subtabs" role="tablist" aria-label="Quoi regarder ce soir">
+        {[
+          ['attente', 'En attente'],
+          ['suggestions', 'Suggestions'],
+        ].map(([v, label]) => (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={subTab === v}
+            className={subTab === v ? 'on' : ''}
+            onClick={() => switchTo(v)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className={`pane ${subTab === 'attente' ? '' : 'pane--hidden'}`} role="tabpanel">
       {nothing && (
         <p className="hint">
           Ajoute des films et séries à ton suivi pour voir apparaître ici quoi
@@ -94,13 +161,14 @@ export default function Tonight({ items, cardProps }) {
                         ? `Prochain : S${p.next.season}E${String(
                             p.next.episode
                           ).padStart(2, '0')} — ${p.next.name}`
-                        : 'À jour ✓'}
+                        : 'À jour'}
                     </span>
                     <button
                       className="btn btn--primary resume__btn"
                       onClick={() => cardProps.onOpenDetail(s)}
                     >
-                      ▸ Reprendre
+                      <Icon name="play" size={14} />
+                      Reprendre
                     </button>
                   </div>
                 </div>
@@ -109,6 +177,8 @@ export default function Tonight({ items, cardProps }) {
           </div>
         </section>
       )}
+
+      <Upcoming items={items} cardProps={cardProps} embedded />
 
       {aVoirFilms.length > 0 && (
         <section className="tonight__section">
@@ -123,6 +193,22 @@ export default function Tonight({ items, cardProps }) {
           {grid(aVoirSeries)}
         </section>
       )}
+
+      </div>
+
+      <div
+        className={`pane ${subTab === 'suggestions' ? '' : 'pane--hidden'}`}
+        role="tabpanel"
+      >
+        <Suggestions
+          items={items}
+          suggestions={suggestions}
+          suggestionsLoading={suggestionsLoading}
+          onRefreshSuggestions={onRefreshSuggestions}
+          cardProps={cardProps}
+          embedded
+        />
+      </div>
     </div>
   );
 }

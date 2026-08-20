@@ -10,7 +10,8 @@ import {
   unmarkWholeSeason,
   getItemListes,
 } from '../api.js';
-import { STATUSES, STATUS_LABEL, deriveSeriesStatus } from '../status.js';
+import { STATUSES, deriveSeriesStatus } from '../status.js';
+import Icon from './Icon.jsx';
 
 // Fiche détail générique (film ou série). Pour une série suivie, la
 // progression et les saisons/épisodes sont intégrées ici.
@@ -156,17 +157,30 @@ export default function Detail({
   const hasStreaming =
     providers && (providers.flatrate.length > 0 || locationAchat.length > 0);
 
+  // Statut d'une série : dérivé de la progression, sauf « Abandonné » qui est
+  // le seul choix manuel. On montre quand même les 4 pour que la lecture soit
+  // la même partout ; les trois dérivés ne sont cliquables que pour sortir
+  // d'un abandon (ils rendent alors la série à sa progression réelle).
+  function pickStatus(value) {
+    if (!isSeries) return onSetStatus(item, value);
+    if (value === 'abandonne') return onSetStatus(item, 'abandonne');
+    if (current === 'abandonne') return onSetStatus(item, deriveSeriesStatus(progress));
+  }
+
+  const statusDisabled = (value) =>
+    isSeries && value !== 'abandonne' && current !== 'abandonne';
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <header className="sheet__head">
-          <h2>{info?.title || item.title}</h2>
-          <button className="sheet__close" onClick={onClose} aria-label="Fermer">
-            ×
+          <button className="sheet__back" onClick={onClose} aria-label="Retour">
+            <Icon name="back" size={22} />
           </button>
+          <h2>{info?.title || item.title}</h2>
         </header>
 
-        {/* En-tête riche : affiche + infos */}
+        {/* En-tête : affiche posée sur l'image de fond du titre. */}
         <div
           className="detail-hero"
           style={
@@ -180,78 +194,58 @@ export default function Detail({
               <img className="detail-hero__poster" src={info.posterUrl} alt={info.title} />
             )}
             <div className="detail-hero__info">
+              <h3 className="detail-hero__title">{info?.title || item.title}</h3>
               <div className="detail-hero__sub">
                 {isSeries ? 'Série' : 'Film'}
                 {info?.year && ` · ${info.year}`}
+                {info?.genres?.length > 0 && ` · ${info.genres.join(', ')}`}
               </div>
-              {info?.genres?.length > 0 && (
-                <div className="genres">
-                  {info.genres.map((g) => (
-                    <span key={g}>{g}</span>
-                  ))}
-                </div>
-              )}
-              <div className="detail-actions">
-                <button
-                  className={`btn ${isFollowed ? 'btn--ghost' : 'btn--primary'}`}
-                  onClick={() => onToggleFollow(item)}
-                >
-                  {isFollowed ? '✓ Dans mes listes' : '+ Ajouter'}
-                </button>
-                {info?.trailer && (
-                  <a
-                    className="btn btn--ghost"
-                    href={info.trailer.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    ▸ Bande-annonce
-                  </a>
-                )}
-              </div>
-
-              {isFollowed && (
-                <div className="status-control">
-                  {isSeries ? (
-                    <>
-                      <span className={`status-badge status--${current}`}>
-                        {STATUS_LABEL[current]}
-                      </span>
-                      {current === 'abandonne' ? (
-                        <button
-                          className="btn btn--ghost"
-                          onClick={() => onSetStatus(item, deriveSeriesStatus(progress))}
-                        >
-                          Reprendre le suivi
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn--ghost"
-                          onClick={() => onSetStatus(item, 'abandonne')}
-                        >
-                          Abandonner
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="status-picker">
-                      {STATUSES.map((s) => (
-                        <button
-                          key={s.value}
-                          className={`status-chip status--${s.value} ${
-                            current === s.value ? 'on' : ''
-                          }`}
-                          onClick={() => onSetStatus(item, s.value)}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
+        </div>
+
+        <div className="detail-pad">
+          <button
+            className={`btn btn--wide ${isFollowed ? 'btn--ghost' : 'btn--primary'}`}
+            onClick={() => onToggleFollow(item)}
+          >
+            <Icon name={isFollowed ? 'check' : 'plus'} size={16} />
+            {isFollowed ? 'Dans mon suivi — retirer' : 'Ajouter à mon suivi'}
+          </button>
+
+          {isFollowed && (
+            <div className="statuspick">
+              {STATUSES.map((st) => (
+                <button
+                  key={st.value}
+                  className={`statuspick__btn status--${st.value} ${
+                    current === st.value ? 'on' : ''
+                  }`}
+                  disabled={statusDisabled(st.value)}
+                  title={
+                    statusDisabled(st.value)
+                      ? 'Pour une série, ce statut suit les épisodes cochés'
+                      : st.label
+                  }
+                  onClick={() => pickStatus(st.value)}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {info?.trailer && (
+            <a
+              className="btn btn--primary btn--wide"
+              href={info.trailer.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon name="play" size={15} />
+              Bande-annonce
+            </a>
+          )}
         </div>
 
         {error && <p className="error detail-pad">{error}</p>}
@@ -272,7 +266,7 @@ export default function Detail({
                 className={`chip-toggle ${listeIds.includes(l.id) ? 'on' : ''}`}
                 onClick={() => toggleListe(l)}
               >
-                {listeIds.includes(l.id) ? '✓ ' : ''}
+                {listeIds.includes(l.id) && <Icon name="check" size={13} />}
                 {l.name}
               </button>
             ))}
@@ -366,7 +360,7 @@ export default function Detail({
                       {progress.next.name}
                     </span>
                   ) : (
-                    <span className="progress__done">À jour ✓</span>
+                    <span className="progress__done">À jour</span>
                   )}
                 </p>
               </div>

@@ -14,7 +14,9 @@ export default function SearchBar({ onSearch, mode = 'title', placeholder }) {
 
   return (
     <div className="search-bar">
-      <span className="search-bar__icon" aria-hidden="true">🔍</span>
+      <span className="search-bar__icon" aria-hidden="true">
+        🔍
+      </span>
       <input
         type="text"
         placeholder={placeholder || 'Chercher…'}

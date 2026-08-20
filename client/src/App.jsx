@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { App as Capacitor } from '@capacitor/app';
 import SearchBar from './components/SearchBar.jsx';
 import MovieCard from './components/MovieCard.jsx';
 import Detail from './components/Detail.jsx';
 import Lists from './components/Lists.jsx';
 import Tonight from './components/Tonight.jsx';
-import Suggestions from './components/Suggestions.jsx';
-import Upcoming from './components/Upcoming.jsx';
-import ProfileSelector from './components/ProfileSelector.jsx';
+import Settings from './components/Settings.jsx';
+import StatusMenu from './components/StatusMenu.jsx';
+import CatalogLanguage from './components/CatalogLanguage.jsx';
+import Icon from './components/Icon.jsx';
 import About from './components/About.jsx';
 import Backup from './components/Backup.jsx';
 import {
@@ -25,6 +27,11 @@ import {
   renameProfile,
   getActiveProfileId,
   setActiveProfileId,
+  hasCatalogLanguage,
+  getCatalogLanguage,
+  languageLabel,
+  chooseInitialLanguage,
+  changeCatalogLanguage,
   getListes,
   createListe as apiCreateListe,
   deleteListe as apiDeleteListe,
@@ -35,7 +42,12 @@ import {
 const keyOf = (item) => `${item.mediaType}-${item.id}`;
 
 export default function App() {
-  const [view, setView] = useState('search'); // 'search' | 'lists'
+  // 4 destinations, comme la barre de navigation du bas.
+  const [view, setView] = useState('search'); // 'search' | 'tonight' | 'lists' | 'settings'
+  // Onglets déjà visités, du plus ancien au plus récent (l'onglet affiché n'y
+  // est pas). Le bouton retour d'Android dépile cette liste ; « Recherche »
+  // est la racine : quand la pile est vide, le retour quitte l'application.
+  const [tabStack, setTabStack] = useState([]);
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | loading | done | error
   const [error, setError] = useState('');
@@ -52,8 +64,15 @@ export default function App() {
   // Suivi complet : clé -> item (avec status et listStatus).
   const [suivi, setSuivi] = useState(() => new Map());
   const [openDetail, setOpenDetail] = useState(null);
+  // Titre dont le menu de statuts (appui long) est ouvert.
+  const [statusMenu, setStatusMenu] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  // Langue du catalogue : tant qu'elle n'a jamais été choisie, l'écran de
+  // bienvenue s'affiche avant tout le reste.
+  const [needLanguage, setNeedLanguage] = useState(() => !hasCatalogLanguage());
+  const [catalogLang, setCatalogLang] = useState(() => getCatalogLanguage());
+  const [showLanguage, setShowLanguage] = useState(false);
   // Profils : la liste et l'id actif. Tant qu'aucun profil n'est prêt, on ne
   // lance aucune opération de suivi (elles sont toujours scopées par profil).
   const [profiles, setProfiles] = useState([]);
@@ -75,6 +94,10 @@ export default function App() {
   }
 
   const [listes, setListes] = useState([]);
+  // Sous-onglet actif de « Ce soir ». Mémorisé tant que l'application tourne
+  // (on retrouve son sous-onglet en revenant depuis un autre onglet), mais
+  // jamais enregistré : à la réouverture on repart toujours d'« En attente ».
+  const [tonightTab, setTonightTab] = useState('attente');
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
@@ -301,6 +324,52 @@ export default function App() {
     }
   }
 
+  // Statut choisi dans le menu d'appui long. Le titre peut venir d'une
+  // recherche : dans ce cas on l'ajoute au suivi avant de poser le statut,
+  // sinon choisir « Vu » sur un titre pas encore suivi ne ferait rien.
+  async function handlePickStatus(item, newStatus) {
+    setStatusMenu(null);
+    try {
+      if (!suivi.has(keyOf(item))) await addToSuivi(item);
+      await apiSetStatus(item.mediaType, item.id, newStatus);
+      loadSuivi();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRemoveFromSuivi(item) {
+    setStatusMenu(null);
+    try {
+      await removeFromSuivi(item.mediaType, item.id);
+      loadSuivi();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  // Premier choix de langue (écran de bienvenue).
+  async function applyInitialLanguage(value, onProgress) {
+    const res = await chooseInitialLanguage(value, onProgress);
+    setCatalogLang(value);
+    setNeedLanguage(false);
+    loadSuivi();
+    return res;
+  }
+
+  // Changement depuis les réglages : les fiches enregistrées sont re-téléchargées.
+  async function applyLanguageChange(value, onProgress) {
+    const res = await changeCatalogLanguage(value, onProgress);
+    setCatalogLang(value);
+    loadSuivi(); // les titres et affiches en base ont changé
+    setSuggestions([]); // recalculées dans la nouvelle langue au prochain passage
+    setResults([]);
+    setTrending([]);
+    getTrending().then(setTrending).catch(() => {});
+    getGenres().then(setGenres).catch(() => {});
+    return res;
+  }
+
   async function handleCreateListe(name) {
     try {
       const created = await apiCreateListe(name);
@@ -339,6 +408,29 @@ export default function App() {
     }
   }
 
+  // Bouton « retour » d'Android. Sans cette écoute, il quittait l'application
+  // au premier appui, où qu'on soit. Il se comporte maintenant exactement
+  // comme les flèches de retour de l'interface : il ferme d'abord ce qui est
+  // ouvert par-dessus (sauvegarde, à propos, fiche), puis dépile les onglets
+  // dans l'ordre où on les a consultés, et ne quitte que depuis l'accueil.
+  useEffect(() => {
+    let handle;
+    Capacitor.addListener('backButton', () => {
+      if (showLanguage) setShowLanguage(false);
+      else if (statusMenu) setStatusMenu(null);
+      else if (showBackup) setShowBackup(false);
+      else if (showAbout) setShowAbout(false);
+      else if (openDetail) closeDetail();
+      else if (tabStack.length > 0) goBackTab();
+      else if (view !== 'search') goTo('search', { push: false });
+      else Capacitor.exitApp();
+    }).then((h) => {
+      handle = h;
+    });
+    return () => handle?.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, tabStack, openDetail, showAbout, showBackup, statusMenu, showLanguage]);
+
   // À la fermeture de la fiche, on recharge : cocher des épisodes / marquer vu
   // a pu faire passer le titre d'une liste à l'autre.
   function closeDetail() {
@@ -350,6 +442,7 @@ export default function App() {
     onToggleFollow: handleToggleFollow,
     onSetStatus: handleSetStatus,
     onOpenDetail: setOpenDetail,
+    onLongPress: setStatusMenu,
   };
 
   const filteredResults =
@@ -375,124 +468,90 @@ export default function App() {
       ? trending
       : trending.filter((r) => r.mediaType === mediaFilter);
 
+  // Passage d'un onglet à l'autre : on rafraîchit les données dont il a besoin.
+  // `push` alimente l'historique de navigation ; on le laisse à false quand
+  // c'est justement le retour qui nous amène là (sinon on tournerait en rond).
+  function goTo(next, { push = true } = {}) {
+    if (next === view) return;
+    // Pile bornée : un aller-retour répété entre deux onglets ne doit pas
+    // obliger à appuyer trente fois sur retour pour sortir.
+    if (push) setTabStack((prev) => [...prev, view].slice(-10));
+    showTab(next);
+  }
+
+  // Revient à l'onglet précédemment consulté (retour Android).
+  function goBackTab() {
+    const prev = tabStack[tabStack.length - 1];
+    setTabStack((s) => s.slice(0, -1));
+    showTab(prev);
+  }
+
+  function showTab(next) {
+    setView(next);
+    if (next === 'tonight' || next === 'lists') loadSuivi();
+    if (next === 'tonight') loadSuggestions();
+  }
+
+  // Premier lancement : on demande la langue du catalogue avant d'entrer.
+  if (needLanguage) {
+    return (
+      <CatalogLanguage current={null} onApply={applyInitialLanguage} welcome />
+    );
+  }
+
   return (
     <div className="app">
       <header className="appbar">
-        <div className="brand">
-          <span className="brand__dot" aria-hidden="true"></span>
-          <span className="brand__name">Suivi</span>
-        </div>
-
-        <nav className="nav">
-          <button
-            className={view === 'search' ? 'is-active' : ''}
-            onClick={() => setView('search')}
-          >
-            Recherche
-          </button>
-          <button
-            className={view === 'tonight' ? 'is-active' : ''}
-            onClick={() => {
-              setView('tonight');
-              loadSuivi();
-            }}
-          >
-            Ce soir
-          </button>
-          <button
-            className={view === 'lists' ? 'is-active' : ''}
-            onClick={() => {
-              setView('lists');
-              loadSuivi();
-            }}
-          >
-            Mes listes
-          </button>
-          <button
-            className={view === 'suggestions' ? 'is-active' : ''}
-            onClick={() => {
-              setView('suggestions');
-              loadSuivi();
-              loadSuggestions();
-            }}
-          >
-            Suggestions
-          </button>
-          <button
-            className={view === 'upcoming' ? 'is-active' : ''}
-            onClick={() => {
-              setView('upcoming');
-              loadSuivi();
-            }}
-          >
-            Sorties à venir
-          </button>
-        </nav>
-
-        <div className="appbar__right">
-          <button
-            className="theme-toggle"
-            onClick={() => setShowBackup(true)}
-            title="Sauvegarde"
-            aria-label="Sauvegarde"
-          >
-            {/* Emoji volontaire : le symbole ⭳ (U+2B73) est absent des polices
-                Android et s'affichait en carré vide. */}
-            💾
-          </button>
-          <button
-            className="theme-toggle"
-            onClick={() => setShowAbout(true)}
-            title="À propos"
-            aria-label="À propos"
-          >
-            ⓘ
-          </button>
-          <button
-            className="theme-toggle"
-            onClick={toggleTheme}
-            title="Basculer clair / sombre"
-            aria-label="Basculer le thème"
-          >
-            {theme === 'dark' ? '☀' : '☾'}
-          </button>
-          <ProfileSelector
-            profiles={profiles}
-            activeId={activeProfile}
-            onSelect={handleSelectProfile}
-            onCreate={handleCreateProfile}
-            onRename={handleRenameProfile}
-          />
-        </div>
+        <span className="brand__dot" aria-hidden="true"></span>
+        <span className="brand__name">Suivi</span>
+        <button
+          className="appbar__profile"
+          onClick={() => goTo('settings')}
+          title="Profil et réglages"
+          aria-label="Profil et réglages"
+        >
+          {(profiles.find((p) => p.id === activeProfile)?.name || '?')
+            .trim()
+            .charAt(0)
+            .toUpperCase()}
+        </button>
       </header>
 
       <main className="content">
 
       {view === 'search' && (
         <>
-          <div className="searchmodes">
-            <span className="searchmodes__label">Chercher par</span>
-            <button
-              className={`chip ${searchMode === 'title' ? 'on' : ''}`}
-              onClick={() => changeMode('title')}
-            >
-              Titre
-            </button>
-            <button
-              className={`chip ${searchMode === 'actor' ? 'on' : ''}`}
-              onClick={() => changeMode('actor')}
-            >
-              Acteur
-            </button>
-            <button
-              className={`chip ${searchMode === 'genre' ? 'on' : ''}`}
-              onClick={() => changeMode('genre')}
-            >
-              Genre
-            </button>
+          {/* Le champ de recherche d'abord : c'est ce pour quoi on ouvre l'écran.
+              Les modes et les filtres viennent ensuite, pas l'inverse. */}
+          {searchMode !== 'genre' && (
+            <SearchBar
+              onSearch={handleSearch}
+              mode={searchMode}
+              placeholder={
+                searchMode === 'actor'
+                  ? 'Chercher un acteur…'
+                  : 'Chercher un film ou une série…'
+              }
+            />
+          )}
+
+          <div className="seg" aria-label="Chercher par">
+            {[
+              ['title', 'Titre'],
+              ['actor', 'Acteur'],
+              ['genre', 'Genre'],
+            ].map(([v, label]) => (
+              <button
+                key={v}
+                className={searchMode === v ? 'on' : ''}
+                onClick={() => changeMode(v)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          {searchMode === 'genre' ? (
+          {searchMode === 'genre' && (
             <div className="genre-picker">
               {genres.map((g) => {
                 const available = availableGenres.includes(g);
@@ -510,20 +569,10 @@ export default function App() {
                 );
               })}
             </div>
-          ) : (
-            <SearchBar
-              onSearch={handleSearch}
-              mode={searchMode}
-              placeholder={
-                searchMode === 'actor'
-                  ? 'Chercher un acteur…'
-                  : 'Chercher un film ou une série…'
-              }
-            />
           )}
 
-          {(hasSearched || (isDefault && trending.length > 0)) && (
-            <div className="filters">
+          {hasSearched && (
+            <div className="seg">
               {[
                 ['all', 'Tout'],
                 ['movie', 'Films'],
@@ -531,7 +580,7 @@ export default function App() {
               ].map(([v, label]) => (
                 <button
                   key={v}
-                  className={`chip ${mediaFilter === v ? 'on' : ''}`}
+                  className={mediaFilter === v ? 'on' : ''}
                   onClick={() => setMediaFilter(v)}
                 >
                   {label}
@@ -572,8 +621,8 @@ export default function App() {
 
           {isDefault && trendingFiltered.length > 0 && (
             <>
-              <div className="actor-head">
-                <span>✨ Tendances de la semaine</span>
+              <div className="sechead">
+                <h3>✨ Tendances de la semaine</h3>
               </div>
               <section className="grid">
                 {trendingFiltered.map((item) => (
@@ -631,23 +680,54 @@ export default function App() {
       )}
 
       {view === 'tonight' && (
-        <Tonight items={Array.from(suivi.values())} cardProps={cardProps} />
-      )}
-
-      {view === 'suggestions' && (
-        <Suggestions
+        <Tonight
           items={Array.from(suivi.values())}
+          cardProps={cardProps}
           suggestions={suggestions}
           suggestionsLoading={suggestionsLoading}
           onRefreshSuggestions={loadSuggestions}
-          cardProps={cardProps}
+          subTab={tonightTab}
+          onSubTab={setTonightTab}
         />
       )}
 
-      {view === 'upcoming' && (
-        <Upcoming items={Array.from(suivi.values())} cardProps={cardProps} />
+      {view === 'settings' && (
+        <Settings
+          profiles={profiles}
+          activeProfile={activeProfile}
+          onSelectProfile={handleSelectProfile}
+          onCreateProfile={handleCreateProfile}
+          onRenameProfile={handleRenameProfile}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          catalogLang={catalogLang}
+          catalogLangLabel={languageLabel(catalogLang)}
+          onOpenLanguage={() => setShowLanguage(true)}
+          onOpenBackup={() => setShowBackup(true)}
+          onOpenAbout={() => setShowAbout(true)}
+          suiviCount={suivi.size}
+        />
       )}
       </main>
+
+      <nav className="tabbar">
+        {[
+          ['search', 'Recherche', 'search'],
+          ['tonight', 'Ce soir', 'film'],
+          ['lists', 'Mes listes', 'lists'],
+          ['settings', 'Réglages', 'gear'],
+        ].map(([v, label, icon]) => (
+          <button
+            key={v}
+            className={view === v ? 'is-active' : ''}
+            onClick={() => goTo(v)}
+            aria-current={view === v ? 'page' : undefined}
+          >
+            <Icon name={icon} size={22} />
+            {label}
+          </button>
+        ))}
+      </nav>
 
       {openDetail && (
         <Detail
@@ -674,6 +754,25 @@ export default function App() {
       )}
 
       {showAbout && <About onClose={() => setShowAbout(false)} />}
+
+      {showLanguage && (
+        <CatalogLanguage
+          current={catalogLang}
+          onApply={applyLanguageChange}
+          onClose={() => setShowLanguage(false)}
+        />
+      )}
+
+      {statusMenu && (
+        <StatusMenu
+          item={statusMenu}
+          isFollowed={suivi.has(keyOf(statusMenu))}
+          status={suivi.get(keyOf(statusMenu))?.status}
+          onPick={handlePickStatus}
+          onRemove={handleRemoveFromSuivi}
+          onClose={() => setStatusMenu(null)}
+        />
+      )}
     </div>
   );
 }

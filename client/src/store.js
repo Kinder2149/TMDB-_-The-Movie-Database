@@ -9,7 +9,8 @@
 // une donnée de suivi appartient toujours à un profil.
 
 import { query, run, runMany } from './db.js';
-import { getSeasons, getEpisodes, getRecommendations } from './tmdb.js';
+import { getSeasons, getEpisodes, getRecommendations, getCardInfo } from './tmdb.js';
+import { TMDB_LANG, getCatalogLanguage } from './lang.js';
 
 // --- Profils ---
 
@@ -52,8 +53,8 @@ export async function addToSuivi(profileId, item) {
   }
   await run(
     `INSERT OR IGNORE INTO suivi
-       (profile_id, tmdb_id, media_type, title, year, release_date, poster_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (profile_id, tmdb_id, media_type, title, year, release_date, poster_url, lang)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       profileId,
       item.id,
@@ -62,6 +63,7 @@ export async function addToSuivi(profileId, item) {
       item.year ?? null,
       item.releaseDate ?? null,
       item.posterUrl ?? null,
+      getCatalogLanguage(),
     ]
   );
 }
@@ -243,6 +245,89 @@ export async function getItemListes(profileId, mediaType, tmdbId) {
     [profileId, tmdbId, mediaType]
   );
   return rows.map((r) => r.listeId);
+}
+
+// --- Langue du catalogue ---
+//
+// Seuls les 4 champs de catalogue enregistrés localement (titre, année, date de
+// sortie, affiche) sont concernés. Statuts, épisodes vus, listes, dates d'ajout
+// et tout ce que l'utilisateur a saisi ne sont jamais touchés : aucune requête
+// de ce bloc n'écrit dans ces colonnes ni dans ces tables.
+
+// Titres dont la fiche n'est pas encore dans la langue demandée. Un titre
+// suivi par plusieurs profils n'est téléchargé qu'une fois.
+function pendingTitles(lang) {
+  return query(
+    `SELECT DISTINCT tmdb_id AS id, media_type AS mediaType
+     FROM suivi WHERE lang IS NULL OR lang <> ?`,
+    [lang]
+  );
+}
+
+export async function countPendingLanguage(lang) {
+  return (await pendingTitles(lang)).length;
+}
+
+// Marque les fiches déjà enregistrées comme étant dans cette langue, sans rien
+// re-télécharger. Sert au tout premier choix : les bases existantes sont en
+// français, choisir « Français » ne doit lancer aucune migration.
+export async function stampLanguage(lang) {
+  await run('UPDATE suivi SET lang = ? WHERE lang IS NULL', [lang]);
+}
+
+// Re-télécharge en une passe toutes les fiches enregistrées dans la nouvelle
+// langue. Reprend là où elle s'est arrêtée : chaque fiche réussie est marquée,
+// donc une coupure réseau ne fait perdre que ce qui n'était pas encore fait.
+export async function migrateCatalogLanguage(lang, onProgress) {
+  const titles = await pendingTitles(lang);
+  const total = titles.length;
+  let done = 0;
+  let failed = 0;
+  onProgress?.({ done, total });
+
+  // Par paquets : on ne veut ni un titre après l'autre (trop lent) ni 300
+  // appels simultanés (TMDB coupe).
+  const BATCH = 5;
+  for (let i = 0; i < titles.length; i += BATCH) {
+    const batch = titles.slice(i, i + BATCH);
+    const infos = await Promise.all(
+      batch.map((t) =>
+        getCardInfo(t.mediaType, t.id, TMDB_LANG[lang])
+          .then((info) => ({ t, info }))
+          .catch(() => ({ t, info: null }))
+      )
+    );
+    for (const { t, info } of infos) {
+      if (!info) {
+        failed += 1; // fiche non marquée : elle sera retentée
+        continue;
+      }
+      // Repli sur la valeur d'origine plutôt qu'un champ vide quand la fiche
+      // n'est pas traduite (COALESCE garde ce qui est déjà enregistré).
+      await run(
+        `UPDATE suivi
+            SET title = COALESCE(?, title),
+                year = COALESCE(?, year),
+                release_date = COALESCE(?, release_date),
+                poster_url = COALESCE(?, poster_url),
+                lang = ?
+          WHERE tmdb_id = ? AND media_type = ?`,
+        [
+          info.title || null,
+          info.year || null,
+          info.releaseDate || null,
+          info.posterUrl || null,
+          lang,
+          t.id,
+          t.mediaType,
+        ]
+      );
+      done += 1;
+    }
+    onProgress?.({ done, total });
+  }
+
+  return { total, done, failed };
 }
 
 // --- Suggestions ---

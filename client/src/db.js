@@ -175,6 +175,7 @@ export function initDb() {
     engine = isWeb ? await createWebEngine() : await createNativeEngine();
     await engine.execute('PRAGMA foreign_keys = ON;');
     await engine.execute(SCHEMA);
+    await migrateSchema();
     await ensureDefaultProfile();
     return engine;
   })();
@@ -198,6 +199,26 @@ export async function runMany(statements) {
   if (statements.length === 0) return;
   await initDb();
   return engine.runMany(statements);
+}
+
+// --- Migrations de schéma ---
+//
+// Les bases déjà installées sur les téléphones ne connaissent pas les colonnes
+// ajoutées après coup. On les ajoute ici, une par une, sans jamais toucher aux
+// données existantes : `ALTER TABLE ... ADD COLUMN` conserve toutes les lignes.
+// Chaque migration est vérifiée avant d'être appliquée, donc rejouable sans
+// risque à chaque démarrage.
+async function migrateSchema() {
+  // Langue dans laquelle la fiche enregistrée a été téléchargée. Vide pour les
+  // bases d'avant ce réglage : elles seront renseignées au premier choix de
+  // langue, sans re-télécharger quoi que ce soit si la langue ne change pas.
+  await addColumnIfMissing('suivi', 'lang', 'TEXT');
+}
+
+async function addColumnIfMissing(table, column, type) {
+  const cols = await engine.query(`PRAGMA table_info(${table})`, []);
+  if (cols.some((c) => c.name === column)) return;
+  await engine.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
 // Garantit qu'au moins un profil existe (base neuve incluse), et renvoie son id.

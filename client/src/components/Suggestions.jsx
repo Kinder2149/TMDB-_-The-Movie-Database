@@ -1,20 +1,23 @@
 import MovieCard from './MovieCard.jsx';
+import Icon from './Icon.jsx';
 
-// Onglet « Suggestions » : recommandations TMDB agrégées depuis les titres
-// marqués vus / en cours du profil.
+// Section « Parce que vous avez aimé… » : recommandations TMDB agrégées depuis
+// les titres marqués vus / en cours du profil. Affichée à l'intérieur de
+// « Ce soir » (embedded), plus d'onglet dédié.
 export default function Suggestions({
   items,
   suggestions,
   suggestionsLoading,
   onRefreshSuggestions,
   cardProps,
+  embedded = false,
 }) {
   const sugFilms = suggestions.filter((i) => i.mediaType === 'movie');
   const sugSeries = suggestions.filter((i) => i.mediaType === 'tv');
   const byKey = new Map(items.map((i) => [`${i.mediaType}-${i.id}`, i]));
 
   const grid = (list) => (
-    <section className="grid">
+    <div className="grid">
       {list.map((item) => {
         const key = `${item.mediaType}-${item.id}`;
         const followed = byKey.get(key);
@@ -28,50 +31,46 @@ export default function Suggestions({
           />
         );
       })}
-    </section>
+    </div>
+  );
+
+  const body = suggestionsLoading ? (
+    <p className="hint">Recherche de suggestions…</p>
+  ) : suggestions.length === 0 ? (
+    <p className="hint">
+      Marque des titres comme vus ou en cours pour recevoir des suggestions.
+    </p>
+  ) : (
+    <>
+      {sugFilms.length > 0 && (
+        <div className="media-section">
+          <h4 className="subhead">Films</h4>
+          {grid(sugFilms)}
+        </div>
+      )}
+      {sugSeries.length > 0 && (
+        <div className="media-section">
+          <h4 className="subhead">Séries</h4>
+          {grid(sugSeries)}
+        </div>
+      )}
+    </>
   );
 
   return (
-    <div className="tonight">
-      <h2 className="tonight__hero">Suggestions pour toi</h2>
-      <p className="tonight__sub">
-        Des idées basées sur ce que tu as déjà vu ou en cours.
-      </p>
-
-      <section className="tonight__section">
-        <h3 className="tonight__title">
-          <button
-            className="btn btn--ghost tonight__refresh"
-            onClick={onRefreshSuggestions}
-            disabled={suggestionsLoading}
-          >
-            ↻ Actualiser
-          </button>
-        </h3>
-        {suggestionsLoading ? (
-          <p className="hint">Recherche de suggestions…</p>
-        ) : suggestions.length === 0 ? (
-          <p className="hint">
-            Marque des titres comme vus ou en cours pour recevoir des
-            suggestions.
-          </p>
-        ) : (
-          <>
-            {sugFilms.length > 0 && (
-              <div className="media-section">
-                <h4 className="subhead">Films</h4>
-                {grid(sugFilms)}
-              </div>
-            )}
-            {sugSeries.length > 0 && (
-              <div className="media-section">
-                <h4 className="subhead">Séries</h4>
-                {grid(sugSeries)}
-              </div>
-            )}
-          </>
-        )}
-      </section>
-    </div>
+    <section className={embedded ? 'tonight__section' : 'tonight'}>
+      <h3 className="tonight__title">
+        Parce que vous avez aimé…
+        <button
+          className="btn btn--ghost tonight__refresh"
+          onClick={onRefreshSuggestions}
+          disabled={suggestionsLoading}
+        >
+          <Icon name="refresh" size={14} />
+          Actualiser
+        </button>
+      </h3>
+      {body}
+    </section>
   );
 }

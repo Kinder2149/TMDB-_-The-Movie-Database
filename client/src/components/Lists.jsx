@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import MovieCard from './MovieCard.jsx';
+import Icon from './Icon.jsx';
 import { STATUSES, isUpcoming } from '../status.js';
 import { getListeItems } from '../api.js';
 
-// Mes listes : barre latérale (statuts + listes perso) + contenu à droite.
+// Mes listes. Les 4 statuts en grille, les listes créées à la main en dessous :
+// avant, tout était mélangé dans une barre latérale pensée pour un écran de PC.
 export default function Lists({
   items,
   listes,
@@ -12,6 +14,7 @@ export default function Lists({
   onToggleFollow,
   onSetStatus,
   onOpenDetail,
+  onLongPress,
 }) {
   const [selected, setSelected] = useState({ type: 'status', value: 'a_voir' });
   const [listItems, setListItems] = useState([]);
@@ -74,6 +77,7 @@ export default function Lists({
           onToggleFollow={onToggleFollow}
           onSetStatus={onSetStatus}
           onOpenDetail={onOpenDetail}
+          onLongPress={onLongPress}
         />
       ))}
     </div>
@@ -87,105 +91,107 @@ export default function Lists({
   }
 
   return (
-    <div className="lists-rail">
-      <aside className="rail">
-        <div className="rail__group">Statuts</div>
-        <ul className="rail__list">
-          {STATUSES.map((s) => (
-            <li
-              key={s.value}
-              className={
-                selected.type === 'status' && selected.value === s.value ? 'active' : ''
-              }
-              onClick={() => setSelected({ type: 'status', value: s.value })}
-            >
-              <span className={`led status--${s.value}`}></span>
-              {s.label}
-              <span className="rail__count">{statusCount(s.value)}</span>
-            </li>
-          ))}
-        </ul>
+    <div className="lists">
+      {/* Où j'en suis : les 4 statuts, avec leur compteur. */}
+      <p className="lists__group">Où j'en suis</p>
+      <div className="lists__statuses">
+        {STATUSES.map((s) => (
+          <button
+            key={s.value}
+            className={`statbtn status--${s.value} ${
+              selected.type === 'status' && selected.value === s.value ? 'on' : ''
+            }`}
+            onClick={() => setSelected({ type: 'status', value: s.value })}
+          >
+            <span className="statbtn__led"></span>
+            {s.label}
+            <b>{statusCount(s.value)}</b>
+          </button>
+        ))}
+      </div>
 
-        <div className="rail__group">Mes listes</div>
-        <ul className="rail__list">
-          {listes.length === 0 && <li className="rail__empty">Aucune liste</li>}
-          {listes.map((l) => (
-            <li
-              key={l.id}
-              className={
-                selected.type === 'liste' && selected.value === l.id ? 'active' : ''
-              }
-              onClick={() => setSelected({ type: 'liste', value: l.id })}
-            >
-              🎬 {l.name}
-              <span className="rail__count">{l.count}</span>
-            </li>
-          ))}
-        </ul>
-        <button className="rail__add" onClick={handleNewListe}>
-          + Nouvelle liste
+      {/* Listes créées à la main. */}
+      <p className="lists__group">Mes listes</p>
+      <div className="lists__chips">
+        {listes.length === 0 && <span className="hint">Aucune liste pour l'instant.</span>}
+        {listes.map((l) => (
+          <button
+            key={l.id}
+            className={`chip ${
+              selected.type === 'liste' && selected.value === l.id ? 'on' : ''
+            }`}
+            onClick={() => setSelected({ type: 'liste', value: l.id })}
+          >
+            {l.name} <b className="chip__count">{l.count}</b>
+          </button>
+        ))}
+        <button className="chip chip--new" onClick={handleNewListe}>
+          <Icon name="plus" size={14} />
+          Nouvelle
         </button>
-      </aside>
+      </div>
 
-      <div className="lists-main">
-        <div className="lists-main__head">
-          <h2 className="lists__title">
-            {title} <span className="lists__count">{filteredItems.length}</span>
-          </h2>
-          <div className="media-filter">
-            {[
-              { value: 'all', label: 'Tout' },
-              { value: 'movie', label: 'Films' },
-              { value: 'tv', label: 'Séries' },
-            ].map((f) => (
-              <button
-                key={f.value}
-                className={`media-filter__btn ${mediaFilter === f.value ? 'active' : ''}`}
-                onClick={() => setMediaFilter(f.value)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          {selectedListe && (
-            <button
-              className="btn btn--ghost"
-              onClick={() => {
-                if (window.confirm(`Supprimer la liste « ${selectedListe.name} » ?`)) {
-                  onDeleteListe(selectedListe.id);
-                }
-              }}
-            >
-              Supprimer la liste
-            </button>
-          )}
-        </div>
+      <div className="seg">
+        {[
+          { value: 'all', label: 'Tout' },
+          { value: 'movie', label: 'Films' },
+          { value: 'tv', label: 'Séries' },
+        ].map((f) => (
+          <button
+            key={f.value}
+            className={mediaFilter === f.value ? 'on' : ''}
+            onClick={() => setMediaFilter(f.value)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-        {loadingItems ? (
-          <p className="hint">Chargement…</p>
-        ) : filteredItems.length === 0 ? (
-          <p className="hint">{mainItems.length === 0 ? 'Liste vide.' : 'Aucun résultat pour ce filtre.'}</p>
-        ) : (
-          <>
-            {films.length > 0 && (
-              <section className="media-section">
-                <h3 className="subhead">
-                  Films <span className="subhead__count">{films.length}</span>
-                </h3>
-                {renderGrid(films)}
-              </section>
-            )}
-            {series.length > 0 && (
-              <section className="media-section">
-                <h3 className="subhead">
-                  Séries <span className="subhead__count">{series.length}</span>
-                </h3>
-                {renderGrid(series)}
-              </section>
-            )}
-          </>
+      <div className="sechead">
+        <h3>{title}</h3>
+        <span className="sechead__count">{filteredItems.length}</span>
+        {selectedListe && (
+          <button
+            className="lists__delete"
+            onClick={() => {
+              if (window.confirm(`Supprimer la liste « ${selectedListe.name} » ?`)) {
+                onDeleteListe(selectedListe.id);
+              }
+            }}
+          >
+            Supprimer
+          </button>
         )}
       </div>
+
+      {loadingItems ? (
+        <p className="hint">Chargement…</p>
+      ) : filteredItems.length === 0 ? (
+        <p className="hint">
+          {mainItems.length === 0
+              ? 'Rien ici pour le moment.'
+              : 'Aucun résultat pour ce filtre.'}
+        </p>
+      ) : (
+        <>
+          {films.length > 0 && (
+            <section className="media-section">
+              <h4 className="subhead">
+                Films <span className="subhead__count">{films.length}</span>
+              </h4>
+              {renderGrid(films)}
+            </section>
+          )}
+          {series.length > 0 && (
+            <section className="media-section">
+              <h4 className="subhead">
+                Séries <span className="subhead__count">{series.length}</span>
+              </h4>
+              {renderGrid(series)}
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }

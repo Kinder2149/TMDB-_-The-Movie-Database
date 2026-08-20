@@ -20,30 +20,39 @@
   --vu:       #2E9E6B;
   --abandon:  #8B8F98;
   --danger:   #C0453B;
+  --faint:    #6F695C;
+  --gold-strong: #8A5F14;
   --shadow:   0 10px 30px rgba(40, 32, 10, .10);
+  color-scheme: light;
   --radius:   14px;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground:#0F1018; --surface:#191B25; --surface2:#22242F; --border:#2C2F3C;
-    --text:#ECEAE4; --muted:#99A0AE; --gold:#E9B44C; --gold-soft:#3A3320;
+    --ground:#0A0B11; --surface:#13151E; --surface2:#1C1F2A; --border:#292D3A;
+    --text:#EDEBE5; --muted:#959CAB; --faint:#7B8394; --gold-strong:#E9B44C;
+    --gold:#E9B44C; --gold-soft:#3A3320;
     --avoir:#5B8DEF; --encours:#B57BEE; --vu:#46C68C; --abandon:#7C8496;
-    --danger:#E86A5E; --shadow:0 14px 40px rgba(0,0,0,.45);
+    --danger:#E86A5E; --shadow:0 14px 40px rgba(0,0,0,.55);
+    color-scheme: dark;
   }
 }
 :root[data-theme="light"] {
   --ground:#F4F1EA; --surface:#FFFFFF; --surface2:#ECE7DC; --border:#E0D8C8;
-  --text:#221F19; --muted:#6C6557; --gold:#A9761F; --gold-soft:#F0E6CF;
+  --text:#221F19; --muted:#6C6557; --faint:#6F695C; --gold-strong:#8A5F14;
+  --gold:#A9761F; --gold-soft:#F0E6CF;
   --avoir:#3E6FD0; --encours:#8B54D6; --vu:#2E9E6B; --abandon:#8B8F98;
   --danger:#C0453B; --shadow:0 10px 30px rgba(40,32,10,.10);
+  color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --ground:#0F1018; --surface:#191B25; --surface2:#22242F; --border:#2C2F3C;
-  --text:#ECEAE4; --muted:#99A0AE; --gold:#E9B44C; --gold-soft:#3A3320;
+  --ground:#0A0B11; --surface:#13151E; --surface2:#1C1F2A; --border:#292D3A;
+  --text:#EDEBE5; --muted:#959CAB; --faint:#7B8394; --gold-strong:#E9B44C;
+  --gold:#E9B44C; --gold-soft:#3A3320;
   --avoir:#5B8DEF; --encours:#B57BEE; --vu:#46C68C; --abandon:#7C8496;
-  --danger:#E86A5E; --shadow:0 14px 40px rgba(0,0,0,.45);
+  --danger:#E86A5E; --shadow:0 14px 40px rgba(0,0,0,.55);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -53,52 +62,64 @@ body {
   color: var(--text);
   font-family: var(--sans);
   line-height: 1.5;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
+h1, h2, h3 { text-wrap: balance; }
 button { font-family: inherit; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 .app { min-height: 100vh; }
 
-/* ---------- Barre d'application ---------- */
+/* ---------- Barre d'application (fine : nom + profil) ----------
+   Toute la plomberie (profils, thème, sauvegarde, à propos) vit désormais
+   dans l'onglet « Réglages » : elle ne servait qu'occasionnellement et
+   occupait le quart de l'écran sur téléphone. */
 .appbar {
   position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
-  padding: .7rem 1.2rem;
+  display: flex; align-items: center; gap: .55rem;
+  padding: .45rem 1rem; min-height: 48px;
+  padding-top: calc(.45rem + env(safe-area-inset-top));
   background: color-mix(in srgb, var(--surface) 92%, var(--gold) 8%);
   border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: .55rem; }
 .brand__dot {
-  width: 22px; height: 22px; border-radius: 6px;
-  background: radial-gradient(circle at 35% 30%, var(--gold), color-mix(in srgb, var(--gold) 55%, #000));
-  box-shadow: 0 0 0 3px var(--gold-soft);
+  width: 20px; height: 20px; border-radius: 6px; flex: 0 0 auto;
+  background: radial-gradient(circle at 35% 28%, var(--gold), color-mix(in srgb, var(--gold) 55%, #000));
 }
-.brand__name { font-family: var(--serif); font-size: 1.15rem; font-weight: 700; }
+.brand__name { font-family: var(--serif); font-size: 1.08rem; font-weight: 700; }
+.appbar__profile {
+  margin-left: auto; width: 32px; height: 32px; border-radius: 50%; border: 0;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--gold); color: #20180A; font-size: .82rem; font-weight: 700;
+}
 
-.nav { display: flex; gap: .3rem; }
-.nav button {
-  padding: .4rem .8rem; border: 0; border-radius: 8px; cursor: pointer;
-  background: transparent; color: var(--muted); font-size: .92rem;
+/* ---------- Navigation basse ----------
+   À portée du pouce, comme toute application Android. */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: .3rem .2rem calc(.5rem + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--surface) 90%, var(--gold) 10%);
+  border-top: 1px solid var(--border);
 }
-.nav button:hover { color: var(--text); }
-.nav button.is-active { color: var(--text); background: var(--surface2); font-weight: 600; }
+.tabbar button {
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
+  min-height: 50px; padding: .35rem 0; border: 0; cursor: pointer;
+  background: transparent; color: var(--muted); font-size: .68rem;
+}
+.tabbar button.is-active { color: var(--gold-strong); }
+.tabbar button.is-active .icon { stroke-width: 2.1; }
+.icon { flex: 0 0 auto; }
 
-.appbar__right { margin-left: auto; display: flex; align-items: center; gap: .8rem; }
-.theme-toggle {
-  width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface);
-  color: var(--text); font-size: 1rem; line-height: 1;
-}
-.theme-toggle:hover { border-color: var(--gold); }
-
-/* Sélecteur de profil */
-.profile-selector { display: flex; align-items: center; gap: .45rem; }
-.profile-selector__label {
-  font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
-}
+/* Sélecteur de profil (dans Réglages) */
+.profile-selector { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; }
+.profile-selector__label { display: none; }
 .profile-selector__select {
   padding: .4rem .6rem; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text); font-size: .88rem; cursor: pointer;
+  background: var(--surface2); color: var(--text); font-size: .88rem; cursor: pointer;
 }
 .profile-selector__rename {
   padding: .4rem .7rem; border-radius: 8px; border: 1px solid var(--border);
@@ -107,17 +128,45 @@ button { font-family: inherit; }
 .profile-selector__rename:hover:not(:disabled) { color: var(--text); border-color: var(--gold); }
 .profile-selector__rename:disabled { opacity: .5; cursor: default; }
 
+/* ---------- Écran Réglages ---------- */
+.settings__title { font-family: var(--serif); font-size: 1.35rem; margin: .3rem 0 1rem; }
+.settings__group {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--muted); margin: 1.3rem 0 .55rem;
+}
+.settings__card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.settings__line {
+  display: flex; align-items: center; gap: .75rem; width: 100%;
+  padding: .8rem .9rem; min-height: 52px; font-size: .92rem;
+  border: 0; border-bottom: 1px solid var(--border);
+  background: transparent; color: var(--text); text-align: left; font-family: inherit;
+}
+.settings__line:last-child { border-bottom: 0; }
+.settings__line--btn { cursor: pointer; }
+.settings__line--btn:hover { background: var(--surface2); }
+.settings__ico { color: var(--muted); }
+.settings__value {
+  margin-left: auto; display: flex; align-items: center; gap: .4rem;
+  color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Contenu ---------- */
-.content { max-width: 1100px; margin: 0 auto; padding: 1.4rem 1.2rem 4rem; }
+.content {
+  max-width: 1100px; margin: 0 auto;
+  padding: 1.2rem 1rem calc(6rem + env(safe-area-inset-bottom));
+}
 
 /* ---------- Barre de recherche ---------- */
 .search-bar {
-  display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem;
-  padding: 0 .95rem; border: 1px solid var(--border); border-radius: 10px;
+  display: flex; align-items: center; gap: .55rem; margin-bottom: .65rem;
+  padding: 0 .85rem; border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface);
 }
 .search-bar:focus-within { border-color: var(--gold); }
-.search-bar__icon { color: var(--muted); font-size: .95rem; }
+.search-bar__icon { color: var(--muted); font-size: 1rem; line-height: 1; }
 .search-bar input {
   flex: 1; min-width: 0; padding: .75rem 0; border: 0;
   background: transparent; color: var(--text); font-size: 1rem;
@@ -125,21 +174,36 @@ button { font-family: inherit; }
 .search-bar input:focus { outline: none; }
 .search-bar input::placeholder { color: var(--muted); }
 
-/* Puce générique (filtres, modes de recherche) */
+/* Puce générique (sélecteur de genres) */
 .chip {
-  padding: .3rem .75rem; border-radius: 999px; cursor: pointer; font-size: .85rem;
-  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  padding: .4rem .8rem; border-radius: 999px; cursor: pointer; font-size: .85rem;
+  min-height: 38px; border: 1px solid var(--border); background: transparent; color: var(--muted);
 }
 .chip.on {
   color: var(--text); border-color: var(--gold);
   background: color-mix(in srgb, var(--gold) 14%, transparent); font-weight: 600;
 }
 .chip--disabled { opacity: .35; cursor: not-allowed; }
-.filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
 
-/* Sélecteur de mode de recherche */
-.searchmodes { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-bottom: .7rem; }
-.searchmodes__label { font-size: .8rem; color: var(--muted); margin-right: .2rem; }
+/* Sélecteur segmenté : modes de recherche (titre / acteur / genre) et
+   filtre Tout / Films / Séries. Une seule rangée compacte au lieu d'une
+   ligne de puces précédée d'une étiquette. */
+.seg {
+  display: flex; gap: .25rem; margin: 0 0 1.2rem; padding: .22rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+}
+.seg button {
+  flex: 1; min-height: 38px; padding: .4rem 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--muted); font-size: .85rem; cursor: pointer;
+}
+.seg button.on {
+  background: color-mix(in srgb, var(--gold) 17%, transparent);
+  color: var(--gold); font-weight: 600;
+}
+
+/* En-tête de section */
+.sechead { display: flex; align-items: baseline; gap: .5rem; margin: 0 0 .8rem; }
+.sechead h3 { font-family: var(--serif); font-size: 1.02rem; font-weight: 700; margin: 0; }
 
 /* Sélecteur de genres */
 .genre-picker { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.2rem; }
@@ -148,8 +212,16 @@ button { font-family: inherit; }
 .voirplus { display: flex; justify-content: center; margin: 1.4rem 0; }
 
 /* Bouton « Actualiser » à côté du titre Suggestions */
-.tonight__refresh { margin-left: auto; font-size: .8rem; padding: .35rem .7rem; }
+.tonight__refresh {
+  margin-left: auto; font-size: .8rem; padding: .35rem .7rem; min-height: 38px;
+  display: inline-flex; align-items: center; gap: .35rem;
+}
 .tonight__refresh:disabled { opacity: .5; cursor: default; }
+
+/* Sous-onglets de « Ce soir ». Les deux volets restent montés : celui qui
+   n'est pas affiché est simplement masqué, ce qui préserve son défilement. */
+.subtabs { margin-bottom: 1rem; }
+.pane--hidden { display: none; }
 
 /* En-tête acteur */
 .actor-head { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.2rem; }
@@ -159,10 +231,14 @@ button { font-family: inherit; }
 .hint { color: var(--muted); }
 .error { color: var(--danger); }
 
-/* ---------- Grille & cartes ---------- */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1.1rem; }
+/* ---------- Grille & cartes ----------
+   3 colonnes sur téléphone : on voit 9 titres par écran au lieu de 2. */
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem .6rem; }
+@media (min-width: 560px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1.2rem 1rem; }
+}
 
-/* Sous-sections Films / Séries (Mes listes, suggestions « Ce soir »). */
+/* Sous-sections Films / Séries (Mes listes, sections de « Ce soir »). */
 .media-section { margin-bottom: 1.6rem; }
 .subhead {
   font-family: var(--serif); font-size: .95rem; color: var(--muted);
@@ -170,55 +246,56 @@ button { font-family: inherit; }
   text-transform: uppercase; letter-spacing: .06em;
 }
 .subhead__count { color: var(--gold); font-weight: 700; }
-.card {
-  display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden;
+
+.card { display: flex; flex-direction: column; }
+.card__poster { position: relative; }
+.card__open {
+  display: block; width: 100%; padding: 0; border: 0; cursor: pointer;
+  background: transparent; position: relative; border-radius: 10px; overflow: hidden;
 }
 .card img, .card__no-poster {
   width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block;
+  border: 1px solid var(--border); border-radius: 10px;
 }
 .card__no-poster {
   display: flex; align-items: center; justify-content: center;
-  background: var(--surface2); color: var(--muted); font-size: .85rem;
-}
-.card__open {
-  display: block; width: 100%; padding: 0; border: 0; cursor: pointer;
-  background: transparent;
+  background: var(--surface2); color: var(--muted); font-size: .8rem; text-align: center;
 }
 .card__open img, .card__open .card__no-poster { transition: opacity .15s ease; }
 .card__open:hover img, .card__open:hover .card__no-poster { opacity: .85; }
-.card__body { padding: .7rem .75rem; display: flex; flex-direction: column; flex: 1; }
-.card__title { font-family: var(--serif); font-size: 1rem; margin: 0 0 .3rem; line-height: 1.25; }
-.card__meta { font-size: .8rem; color: var(--muted); margin: 0 0 .7rem; }
-.card__type { text-transform: capitalize; }
-.why { font-size: .74rem; color: var(--muted); margin: 0 0 .5rem; }
+
+/* Liseré de statut au pied de l'affiche : lisible d'un coup d'œil, sans
+   occuper de place ni demander de légende. */
+.card__stripe {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+  background: var(--sc); border-radius: 0 0 10px 10px;
+}
+
+/* Pastille « suivre » posée sur l'affiche. Pleine dorée une fois le titre suivi. */
+.card__add {
+  position: absolute; top: .3rem; right: .3rem;
+  width: 32px; height: 32px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; color: var(--gold);
+  background: color-mix(in srgb, #05060A 72%, transparent);
+  backdrop-filter: blur(5px);
+}
+.card__add.is-followed { background: var(--gold); color: #20180A; }
+/* La pastille reste petite pour ne pas manger l'affiche, mais sa zone de
+   toucher, elle, fait bien 44 px. */
+.card__add::after, .appbar__profile::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
+.appbar__profile { position: relative; }
+
+.card__title {
+  font-family: var(--serif); font-size: .82rem; font-weight: 600;
+  margin: .4rem 0 .1rem; line-height: 1.2;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card__meta { font-size: .72rem; color: var(--faint); margin: 0; }
+.why { font-size: .68rem; color: var(--faint); margin: .25rem 0 0; }
 .why b { color: var(--text); font-weight: 600; }
-
-/* Boutons de carte — codes couleur cohérents avec les statuts */
-.card__watched, .card__episodes, .card__follow {
-  width: 100%; padding: .5rem; border-radius: 8px; cursor: pointer;
-  font-size: .85rem; border: 1px solid var(--border); background: transparent;
-}
-.card__watched { margin-bottom: .4rem; color: var(--muted); }
-.card__watched:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
-.card__watched.is-watched {
-  border-color: var(--vu); background: color-mix(in srgb, var(--vu) 15%, transparent);
-  color: var(--vu); font-weight: 600;
-}
-.card__episodes { margin-bottom: .4rem; border-color: var(--encours); color: var(--encours); }
-.card__episodes:hover { background: color-mix(in srgb, var(--encours) 14%, transparent); }
-
-.card__follow { margin-top: auto; border-color: var(--gold); color: var(--gold); }
-.card__follow:hover { background: color-mix(in srgb, var(--gold) 14%, transparent); }
-.card__follow.is-followed {
-  border-color: var(--border); color: var(--muted);
-  background: var(--surface2); font-weight: 600;
-}
-.card__follow.is-followed:hover {
-  border-color: var(--danger); color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
 
 /* ---------- Page « Ce soir » ---------- */
 .tonight__hero { font-family: var(--serif); font-size: 1.7rem; margin: .3rem 0 .2rem; }
@@ -248,7 +325,10 @@ button { font-family: inherit; }
 .resume__info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .resume__title { font-family: var(--serif); font-weight: 700; }
 .resume__next { font-size: .82rem; color: var(--muted); margin: .2rem 0 .6rem; }
-.resume__btn { margin-top: auto; align-self: flex-start; }
+.resume__btn {
+  margin-top: auto; align-self: flex-start;
+  display: inline-flex; align-items: center; gap: .35rem;
+}
 
 /* ---------- Statuts (couleur portée par --sc) ---------- */
 .status--a_voir   { --sc: var(--avoir); }
@@ -256,78 +336,42 @@ button { font-family: inherit; }
 .status--vu       { --sc: var(--vu); }
 .status--abandonne{ --sc: var(--abandon); }
 
-/* Sélecteur de statut d'un film (sur la carte) */
-.card__status {
-  width: 100%; margin-bottom: .4rem; padding: .45rem .5rem;
-  border-radius: 8px; cursor: pointer; font-size: .82rem; font-weight: 600;
-  border: 1px solid var(--sc); color: var(--sc);
-  background: color-mix(in srgb, var(--sc) 12%, var(--surface));
+/* ---------- Mes listes ---------- */
+.lists__group {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--muted); margin: .3rem 0 .55rem;
+}
+.lists__statuses { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; margin-bottom: .4rem; }
+.statbtn {
+  display: flex; align-items: center; gap: .5rem; min-height: 46px;
+  padding: .6rem .7rem; border-radius: 12px; cursor: pointer; text-align: left;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font-size: .84rem;
+}
+.statbtn__led { width: 8px; height: 8px; border-radius: 50%; background: var(--sc); flex: 0 0 auto; }
+.statbtn b { margin-left: auto; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.statbtn.on {
+  border-color: var(--sc); color: var(--text); font-weight: 600;
+  background: color-mix(in srgb, var(--sc) 13%, var(--surface));
 }
 
-/* Pastille de statut (séries sur la carte, et fiche) */
-.status-badge {
-  display: inline-flex; align-items: center; padding: .28rem .65rem;
-  border-radius: 999px; font-size: .78rem; font-weight: 600;
-  border: 1px solid var(--sc); color: var(--sc);
-  background: color-mix(in srgb, var(--sc) 14%, transparent);
-}
-.card .status-badge { align-self: flex-start; margin-bottom: .4rem; }
+.lists__chips { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: 1.1rem; }
+.lists__chips .chip { display: inline-flex; align-items: center; gap: .4rem; }
+.chip__count { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip--new { color: var(--gold-strong); border-style: dashed; }
 
-/* Contrôle de statut dans la fiche */
-.status-control { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .7rem; }
-.status-picker { display: flex; gap: .4rem; flex-wrap: wrap; }
-.status-chip {
-  padding: .35rem .7rem; border-radius: 999px; cursor: pointer; font-size: .82rem;
-  border: 1px solid var(--border); background: transparent; color: var(--muted);
+.sechead__count { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.lists__delete {
+  margin-left: auto; padding: .35rem .7rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: .78rem;
 }
-.status-chip.on {
-  border-color: var(--sc); color: var(--sc); font-weight: 600;
-  background: color-mix(in srgb, var(--sc) 14%, transparent);
-}
-
-/* ---------- Mes listes (barre latérale + contenu) ---------- */
-.lists-rail { display: grid; grid-template-columns: 220px 1fr; gap: 0; }
-.rail { border-right: 1px solid var(--border); padding: 1rem 1.1rem 1rem 0; }
-.rail__group {
-  font-size: .72rem; text-transform: uppercase; letter-spacing: .12em;
-  color: var(--muted); margin: .4rem 0 .5rem;
-}
-.rail__list { list-style: none; margin: 0 0 1.1rem; padding: 0; display: flex; flex-direction: column; gap: .1rem; }
-.rail__list li {
-  display: flex; align-items: center; gap: .55rem;
-  padding: .45rem .55rem; border-radius: 8px; font-size: .9rem; cursor: pointer;
-}
-.rail__list li:hover { background: var(--surface2); }
-.rail__list li.active { background: var(--surface2); font-weight: 600; }
-.rail__list li .led {
-  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-  background: var(--sc, var(--muted));
-}
-.rail__count { margin-left: auto; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
-.rail__empty { color: var(--muted); font-size: .82rem; cursor: default; }
-.rail__empty:hover { background: transparent; }
-.rail__add {
-  padding: .4rem .55rem; border: 0; background: transparent;
-  color: var(--gold); font-size: .85rem; font-weight: 600; cursor: pointer;
-}
-
-.lists-main { padding: .2rem 0 0 1.3rem; }
-.lists-main__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.lists__title { font-family: var(--serif); font-size: 1.3rem; margin: .3rem 0 .9rem; }
-.lists__count { color: var(--muted); font-size: .9rem; font-weight: 400; }
-
-.media-filter { display: flex; gap: .35rem; margin-left: auto; }
-.media-filter__btn {
-  padding: .35rem .8rem; border-radius: 999px; cursor: pointer; font-size: .82rem;
-  border: 1px solid var(--border); background: transparent; color: var(--muted);
-}
-.media-filter__btn:hover { border-color: var(--gold); color: var(--text); }
-.media-filter__btn.active { background: var(--gold); border-color: var(--gold); color: #16140b; font-weight: 600; }
+.lists__delete:hover { border-color: var(--danger); color: var(--danger); }
 
 /* Puces de liste dans la fiche */
 .liste-toggles { display: flex; flex-wrap: wrap; gap: .4rem; }
 .chip-toggle {
-  padding: .35rem .7rem; border-radius: 999px; cursor: pointer; font-size: .82rem;
+  display: inline-flex; align-items: center; gap: .35rem; min-height: 38px;
+  padding: .4rem .75rem; border-radius: 999px; cursor: pointer; font-size: .82rem;
   border: 1px solid var(--border); background: transparent; color: var(--muted);
 }
 .chip-toggle.on {
@@ -336,39 +380,103 @@ button { font-family: inherit; }
 }
 .chip-toggle--new { color: var(--gold); border-style: dashed; }
 
-@media (max-width: 640px) {
-  .lists-rail { grid-template-columns: 1fr; }
-  .rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 1rem 0; }
-  .lists-main { padding: 1rem 0 0; }
-}
-
 /* ---------- Fiche série (fenêtre modale) ---------- */
+/* Sur telephone la fiche prend tout l'ecran : une fenetre flottante avec des
+   marges gaspillait la place et donnait un air de site web. */
 .overlay {
   position: fixed; inset: 0; z-index: 10;
-  background: rgba(0, 0, 0, .6);
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: 2rem 1rem; overflow-y: auto;
+  background: var(--ground);
+  display: flex; justify-content: center; overflow-y: auto;
 }
 .sheet {
-  width: 100%; max-width: 640px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
+  width: 100%; max-width: 640px; min-height: 100%;
+  background: var(--surface);
 }
 .sheet__head {
   position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: .4rem;
+  padding: .45rem .6rem; min-height: 52px;
+  padding-top: calc(.45rem + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.sheet__head h2 {
+  font-family: var(--serif); font-size: 1.05rem; margin: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sheet__back {
+  width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: transparent; color: var(--text);
+}
+.sheet__back:hover { background: var(--surface2); }
+
+@media (min-width: 700px) {
+  .overlay { background: rgba(0,0,0,.6); padding: 2rem 1rem; align-items: flex-start; }
+  .sheet {
+    min-height: 0; border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .sheet__head { border-radius: var(--radius) var(--radius) 0 0; }
+}
+
+/* ---------- Menu des statuts (appui long sur une affiche) ---------- */
+/* Feuille qui monte du bas : le pouce y accede sans lacher le telephone. */
+.overlay--bottom {
+  background: rgba(0,0,0,.55); align-items: flex-end; overflow: hidden;
+}
+.menu {
+  width: 100%; max-width: 640px; margin: 0 auto;
+  background: var(--surface); border-top: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: .5rem .5rem calc(.7rem + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow);
+}
+.menu__title {
+  margin: .4rem .6rem .6rem; font-family: var(--serif); font-size: .95rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.menu__line {
+  display: flex; align-items: center; gap: .7rem; width: 100%;
+  min-height: 50px; padding: 0 .6rem; border: 0; border-radius: 10px;
+  background: transparent; color: var(--text); font-size: .95rem;
+  text-align: left; cursor: pointer;
+}
+.menu__line:hover:not(:disabled) { background: var(--surface2); }
+.menu__line:disabled { opacity: .4; cursor: default; }
+.menu__line.is-current { color: var(--gold); font-weight: 600; }
+.menu__line.is-current .icon { margin-left: auto; }
+.menu__line--danger { color: var(--abandon); border-top: 1px solid var(--border); border-radius: 0; margin-top: .3rem; }
+.menu__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--sc, var(--muted)); flex: 0 0 auto; }
+
+/* ---------- Langue du catalogue ---------- */
+.welcome {
+  min-height: 100vh; max-width: 460px; margin: 0 auto;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 2rem 1.2rem calc(2rem + env(safe-area-inset-bottom));
+}
+.welcome__title { font-family: var(--serif); font-size: 1.9rem; margin: 0 0 .4rem; }
+.welcome__sub { color: var(--muted); margin: 0 0 1.4rem; }
+.lang__note { color: var(--muted); font-size: .85rem; margin: 0 0 1rem; }
+.lang__choices { display: flex; flex-direction: column; gap: .5rem; }
+.lang__choice {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 1rem 1.2rem; border-bottom: 1px solid var(--border);
-  background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+  min-height: 54px; padding: 0 1rem; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); color: var(--text); font-size: 1rem;
 }
-.sheet__head h2 { font-family: var(--serif); font-size: 1.3rem; margin: 0; }
-.sheet__close {
-  border: 0; background: transparent; color: var(--muted);
-  font-size: 1.8rem; line-height: 1; cursor: pointer;
+.lang__choice:hover:not(:disabled) { border-color: var(--gold); }
+.lang__choice.is-current { border-color: var(--gold); color: var(--gold); font-weight: 600; }
+.lang__choice:disabled { opacity: .5; cursor: default; }
+.lang__progress { margin-top: 1.2rem; }
+.bar {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--surface2); margin: .5rem 0;
 }
-.sheet__close:hover { color: var(--text); }
+.bar__fill { height: 100%; background: var(--gold); transition: width .2s ease; }
+.lang__retry { display: flex; gap: .6rem; margin-top: 1rem; }
 
 /* Blocs de section dans la fiche */
-.section { padding: 1.1rem 1.2rem; border-top: 1px solid var(--border); }
+.section { padding: 1.1rem 1rem; border-top: 1px solid var(--border); }
 .section h4 {
   margin: 0 0 .8rem; font-size: .78rem; text-transform: uppercase;
   letter-spacing: .12em; color: var(--muted);
@@ -380,36 +488,62 @@ button { font-family: inherit; }
   border-bottom: 1px solid var(--border);
 }
 .detail-hero__scrim {
-  display: flex; gap: 1.1rem; padding: 1.2rem;
+  display: flex; gap: .9rem; padding: 1.1rem 1rem;
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--surface) 55%, transparent),
     var(--surface));
 }
 .detail-hero__poster {
-  width: 110px; aspect-ratio: 2/3; border-radius: 10px; flex-shrink: 0;
-  object-fit: cover; box-shadow: 0 8px 22px rgba(0,0,0,.35);
+  width: 92px; aspect-ratio: 2/3; border-radius: 10px; flex-shrink: 0;
+  object-fit: cover; box-shadow: 0 10px 26px rgba(0,0,0,.55);
   border: 1px solid rgba(255,255,255,.12);
 }
-.detail-hero__info { display: flex; flex-direction: column; min-width: 0; }
-.detail-hero__sub { color: var(--muted); font-size: .9rem; margin-bottom: .5rem; }
+.detail-hero__info {
+  display: flex; flex-direction: column; justify-content: flex-end; min-width: 0;
+}
+.detail-hero__title {
+  font-family: var(--serif); font-size: 1.3rem; font-weight: 700;
+  margin: 0 0 .2rem; line-height: 1.15; text-wrap: balance;
+}
+.detail-hero__sub { color: var(--faint); font-size: .82rem; }
 .genres { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .8rem; }
 .genres span {
   font-size: .74rem; padding: .2rem .55rem; border-radius: 999px;
   border: 1px solid var(--border); color: var(--muted); background: var(--surface);
 }
-.detail-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: auto; }
 .btn {
-  padding: .5rem .9rem; border-radius: 9px; cursor: pointer;
-  font-size: .85rem; font-weight: 600; border: 1px solid var(--border);
+  padding: .55rem .9rem; border-radius: 10px; cursor: pointer; min-height: 44px;
+  font-size: .88rem; font-weight: 600; border: 1px solid var(--border);
   background: var(--surface2); color: var(--text);
 }
+/* Action principale de la fiche : pleine largeur, sous le pouce. */
+.btn--wide {
+  display: flex; align-items: center; justify-content: center; gap: .45rem;
+  width: 100%; margin-bottom: .8rem; text-decoration: none;
+}
+
+/* Choix du statut : les 4 d'un coup, un geste suffit. */
+.statuspick {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: .35rem; margin-bottom: 1rem;
+}
+.statuspick__btn {
+  min-height: 44px; padding: .5rem .2rem; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--muted); font-size: .74rem;
+}
+.statuspick__btn.on {
+  border-color: var(--sc); color: var(--sc); font-weight: 700;
+  background: color-mix(in srgb, var(--sc) 14%, var(--surface));
+}
+.statuspick__btn:disabled { opacity: .45; cursor: default; }
+.statuspick__btn.on:disabled { opacity: 1; }
 .btn--primary { background: var(--gold); border-color: var(--gold); color: #231A06; }
 .btn--ghost { background: var(--surface); color: var(--text); }
 .btn--ghost:hover { border-color: var(--gold); }
-.btn--vu { background: color-mix(in srgb, var(--vu) 15%, transparent); border-color: var(--vu); color: var(--vu); }
 
 .synopsis { font-size: .92rem; max-width: 62ch; margin: 0; }
-.detail-pad { padding: 0 1.2rem; }
+.detail-pad { padding: 1rem 1rem 0; }
 
 /* Où le voir (streaming) */
 .prov-group { margin-bottom: .8rem; }
@@ -425,11 +559,17 @@ button { font-family: inherit; }
   font-size: .82rem; font-weight: 600;
 }
 .prov__logo { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
-.attn { color: var(--muted); font-size: .72rem; margin: .3rem 0 0; }
+.attn { color: var(--faint); font-size: .72rem; margin: .3rem 0 0; }
 
 /* Acteurs */
-.cast { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: .9rem; }
-.actor { text-align: center; }
+/* Distribution : defilement horizontal plutot que trois rangees de visages
+   empilees sur un ecran de telephone. */
+.cast {
+  display: flex; gap: .9rem; overflow-x: auto;
+  margin: 0 -1rem; padding: 0 1rem .3rem; scrollbar-width: none;
+}
+.cast::-webkit-scrollbar { display: none; }
+.actor { text-align: center; width: 64px; flex: 0 0 64px; }
 .actor__ph {
   width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
   margin: 0 auto .4rem; display: block;
@@ -439,10 +579,10 @@ button { font-family: inherit; }
   background: var(--surface2); color: var(--muted); font-weight: 700;
 }
 .actor__n { font-size: .78rem; font-weight: 600; display: block; }
-.actor__r { font-size: .72rem; color: var(--muted); }
+.actor__r { font-size: .72rem; color: var(--faint); }
 
 /* Progression */
-.progress { padding: .95rem 1.2rem; border-bottom: 1px solid var(--border); }
+.progress { padding: .95rem 1rem; border-top: 1px solid var(--border); }
 .progress__bar { height: 8px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
 .progress__fill { height: 100%; background: var(--vu); transition: width .25s ease; }
 .progress__text {
@@ -453,38 +593,37 @@ button { font-family: inherit; }
 .progress span > b, .progress .progress__text b { color: var(--encours); }
 
 /* Saisons & épisodes */
-.season-list { list-style: none; margin: 0; padding: .6rem 1rem 1.2rem; }
+.season-list { list-style: none; margin: 0; padding: .2rem 1rem 2rem; }
 .season { border-bottom: 1px solid var(--border); }
 .season__head {
   width: 100%; display: flex; justify-content: space-between; align-items: center;
-  padding: .9rem .2rem; border: 0; background: transparent;
-  color: var(--text); font-size: 1rem; cursor: pointer;
+  padding: .9rem .2rem; min-height: 48px; border: 0; background: transparent;
+  color: var(--text); font-size: .95rem; cursor: pointer;
 }
-.season__count { color: var(--muted); font-size: .85rem; }
+.season__count { color: var(--faint); font-size: .85rem; font-variant-numeric: tabular-nums; }
 .season__body { padding: 0 .2rem .8rem; }
 .season__all {
-  margin: .2rem 0 .8rem; padding: .45rem .8rem; border-radius: 8px; cursor: pointer;
+  margin: .2rem 0 .8rem; padding: .5rem .8rem; min-height: 42px;
+  border-radius: 8px; cursor: pointer;
   border: 1px solid var(--encours); background: transparent; color: var(--encours); font-size: .85rem;
 }
 .season__all:hover { background: color-mix(in srgb, var(--encours) 14%, transparent); }
 
 .episode-list { list-style: none; margin: 0; padding: 0; }
 .episode {
-  display: flex; align-items: center; gap: .6rem;
-  padding: .4rem .2rem; cursor: pointer;
+  display: flex; align-items: center; gap: .7rem;
+  padding: .5rem .2rem; min-height: 46px; cursor: pointer;
 }
-.episode input { width: 18px; height: 18px; flex-shrink: 0; cursor: pointer; accent-color: var(--vu); }
+.episode input {
+  width: 22px; height: 22px; flex-shrink: 0; cursor: pointer; accent-color: var(--vu);
+}
 .episode__num {
-  color: var(--muted); font-size: .85rem; flex-shrink: 0;
+  color: var(--faint); font-size: .85rem; flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 .episode__name { font-size: .9rem; }
 
 /* ---------- Réactif ---------- */
-@media (max-width: 520px) {
-  .appbar { gap: .7rem; }
-  .profile-selector__label { display: none; }
-}
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }

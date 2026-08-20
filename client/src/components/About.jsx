@@ -1,3 +1,4 @@
+import Icon from './Icon.jsx';
 // Écran « À propos ». Porte la mention d'attribution TMDB, qui est une
 // **obligation** de leurs conditions d'utilisation (voir PLAN_ANDROID.md) :
 // la phrase ci-dessous doit figurer telle quelle, en anglais, et le logo TMDB
@@ -8,8 +9,8 @@ export default function About({ onClose }) {
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <header className="sheet__head">
           <h2>À propos</h2>
-          <button className="sheet__close" onClick={onClose} aria-label="Fermer">
-            ×
+          <button className="sheet__back" onClick={onClose} aria-label="Retour">
+            <Icon name="back" size={22} />
           </button>
         </header>
 

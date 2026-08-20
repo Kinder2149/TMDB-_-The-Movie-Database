@@ -1,3 +1,4 @@
+import Icon from './Icon.jsx';
 import { useState, useRef } from 'react';
 import {
   exportProfile,
@@ -105,8 +106,8 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <header className="sheet__head">
           <h2>Sauvegarde</h2>
-          <button className="sheet__close" onClick={onClose} aria-label="Fermer">
-            ×
+          <button className="sheet__back" onClick={onClose} aria-label="Retour">
+            <Icon name="back" size={22} />
           </button>
         </header>
 

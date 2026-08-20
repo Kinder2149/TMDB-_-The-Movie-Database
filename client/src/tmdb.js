@@ -7,17 +7,26 @@
 // La clé est embarquée dans l'application (décision figée, PLAN_ANDROID) : elle
 // n'ouvre que le catalogue public TMDB, aucune donnée personnelle ni budget.
 
+import { getCatalogLanguage, TMDB_LANG } from './lang.js';
+
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 
-// Appel générique à TMDB en français.
-async function tmdbGet(path, params = {}) {
+// Appel générique à TMDB. La langue du catalogue est posée ici, et *seulement*
+// ici : tous les appels de ce fichier passent par cette porte, donc changer la
+// langue dans les réglages suffit à changer toutes les fiches, sans toucher un
+// seul appel. `language` ne sert qu'à la migration, qui demande explicitement
+// une langue donnée.
+async function tmdbGet(path, params = {}, language) {
   const apiKey = import.meta.env.VITE_TMDB_API_KEY;
   if (!apiKey) {
     throw new Error('TMDB_API_KEY manquante. Renseignez-la dans client/.env');
   }
   const url = new URL(`${TMDB_BASE}${path}`);
   url.searchParams.set('api_key', apiKey);
-  url.searchParams.set('language', 'fr-FR');
+  url.searchParams.set(
+    'language',
+    language || TMDB_LANG[getCatalogLanguage()] || TMDB_LANG.fr
+  );
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
@@ -192,6 +201,20 @@ export async function getDetails(mediaType, id) {
     include_video_language: 'fr,en',
   });
 
+  // Repli : TMDB renvoie un synopsis vide quand la fiche n'est pas traduite.
+  // Plutôt qu'un blanc, on va chercher celui de l'autre langue.
+  let overview = data.overview || '';
+  if (!overview) {
+    const fallback =
+      getCatalogLanguage() === 'fr' ? TMDB_LANG.en : TMDB_LANG.fr;
+    try {
+      const alt = await tmdbGet(path, {}, fallback);
+      overview = alt.overview || '';
+    } catch {
+      /* réseau indisponible : on laisse le synopsis vide */
+    }
+  }
+
   const isMovie = mediaType === 'movie';
   const date = isMovie ? data.release_date : data.first_air_date;
   const cast = (data.credits?.cast || []).slice(0, 8).map((c) => ({
@@ -232,7 +255,7 @@ export async function getDetails(mediaType, id) {
     year: date ? date.slice(0, 4) : null,
     releaseDate: date || null,
     genres: (data.genres || []).map((g) => g.name),
-    overview: data.overview || '',
+    overview,
     posterUrl: data.poster_path
       ? `https://image.tmdb.org/t/p/w342${data.poster_path}`
       : null,
@@ -243,6 +266,13 @@ export async function getDetails(mediaType, id) {
     trailer,
     providers,
   };
+}
+
+// Champs de carte d'un titre (titre, année, date, affiche) dans une langue
+// explicite. Sert uniquement à la migration de langue du catalogue.
+export async function getCardInfo(mediaType, id, language) {
+  const data = await tmdbGet(`/${mediaType}/${id}`, {}, language);
+  return toCardItem(data, mediaType);
 }
 
 // Épisodes d'une saison donnée.

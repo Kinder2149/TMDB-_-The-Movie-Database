@@ -7,6 +7,7 @@
 // Plus aucun serveur : il n'y a plus un seul appel réseau vers /api.
 import * as tmdb from './tmdb.js';
 import * as store from './store.js';
+import * as lang from './lang.js';
 
 // --- Profil actif ---
 // L'UI garde en mémoire (et dans localStorage) l'id du profil actif.
@@ -44,6 +45,38 @@ export async function createProfile(name) {
 
 export async function renameProfile(id, name) {
   return store.renameProfile(id, name);
+}
+
+// --- Langue du catalogue ---
+// La langue est injectée dans les appels TMDB depuis `tmdb.js`, en un seul
+// point : rien ici ne la passe appel par appel.
+
+export { getCatalogLanguage, hasCatalogLanguage, LANGUAGES, languageLabel } from './lang.js';
+
+// Premier choix (écran de bienvenue). Les fiches déjà enregistrées sont
+// simplement marquées si elles sont déjà dans cette langue ; sinon elles sont
+// re-téléchargées comme lors d'un changement.
+export async function chooseInitialLanguage(value, onProgress) {
+  const had = lang.hasCatalogLanguage();
+  lang.setCatalogLanguage(value);
+  if (!had && value === 'fr') {
+    // Les bases d'avant ce réglage sont en français : rien à re-télécharger.
+    await store.stampLanguage('fr');
+    return { total: 0, done: 0, failed: 0 };
+  }
+  return store.migrateCatalogLanguage(value, onProgress);
+}
+
+// Changement depuis les réglages : nouvelle langue puis re-téléchargement.
+export async function changeCatalogLanguage(value, onProgress) {
+  lang.setCatalogLanguage(value);
+  return store.migrateCatalogLanguage(value, onProgress);
+}
+
+// Reprise d'une migration interrompue (coupure réseau) : combien de fiches
+// restent à mettre à jour.
+export async function countPendingLanguage(value = lang.getCatalogLanguage()) {
+  return store.countPendingLanguage(value);
 }
 
 // --- Catalogue (TMDB en direct) ---
