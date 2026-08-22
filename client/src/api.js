@@ -8,6 +8,16 @@
 import * as tmdb from './tmdb.js';
 import * as store from './store.js';
 import * as lang from './lang.js';
+import { markChanged } from './backup.js';
+
+// Toute écriture passe par ici : la sauvegarde cloud doit savoir qu'il y a du
+// nouveau à envoyer. Sans compte Google relié, `markChanged` ne fait rien —
+// l'application sans sauvegarde cloud se comporte exactement comme avant.
+async function ecriture(promesse) {
+  const resultat = await promesse;
+  markChanged();
+  return resultat;
+}
 
 // --- Profil actif ---
 // L'UI garde en mémoire (et dans localStorage) l'id du profil actif.
@@ -40,11 +50,11 @@ export async function getProfiles() {
 }
 
 export async function createProfile(name) {
-  return store.createProfile(name);
+  return ecriture(store.createProfile(name));
 }
 
 export async function renameProfile(id, name) {
-  return store.renameProfile(id, name);
+  return ecriture(store.renameProfile(id, name));
 }
 
 // --- Langue du catalogue ---
@@ -132,16 +142,16 @@ export async function getSuivi() {
 }
 
 export async function addToSuivi(item) {
-  return store.addToSuivi(requireProfile(), item);
+  return ecriture(store.addToSuivi(requireProfile(), item));
 }
 
 export async function removeFromSuivi(mediaType, id) {
-  return store.removeFromSuivi(requireProfile(), mediaType, id);
+  return ecriture(store.removeFromSuivi(requireProfile(), mediaType, id));
 }
 
 // Change le statut d'un titre : 'a_voir' | 'en_cours' | 'vu' | 'abandonne'.
 export async function setStatus(mediaType, id, status) {
-  return store.setStatus(requireProfile(), mediaType, id, status);
+  return ecriture(store.setStatus(requireProfile(), mediaType, id, status));
 }
 
 // --- Séries : épisodes et progression ---
@@ -156,19 +166,19 @@ export async function getProgress(seriesId) {
 }
 
 export async function markEpisode(seriesId, season, episode) {
-  return store.markEpisode(requireProfile(), seriesId, season, episode);
+  return ecriture(store.markEpisode(requireProfile(), seriesId, season, episode));
 }
 
 export async function unmarkEpisode(seriesId, season, episode) {
-  return store.unmarkEpisode(requireProfile(), seriesId, season, episode);
+  return ecriture(store.unmarkEpisode(requireProfile(), seriesId, season, episode));
 }
 
 export async function markWholeSeason(seriesId, season, episodeNumbers) {
-  return store.markWholeSeason(requireProfile(), seriesId, season, episodeNumbers);
+  return ecriture(store.markWholeSeason(requireProfile(), seriesId, season, episodeNumbers));
 }
 
 export async function unmarkWholeSeason(seriesId, season) {
-  return store.unmarkWholeSeason(requireProfile(), seriesId, season);
+  return ecriture(store.unmarkWholeSeason(requireProfile(), seriesId, season));
 }
 
 // --- Listes personnalisées ---
@@ -178,11 +188,11 @@ export async function getListes() {
 }
 
 export async function createListe(name) {
-  return store.createListe(requireProfile(), name);
+  return ecriture(store.createListe(requireProfile(), name));
 }
 
 export async function deleteListe(id) {
-  return store.deleteListe(requireProfile(), id);
+  return ecriture(store.deleteListe(requireProfile(), id));
 }
 
 export async function getListeItems(id) {
@@ -190,11 +200,11 @@ export async function getListeItems(id) {
 }
 
 export async function addToListe(id, item) {
-  return store.addToListe(requireProfile(), id, item);
+  return ecriture(store.addToListe(requireProfile(), id, item));
 }
 
 export async function removeFromListe(id, mediaType, tmdbId) {
-  return store.removeFromListe(requireProfile(), id, mediaType, tmdbId);
+  return ecriture(store.removeFromListe(requireProfile(), id, mediaType, tmdbId));
 }
 
 // Ids des listes contenant un titre (pour la fiche).

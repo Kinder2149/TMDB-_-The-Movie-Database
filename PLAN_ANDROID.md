@@ -303,3 +303,54 @@ précisément ce que la tranche 4 couvre — elle ne peut pas être reportée.
 Tranche 5 — la publication. **Plus de code à écrire** : compte développeur, signature de
 l'application, fiche Play Store, politique de confidentialité, puis la phase de test
 fermé imposée par Google (12 testeurs, 14 jours). C'est là que le délai pèse.
+
+---
+
+## Tranche cloud — sauvegarde dans le Drive de l'utilisateur (2026-08-22)
+
+Cadrage validé : la sauvegarde part dans **l'espace applicatif caché du Google Drive
+de l'utilisateur**. Aucun serveur, aucune donnée hébergée, aucun coût. La connexion
+Google reste **facultative** : l'application démarre et fonctionne sans compte.
+
+Portée demandée : `drive.appdata` uniquement — l'application ne voit que le dossier
+qu'elle a créé, jamais les fichiers de l'utilisateur. Portée classée **non sensible**
+par Google : vérification OAuth de base, pas d'audit de sécurité payant.
+
+**Étape 1 (faite)** — la connexion. Nouveau module `client/src/google.js` (porte unique
+vers le compte Google, pendant de `tmdb.js`) et section « Sauvegarde cloud » dans
+l'écran Sauvegarde. Composant : `@capawesome/capacitor-google-sign-in` (MIT, gratuit).
+Identifiant d'application dans `client/.env` → `VITE_GOOGLE_CLIENT_ID` (client **web**
+de la console Google Cloud). Vide = section masquée, aucune régression.
+
+**Étape 2 (faite)** — dépôt et restauration. Un fichier par profil dans le dossier
+caché, nommé d'après l'UUID portable du profil (`profil-<uuid>.json`) : sauvegarder
+n'invente aucun format, c'est celui de `exportProfile` déjà en place. Restaurer
+remplace le profil de même identifiant, jamais les autres. Fonctions ajoutées à
+`backup.js`, accès Drive dans `google.js`, écran dans `Backup.jsx`.
+
+**Constat de mise au point (téléphone réel, 2026-08-22)** : Google **réaffiche toujours
+son écran de compte** quand l'application redemande l'autorisation. La sauvegarde
+automatique invisible est donc **impossible** avec le composant gratuit.
+
+Repli retenu : chaque écriture passe par `ecriture()` dans `api.js`, qui pose un
+drapeau « en attente ». Au lancement, un bandeau écartable le signale et mène à
+l'écran Sauvegarde. Le départ vers Drive est **toujours** déclenché par un geste —
+jamais dans le dos de l'utilisateur. Le drapeau ne se pose pas si aucun compte n'est
+relié : sans sauvegarde cloud, l'application se comporte exactement comme avant.
+
+
+**Validé sur téléphone réel le 2026-08-22** : sauvegarde envoyée dans Drive,
+désinstallation complète de l'application, réinstallation, reconnexion,
+restauration — le suivi revient intact. La boucle « changer d'appareil sans rien
+perdre » est prouvée.
+
+Piège rencontré, à ne pas réoublier : créer les identifiants ne suffit pas, il faut
+**activer l'API Drive** dans le projet Google Cloud (console › API et services ›
+Bibliothèque › Google Drive API). Sans cela, chaque appel revient en 403.
+
+**Reste à faire avant publication** :
+1. Proposer la restauration **d'elle-même** au premier lancement quand une sauvegarde
+   plus riche existe dans le Drive (aujourd'hui il faut aller la chercher dans les réglages).
+2. Vérification OAuth de base côté Google (portée non sensible) + déclarer la **troisième
+   empreinte** : celle de la signature d'application Play. Sans elle, la connexion marche
+   chez le développeur et échoue chez les utilisateurs.

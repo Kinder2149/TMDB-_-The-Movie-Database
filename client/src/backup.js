@@ -201,3 +201,156 @@ export function toLetterboxdCsv(suivi) {
   }
   return { csv: lignes.join('\n'), films: films.length, series: suivi.length - films.length };
 }
+
+// --- Sauvegarde cloud : le Drive de l'utilisateur ---
+//
+// Même sauvegarde que ci-dessus, déposée dans le dossier caché que Google
+// réserve à l'application dans le Drive de l'utilisateur. Un fichier par
+// profil, nommé d'après son **UUID portable** : c'est ce qui permet de
+// retrouver ses données sur un autre appareil sans rien fusionner à l'aveugle.
+//
+// Constaté à la mise au point : Google réaffiche son écran de compte à chaque
+// nouvelle autorisation. Une sauvegarde ne peut donc pas partir toute seule
+// pendant que l'utilisateur fait autre chose. On enregistre à la place qu'il
+// y a « quelque chose à sauvegarder », et l'application le lui propose en un
+// geste — voir `hasPendingChanges()`.
+
+import {
+  listDriveFiles,
+  uploadDriveFile,
+  downloadDriveFile,
+  getAccount,
+} from './google.js';
+
+const PENDING_KEY = 'cloud-pending';
+const LAST_BACKUP_KEY = 'cloud-last-backup';
+
+const cloudFileName = (profileId) => `profil-${profileId}.json`;
+
+function readLocal(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocal(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    /* stockage indisponible : on perd seulement l'indication d'attente */
+  }
+}
+
+// Signale qu'une donnée a changé depuis la dernière sauvegarde. Appelé par
+// `api.js` à chaque modification (titre ajouté, épisode coché, statut changé).
+// Volontairement sans effet si aucun compte n'est relié : on ne réclame rien
+// à qui n'a pas demandé de sauvegarde cloud.
+export function markChanged() {
+  if (!getAccount()) return;
+  writeLocal(PENDING_KEY, new Date().toISOString());
+}
+
+// Vrai s'il y a des modifications non sauvegardées dans le Drive.
+export function hasPendingChanges() {
+  return !!getAccount() && !!readLocal(PENDING_KEY);
+}
+
+// Date de la dernière sauvegarde réussie, ou null. Affichée en clair : c'est
+// la seule façon pour l'utilisateur de savoir où il en est.
+export function lastCloudBackup() {
+  const value = readLocal(LAST_BACKUP_KEY);
+  return value ? new Date(value) : null;
+}
+
+export function forgetCloudState() {
+  writeLocal(PENDING_KEY, null);
+  writeLocal(LAST_BACKUP_KEY, null);
+}
+
+// Envoie **tous** les profils de l'appareil dans le Drive. Sauvegarder à
+// moitié n'aurait pas de sens : on change d'appareil avec tout son suivi.
+export async function backupToDrive(token) {
+  const profils = await query('SELECT id, name FROM profiles ORDER BY created_at');
+  const existants = await listDriveFiles(token);
+  let envoyes = 0;
+
+  for (const profil of profils) {
+    const data = await exportProfile(profil.id);
+    const nom = cloudFileName(profil.id);
+    const existant = existants.find((f) => f.name === nom);
+    await uploadDriveFile(token, {
+      fileId: existant?.id,
+      name: nom,
+      contents: JSON.stringify(data),
+      // Le nom du profil est rangé à côté du fichier : on peut annoncer
+      // « profil Marie » avant de télécharger quoi que ce soit.
+      appProperties: { profileId: profil.id, profileName: profil.name },
+    });
+    envoyes += 1;
+  }
+
+  writeLocal(LAST_BACKUP_KEY, new Date().toISOString());
+  writeLocal(PENDING_KEY, null);
+  return { profils: envoyes };
+}
+
+// Ce que contient le Drive, sans rien télécharger : de quoi annoncer à
+// l'utilisateur ce qu'il s'apprête à restaurer.
+export async function listCloudBackups(token) {
+  const fichiers = await listDriveFiles(token);
+  return fichiers
+    .filter((f) => f.name.startsWith('profil-'))
+    .map((f) => ({
+      fileId: f.id,
+      profileId: f.appProperties?.profileId || f.name.slice(7, -5),
+      profileName: f.appProperties?.profileName || 'Profil',
+      modifiedAt: f.modifiedTime ? new Date(f.modifiedTime) : null,
+    }));
+}
+
+// Restaure tout ce que contient le Drive. Chaque profil restauré **remplace**
+// celui qui porte le même identifiant ; les autres ne sont pas touchés.
+// Renvoie l'id du premier profil restauré, à activer dans l'UI.
+export async function restoreFromDrive(token, sauvegardes) {
+  let premier = null;
+  for (const s of sauvegardes) {
+    const data = validateBackup(await downloadDriveFile(token, s.fileId));
+    const id = await importProfile(data);
+    if (!premier) premier = id;
+  }
+  writeLocal(PENDING_KEY, null);
+  return premier;
+}
+
+// Sauvegardes qu'il est **pertinent** de proposer au premier branchement d'un
+// compte : celles dont le profil n'existe pas sur cet appareil, ou dont le
+// profil local est vide.
+//
+// La règle est volontairement prudente. Proposer de restaurer par-dessus un
+// suivi déjà rempli reviendrait à proposer d'en perdre une partie : on ne le
+// fait jamais de soi-même. L'utilisateur garde le bouton « Restaurer depuis
+// Drive… » pour les cas que cette règle écarte.
+export async function cloudRestoreSuggestions(token) {
+  const sauvegardes = await listCloudBackups(token);
+  if (sauvegardes.length === 0) return [];
+
+  const locaux = await query('SELECT id FROM profiles');
+  const connus = new Set(locaux.map((p) => p.id));
+  const proposables = [];
+
+  for (const s of sauvegardes) {
+    if (!connus.has(s.profileId)) {
+      proposables.push(s);
+      continue;
+    }
+    const [{ n }] = await query(
+      'SELECT COUNT(*) AS n FROM suivi WHERE profile_id = ?',
+      [s.profileId]
+    );
+    if (n === 0) proposables.push(s);
+  }
+  return proposables;
+}

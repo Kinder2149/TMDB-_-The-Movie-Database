@@ -39,6 +39,8 @@ import {
   removeFromListe as apiRemoveFromListe,
 } from './api.js';
 
+import { hasPendingChanges } from './backup.js';
+
 const keyOf = (item) => `${item.mediaType}-${item.id}`;
 
 export default function App() {
@@ -68,6 +70,11 @@ export default function App() {
   const [statusMenu, setStatusMenu] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  // Rappel de sauvegarde cloud. Google réaffichant son écran de compte à
+  // chaque autorisation, une sauvegarde ne peut pas partir sans un geste :
+  // on le demande une fois, au lancement, plutôt que d'interrompre en pleine
+  // utilisation. Écarté d'un geste, il ne revient pas de la session.
+  const [rappelSauvegarde, setRappelSauvegarde] = useState(hasPendingChanges);
   // Langue du catalogue : tant qu'elle n'a jamais été choisie, l'écran de
   // bienvenue s'affiche avant tout le reste.
   const [needLanguage, setNeedLanguage] = useState(() => !hasCatalogLanguage());
@@ -517,6 +524,22 @@ export default function App() {
         </button>
       </header>
 
+      {rappelSauvegarde && !showBackup && (
+        <div className="rappel">
+          <span>Des modifications ne sont pas encore sauvegardées.</span>
+          <button className="btn" onClick={() => setShowBackup(true)}>
+            Sauvegarder
+          </button>
+          <button
+            className="rappel__fermer"
+            onClick={() => setRappelSauvegarde(false)}
+            aria-label="Masquer le rappel"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <main className="content">
 
       {view === 'search' && (
@@ -749,7 +772,10 @@ export default function App() {
           profileId={activeProfile}
           profileName={profiles.find((p) => p.id === activeProfile)?.name || 'Mon profil'}
           onRestored={handleRestored}
-          onClose={() => setShowBackup(false)}
+          onClose={() => {
+            setShowBackup(false);
+            setRappelSauvegarde(hasPendingChanges());
+          }}
         />
       )}
 
