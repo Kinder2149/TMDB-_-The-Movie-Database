@@ -34,3 +34,7 @@ suivi-*.csv
 signature.properties
 *.jks
 *.keystore
+
+# Identifiants OAuth téléchargés depuis Google Cloud — le fichier du client web
+# contient un secret. Jamais dans le dépôt.
+client_secret_*.json
