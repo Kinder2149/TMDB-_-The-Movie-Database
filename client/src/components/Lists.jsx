@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import MovieCard from './MovieCard.jsx';
 import Icon from './Icon.jsx';
+import AddToListe from './AddToListe.jsx';
 import { STATUSES, isUpcoming } from '../status.js';
 import { getListeItems } from '../api.js';
 
@@ -11,6 +12,8 @@ export default function Lists({
   listes,
   onCreateListe,
   onDeleteListe,
+  onAddManyToListe,
+  onSurcouche,
   onToggleFollow,
   onSetStatus,
   onOpenDetail,
@@ -20,16 +23,30 @@ export default function Lists({
   const [listItems, setListItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [mediaFilter, setMediaFilter] = useState('all');
+  const [ajoutOuvert, setAjoutOuvert] = useState(false); // ajout en masse
 
   // Charger les éléments quand une liste perso est sélectionnée.
-  useEffect(() => {
-    if (selected.type !== 'liste') return;
+  function chargeListe(id) {
     setLoadingItems(true);
-    getListeItems(selected.value)
+    return getListeItems(id)
       .then(setListItems)
       .catch(() => setListItems([]))
       .finally(() => setLoadingItems(false));
+  }
+
+  useEffect(() => {
+    if (selected.type !== 'liste') return;
+    chargeListe(selected.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  // L'écran d'ajout couvre toute la page : le bouton retour d'Android doit le
+  // fermer, pas changer d'onglet. On signale donc son ouverture à l'application,
+  // qui tient la chaîne des retours.
+  useEffect(() => {
+    onSurcouche?.(ajoutOuvert ? { fermer: () => setAjoutOuvert(false) } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ajoutOuvert]);
 
   // Si la liste sélectionnée disparaît (suppression), revenir aux statuts.
   useEffect(() => {
@@ -151,6 +168,12 @@ export default function Lists({
         <h3>{title}</h3>
         <span className="sechead__count">{filteredItems.length}</span>
         {selectedListe && (
+          <button className="sechead__add" onClick={() => setAjoutOuvert(true)}>
+            <Icon name="plus" size={14} />
+            Ajouter
+          </button>
+        )}
+        {selectedListe && (
           <button
             className="lists__delete"
             onClick={() => {
@@ -191,6 +214,19 @@ export default function Lists({
             </section>
           )}
         </>
+      )}
+ 
+      {ajoutOuvert && selectedListe && (
+        <AddToListe
+          liste={selectedListe}
+          items={items}
+          dejaDedans={listItems}
+          onValider={async (choisis) => {
+            await onAddManyToListe(selectedListe.id, choisis);
+            await chargeListe(selectedListe.id);
+          }}
+          onClose={() => setAjoutOuvert(false)}
+        />
       )}
     </div>
   );

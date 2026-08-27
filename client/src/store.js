@@ -9,26 +9,82 @@
 // une donnée de suivi appartient toujours à un profil.
 
 import { query, run, runMany } from './db.js';
-import { getSeasons, getEpisodes, getRecommendations, getCardInfo } from './tmdb.js';
-import { TMDB_LANG, getCatalogLanguage } from './lang.js';
+import {
+  getSeriesStructure,
+  getEpisodes,
+  getRecommendations,
+  getCardInfo,
+  getRuntime,
+} from './tmdb.js';
+import { TMDB_LANG, getCatalogLanguage, getCatalogRegion } from './lang.js';
 
 // --- Profils ---
 
 // L'ouverture de la base garantit déjà un profil par défaut : cette liste
 // n'est jamais vide, même sur une installation neuve.
 export function listProfiles() {
-  return query('SELECT id, name, created_at AS createdAt FROM profiles ORDER BY created_at');
+  return query(
+    `SELECT id, name, avatar, created_at AS createdAt
+     FROM profiles ORDER BY created_at`
+  );
 }
 
-export async function createProfile(name) {
+export async function createProfile(name, avatar = null) {
   const id = crypto.randomUUID();
-  await run('INSERT INTO profiles (id, name) VALUES (?, ?)', [id, name]);
-  return { id, name };
+  await run('INSERT INTO profiles (id, name, avatar) VALUES (?, ?, ?)', [id, name, avatar]);
+  return { id, name, avatar };
 }
 
 export async function renameProfile(id, name) {
   const { changes } = await run('UPDATE profiles SET name = ? WHERE id = ?', [name, id]);
   if (changes === 0) throw new Error('Profil introuvable.');
+}
+
+export async function setProfileAvatar(id, avatar) {
+  const { changes } = await run('UPDATE profiles SET avatar = ? WHERE id = ?', [
+    avatar || null,
+    id,
+  ]);
+  if (changes === 0) throw new Error('Profil introuvable.');
+}
+
+// Ce qu'un profil emporterait avec lui : sert à l'annoncer avant de supprimer.
+export async function countProfileData(id) {
+  const [titres] = await query('SELECT COUNT(*) AS n FROM suivi WHERE profile_id = ?', [id]);
+  const [episodes] = await query(
+    'SELECT COUNT(*) AS n FROM episodes_vus WHERE profile_id = ?',
+    [id]
+  );
+  const [listes] = await query('SELECT COUNT(*) AS n FROM listes WHERE profile_id = ?', [id]);
+  return { titres: titres.n, episodes: episodes.n, listes: listes.n };
+}
+
+// Supprime un profil et **tout** son contenu (les cascades de la base s'en
+// chargent : suivi, épisodes vus, listes).
+//
+// On refuse de supprimer le dernier profil : l'application n'a de sens qu'avec
+// au moins un, et l'ouverture en recréerait un vide dans la foulée — autant
+// le dire clairement plutôt que de faire disparaître les données sans raison
+// visible. La sauvegarde Drive du profil, elle, n'est pas touchée : c'est le
+// filet de sécurité, il doit survivre à une suppression locale.
+export async function deleteProfile(id) {
+  const profils = await listProfiles();
+  if (!profils.some((p) => p.id === id)) throw new Error('Profil introuvable.');
+  if (profils.length <= 1) {
+    throw new Error("C'est le seul profil : il ne peut pas être supprimé.");
+  }
+  // Les cascades de la base le feraient, mais elles dépendent d'un réglage de
+  // connexion : on efface explicitement, dans l'ordre, pour que la suppression
+  // soit complète sur les deux moteurs (téléphone et PC).
+  await run(
+    'DELETE FROM liste_items WHERE liste_id IN (SELECT id FROM listes WHERE profile_id = ?)',
+    [id]
+  );
+  await run('DELETE FROM listes WHERE profile_id = ?', [id]);
+  await run('DELETE FROM episodes_vus WHERE profile_id = ?', [id]);
+  await run('DELETE FROM suivi WHERE profile_id = ?', [id]);
+  await run('DELETE FROM profiles WHERE id = ?', [id]);
+  return profils.find((p) => p.id !== id).id; // profil sur lequel se rabattre
 }
 
 // --- Suivi ---
@@ -38,12 +94,41 @@ const STATUSES = ['a_voir', 'en_cours', 'vu', 'abandonne'];
 export function listSuivi(profileId) {
   return query(
     `SELECT s.tmdb_id AS id, s.media_type AS mediaType, s.title, s.year,
-            s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status
+            s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status,
+            s.note, s.rating
      FROM suivi s
      WHERE s.profile_id = ?
      ORDER BY s.added_at DESC`,
     [profileId]
   );
+}
+
+// --- Note personnelle ---
+//
+// Un avis écrit et une note en étoiles, tous deux facultatifs. Ils vivent sur
+// la ligne de suivi : retirer un titre du suivi emporte donc sa note, ce qui
+// est le comportement attendu (on ne garde pas l'avis d'un titre qu'on ne
+// suit plus).
+
+export async function getNote(profileId, mediaType, id) {
+  const [row] = await query(
+    'SELECT note, rating FROM suivi WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?',
+    [profileId, id, mediaType]
+  );
+  return row ? { note: row.note ?? '', rating: row.rating ?? null } : null;
+}
+
+export async function setNote(profileId, mediaType, id, { note, rating }) {
+  if (rating != null && !(Number.isInteger(rating) && rating >= 1 && rating <= 5)) {
+    throw new Error('Note invalide.');
+  }
+  const texte = (note ?? '').trim();
+  const { changes } = await run(
+    `UPDATE suivi SET note = ?, rating = ?
+     WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?`,
+    [texte || null, rating ?? null, profileId, id, mediaType]
+  );
+  if (changes === 0) throw new Error('Titre absent du suivi.');
 }
 
 // Idempotent : ré-ajouter un élément déjà suivi ne crée pas de doublon.
@@ -131,6 +216,77 @@ export async function unmarkWholeSeason(profileId, seriesId, season) {
   );
 }
 
+// Marque d'un coup tous les épisodes *déjà diffusés* d'une saison. On va
+// chercher la vraie liste des épisodes plutôt que de supposer une numérotation
+// de 1 à N : certaines saisons ont des trous.
+export async function markSeasonWatched(profileId, seriesId, season) {
+  const numeros = airedOnly(await getEpisodes(seriesId, season));
+  await markWholeSeason(profileId, seriesId, season, numeros);
+  return numeros.length;
+}
+
+// « J'ai vu toute la série » : tout ce qui est sorti, saison par saison.
+// Les épisodes annoncés mais pas encore diffusés ne sont pas cochés — sinon
+// la série serait déclarée finie avant de l'être.
+export async function markSeriesWatched(profileId, seriesId) {
+  const { seasons } = await getSeriesStructure(seriesId);
+  const ecritures = [];
+  for (const s of seasons) {
+    for (const numero of airedOnly(await getEpisodes(seriesId, s.seasonNumber))) {
+      ecritures.push({
+        sql: `INSERT OR IGNORE INTO episodes_vus
+                (profile_id, series_id, season_number, episode_number)
+              VALUES (?, ?, ?, ?)`,
+        params: [profileId, seriesId, s.seasonNumber, numero],
+      });
+    }
+  }
+  await runMany(ecritures);
+  return ecritures.length;
+}
+
+export async function unmarkSeriesWatched(profileId, seriesId) {
+  await run('DELETE FROM episodes_vus WHERE profile_id = ? AND series_id = ?', [
+    profileId,
+    seriesId,
+  ]);
+}
+
+// Numéros des épisodes déjà diffusés. Un épisode sans date de diffusion est
+// considéré comme sorti : c'est le cas de vieilles fiches incomplètes, où
+// refuser de cocher serait plus gênant que l'inverse.
+function airedOnly(episodes) {
+  const today = new Date().toISOString().slice(0, 10);
+  return episodes
+    .filter((e) => !e.airDate || e.airDate <= today)
+    .map((e) => e.episodeNumber);
+}
+
+// Saisons d'une série avec, pour chacune, le nombre d'épisodes diffusés et le
+// nombre d'épisodes vus. Sert à la fiche : elle peut afficher l'avancement de
+// chaque saison et proposer de la cocher entière sans avoir à la déplier.
+// Un seul appel TMDB, le même que pour la liste des saisons.
+export async function getSeasonsProgress(profileId, seriesId) {
+  const { seasons, lastAired } = await getSeriesStructure(seriesId);
+  const vus = await listWatchedEpisodes(profileId, seriesId);
+
+  return seasons.map((s) => {
+    const vusSaison = vus.filter((v) => v.season === s.seasonNumber).length;
+    let aired = 0;
+    if (lastAired) {
+      if (s.seasonNumber < lastAired.season) aired = s.episodeCount;
+      else if (s.seasonNumber === lastAired.season) {
+        aired = Math.min(lastAired.episode, s.episodeCount);
+      }
+    }
+    return {
+      ...s,
+      aired: Math.min(s.episodeCount, Math.max(aired, vusSaison)),
+      watched: vusSaison,
+    };
+  });
+}
+
 // Épisodes d'une saison (TMDB) enrichis de leur état vu (base locale).
 export async function getSeasonEpisodes(profileId, seriesId, season) {
   const episodes = await getEpisodes(seriesId, season);
@@ -139,15 +295,37 @@ export async function getSeasonEpisodes(profileId, seriesId, season) {
   return episodes.map((e) => ({ ...e, watched: watched.has(e.episodeNumber) }));
 }
 
-// Progression d'une série : { total, watched, next }.
-// Prochain à voir = premier épisode non coché, dans l'ordre, déjà diffusé.
+// Nombre d'épisodes réellement diffusés, déduit du dernier épisode sorti :
+// tout ce qui précède sa saison, plus ce qui est sorti dans sa saison. Les
+// saisons annoncées après lui ne comptent pas encore.
+function countAired(seasons, lastAired) {
+  if (!lastAired) return 0; // rien n'est encore sorti
+  let n = 0;
+  for (const s of seasons) {
+    if (s.seasonNumber < lastAired.season) n += s.episodeCount;
+    else if (s.seasonNumber === lastAired.season) {
+      n += Math.min(lastAired.episode, s.episodeCount);
+    }
+  }
+  return n;
+}
+
+// Progression d'une série : { total, aired, watched, next }.
+//   total   = tous les épisodes annoncés (ce que la série fera au bout du compte) ;
+//   aired   = ceux réellement diffusés (ce qu'on peut regarder aujourd'hui) ;
+//   watched = ceux cochés ;
+//   next    = premier épisode non coché, dans l'ordre, déjà diffusé.
+// C'est `aired` qui sert à dire « je suis à jour » — pas `total`, qui compte
+// les épisodes déjà programmés mais pas encore sortis.
 export async function getProgress(profileId, seriesId) {
-  const seasons = [...(await getSeasons(seriesId))].sort(
-    (a, b) => a.seasonNumber - b.seasonNumber
-  );
+  const { seasons: brut, lastAired } = await getSeriesStructure(seriesId);
+  const seasons = [...brut].sort((a, b) => a.seasonNumber - b.seasonNumber);
   const watched = await listWatchedEpisodes(profileId, seriesId);
 
   const total = seasons.reduce((sum, s) => sum + s.episodeCount, 0);
+  // Garde-fou : si TMDB ne sait pas dire ce qui est sorti, on ne prétend pas
+  // qu'il y a moins d'épisodes diffusés que d'épisodes déjà cochés.
+  const aired = Math.min(total, Math.max(countAired(seasons, lastAired), watched.length));
 
   const watchedBySeason = new Map();
   for (const w of watched) {
@@ -176,7 +354,7 @@ export async function getProgress(profileId, seriesId) {
     }
   }
 
-  return { total, watched: watched.length, next };
+  return { total, aired, watched: watched.length, next };
 }
 
 // --- Listes personnalisées ---
@@ -207,7 +385,8 @@ export async function deleteListe(profileId, id) {
 export function getListeItems(profileId, listeId) {
   return query(
     `SELECT s.tmdb_id AS id, s.media_type AS mediaType, s.title, s.year,
-            s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status
+            s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status,
+            s.note, s.rating
      FROM liste_items li
      JOIN suivi s
        ON s.profile_id = li.profile_id
@@ -292,7 +471,7 @@ export async function migrateCatalogLanguage(lang, onProgress) {
     const batch = titles.slice(i, i + BATCH);
     const infos = await Promise.all(
       batch.map((t) =>
-        getCardInfo(t.mediaType, t.id, TMDB_LANG[lang])
+        getCardInfo(t.mediaType, t.id, TMDB_LANG[lang], getCatalogRegion(lang))
           .then((info) => ({ t, info }))
           .catch(() => ({ t, info: null }))
       )
@@ -310,7 +489,8 @@ export async function migrateCatalogLanguage(lang, onProgress) {
                 year = COALESCE(?, year),
                 release_date = COALESCE(?, release_date),
                 poster_url = COALESCE(?, poster_url),
-                lang = ?
+                lang = ?,
+                release_region = ?
           WHERE tmdb_id = ? AND media_type = ?`,
         [
           info.title || null,
@@ -318,6 +498,7 @@ export async function migrateCatalogLanguage(lang, onProgress) {
           info.releaseDate || null,
           info.posterUrl || null,
           lang,
+          regionAttendue(t.mediaType, getCatalogRegion(lang)),
           t.id,
           t.mediaType,
         ]
@@ -328,6 +509,178 @@ export async function migrateCatalogLanguage(lang, onProgress) {
   }
 
   return { total, done, failed };
+}
+
+// --- Rattrapage : dates de sortie manquantes ---
+//
+// La date de sortie complète n'a été ajoutée au suivi qu'en cours de route
+// (12/08/2026). Les titres enregistrés avant sont restés sans date — et sans
+// date, l'application ne peut pas savoir qu'un film n'est pas encore sorti :
+// « Avatar 4 » et « Avatar 5 » réapparaissaient donc dans « À voir » malgré
+// le filtre. On va chercher ce qui manque auprès de TMDB, au démarrage.
+//
+// Ne touche que les lignes sans date : aucune date déjà connue n'est écrasée,
+// et rien d'autre que la date (et l'année si elle manquait) n'est modifié.
+// Pays dont la date d'une ligne devrait provenir. Une série n'a pas de date
+// par pays chez TMDB : elle est rangée sous 'monde', ce qui la met une fois
+// pour toutes à l'écart des mises à jour de pays.
+const regionAttendue = (mediaType, region) => (mediaType === 'movie' ? region : 'monde');
+
+export async function backfillReleaseDates(region = getCatalogRegion()) {
+  // Deux cas d'un coup : les fiches sans date (celles d'avant que
+  // l'application ne retienne la date de sortie) et celles dont la date vient
+  // d'un autre pays (changement de langue). Une ligne déjà à jour n'est jamais
+  // redemandée — c'est ce qui rend ce rattrapage gratuit au lancement suivant.
+  const aFaire = await query(
+    `SELECT DISTINCT tmdb_id AS id, media_type AS mediaType
+     FROM suivi
+     WHERE release_region IS NULL
+        OR (media_type = 'movie' AND release_region <> ?)`,
+    [region]
+  );
+  if (aFaire.length === 0) return 0;
+
+  const langue = TMDB_LANG[getCatalogLanguage()];
+  let completes = 0;
+  const BATCH = 5; // ni un par un (trop lent) ni tout d'un coup (TMDB coupe)
+  for (let i = 0; i < aFaire.length; i += BATCH) {
+    const infos = await Promise.all(
+      aFaire.slice(i, i + BATCH).map((t) =>
+        getCardInfo(t.mediaType, t.id, langue, region)
+          .then((info) => ({ t, info }))
+          .catch(() => ({ t, info: null }))
+      )
+    );
+    for (const { t, info } of infos) {
+      // Échec réseau : on ne marque rien, ce sera retenté au prochain
+      // lancement. Fiche obtenue mais sans date connue chez TMDB : on marque
+      // quand même le pays, sinon on la redemanderait indéfiniment sans jamais
+      // rien obtenir de plus.
+      if (!info) continue;
+      await run(
+        `UPDATE suivi
+            SET release_date = COALESCE(?, release_date),
+                year = COALESCE(year, ?),
+                release_region = ?
+          WHERE tmdb_id = ? AND media_type = ?`,
+        [
+          info.releaseDate ?? null,
+          info.year ?? null,
+          regionAttendue(t.mediaType, region),
+          t.id,
+          t.mediaType,
+        ]
+      );
+      if (info.releaseDate) completes += 1;
+    }
+  }
+  return completes;
+}
+
+
+// --- Statistiques ---
+//
+// Le temps passé se calcule sur ce qu'on a **réellement regardé** :
+//   - un film compte s'il est marqué « vu » (sa durée entière) ;
+//   - une série compte par épisode coché (durée d'un épisode × épisodes vus).
+// Un titre dont TMDB ignore la durée n'est pas estimé : il est compté à part,
+// pour que le total affiché reste un total et pas une approximation muette.
+
+// Va chercher les durées manquantes. Même principe que les dates de sortie :
+// seules les lignes vides sont demandées, donc l'appel suivant ne refait rien.
+export async function backfillRuntimes(onProgress) {
+  const manquants = await query(
+    'SELECT DISTINCT tmdb_id AS id, media_type AS mediaType FROM suivi WHERE runtime IS NULL'
+  );
+  const total = manquants.length;
+  let done = 0;
+  onProgress?.({ done, total });
+  if (total === 0) return { total, done };
+
+  const BATCH = 5;
+  for (let i = 0; i < manquants.length; i += BATCH) {
+    const durees = await Promise.all(
+      manquants.slice(i, i + BATCH).map((t) =>
+        getRuntime(t.mediaType, t.id)
+          .then((minutes) => ({ t, minutes }))
+          .catch(() => ({ t, minutes: null }))
+      )
+    );
+    for (const { t, minutes } of durees) {
+      // Durée inconnue chez TMDB : on note 0 plutôt que de laisser vide, sinon
+      // on la redemanderait à chaque ouverture de l'écran sans jamais l'obtenir.
+      await run('UPDATE suivi SET runtime = ? WHERE tmdb_id = ? AND media_type = ?', [
+        minutes ?? 0,
+        t.id,
+        t.mediaType,
+      ]);
+      done += 1;
+    }
+    onProgress?.({ done, total });
+  }
+  return { total, done };
+}
+
+export async function getStats(profileId) {
+  const suivi = await query(
+    `SELECT tmdb_id AS id, media_type AS mediaType, status, runtime, rating
+     FROM suivi WHERE profile_id = ?`,
+    [profileId]
+  );
+  const episodes = await query(
+    `SELECT series_id AS seriesId, COUNT(*) AS vus
+     FROM episodes_vus WHERE profile_id = ? GROUP BY series_id`,
+    [profileId]
+  );
+  const vusParSerie = new Map(episodes.map((e) => [e.seriesId, e.vus]));
+
+  const films = suivi.filter((t) => t.mediaType === 'movie');
+  const series = suivi.filter((t) => t.mediaType === 'tv');
+
+  const filmsVus = films.filter((t) => t.status === 'vu');
+  const minutesFilms = filmsVus.reduce((n, t) => n + (t.runtime || 0), 0);
+
+  let minutesSeries = 0;
+  let episodesVus = 0;
+  for (const serie of series) {
+    const vus = vusParSerie.get(serie.id) || 0;
+    episodesVus += vus;
+    minutesSeries += vus * (serie.runtime || 0);
+  }
+
+  // Titres qui pèsent dans le calcul mais dont la durée est inconnue : c'est
+  // ce qui explique un total plus bas que la réalité.
+  const sansDuree =
+    filmsVus.filter((t) => !t.runtime).length +
+    series.filter((t) => !t.runtime && (vusParSerie.get(t.id) || 0) > 0).length;
+
+  const parStatut = {};
+  for (const st of STATUSES) {
+    parStatut[st] = suivi.filter((t) => (t.status || 'a_voir') === st).length;
+  }
+
+  // Les étoiles données depuis les fiches : combien de titres notés, et la
+  // moyenne. Un titre sans note n'entre pas dans le calcul.
+  const notes = suivi.filter((t) => t.rating != null).map((t) => t.rating);
+  const noteMoyenne = notes.length
+    ? Math.round((notes.reduce((a, b) => a + b, 0) / notes.length) * 10) / 10
+    : null;
+
+  return {
+    titres: suivi.length,
+    films: films.length,
+    series: series.length,
+    filmsVus: filmsVus.length,
+    episodesVus,
+    minutesFilms,
+    minutesSeries,
+    minutesTotal: minutesFilms + minutesSeries,
+    sansDuree,
+    enAttenteDeMesure: suivi.filter((t) => t.runtime == null).length,
+    notes: notes.length,
+    noteMoyenne,
+    parStatut,
+  };
 }
 
 // --- Suggestions ---

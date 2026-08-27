@@ -34,6 +34,11 @@ const PATHS = {
   refresh: <path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   back: <path d="M15 5 8 12l7 7" />,
+  // Étoile de notation : creuse par défaut, remplie par le CSS quand la note
+  // est atteinte (`.rating__star.on`).
+  star: (
+    <path d="m12 3.6 2.6 5.5 6 .8-4.4 4.2 1.1 5.9-5.3-2.8-5.3 2.8 1.1-5.9L3.4 9.9l6-.8z" />
+  ),
 };
 
 export default function Icon({ name, size = 22, className = '' }) {

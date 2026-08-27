@@ -137,9 +137,12 @@ relance → le titre suivi est toujours là**. La base embarquée fonctionne sur
 **Construire l'APK** (le SDK Android et le JDK d'Android Studio sont déjà sur le poste) :
 ```
 npm run build --prefix client
-npx --prefix client cap sync android
-cd client/android && ./gradlew assembleDebug
+cd client && npx cap sync android
+cd android && JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug
 ```
+`JAVA_HOME` est nécessaire : le Java installé par défaut sur le poste est un Java 8,
+trop ancien pour Gradle. Celui d'Android Studio (`jbr`) convient.
+L'APK sort dans `client/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ### 4. Sauvegarde, export, récupération ✅ terminé (2026-08-17)
 Rendu obligatoire par le « tout en local » :

@@ -12,19 +12,26 @@
 import { query, run, runMany } from './db.js';
 
 export const BACKUP_FORMAT = 'suivi-films-series';
-export const BACKUP_VERSION = 1;
+// Version 2 : les sauvegardes emportent la note personnelle (avis + étoiles).
+// Le numéro monte parce qu'une version plus ancienne de l'application, qui ne
+// connaît pas ces champs, les perdrait en silence en restaurant puis en
+// ré-exportant. Elle refuse donc le fichier plutôt que d'effacer des avis.
+export const BACKUP_VERSION = 2;
 
 // --- Sauvegarde complète ---
 
 // Renvoie l'intégralité d'un profil sous forme d'objet (profil, suivi,
 // épisodes vus, listes et leur contenu).
 export async function exportProfile(profileId) {
-  const [profil] = await query('SELECT id, name FROM profiles WHERE id = ?', [profileId]);
+  const [profil] = await query('SELECT id, name, avatar FROM profiles WHERE id = ?', [
+    profileId,
+  ]);
   if (!profil) throw new Error('Profil introuvable.');
 
   const suivi = await query(
     `SELECT tmdb_id AS tmdbId, media_type AS mediaType, title, year,
             release_date AS releaseDate, poster_url AS posterUrl, status,
+            note, rating, runtime, release_region AS releaseRegion,
             added_at AS addedAt
      FROM suivi WHERE profile_id = ? ORDER BY added_at`,
     [profileId]
@@ -58,7 +65,7 @@ export async function exportProfile(profileId) {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    profile: { id: profil.id, name: profil.name },
+    profile: { id: profil.id, name: profil.name, avatar: profil.avatar ?? null },
     suivi,
     episodesVus,
     listes,
@@ -104,13 +111,21 @@ export async function importProfile(data) {
 
   const existe = (await query('SELECT id FROM profiles WHERE id = ?', [id])).length > 0;
   if (existe) {
-    await run('UPDATE profiles SET name = ? WHERE id = ?', [name, id]);
+    await run('UPDATE profiles SET name = ?, avatar = ? WHERE id = ?', [
+      name,
+      data.profile.avatar ?? null,
+      id,
+    ]);
     // Les suppressions en cascade emportent listes, éléments et épisodes.
     await run('DELETE FROM suivi WHERE profile_id = ?', [id]);
     await run('DELETE FROM episodes_vus WHERE profile_id = ?', [id]);
     await run('DELETE FROM listes WHERE profile_id = ?', [id]);
   } else {
-    await run('INSERT INTO profiles (id, name) VALUES (?, ?)', [id, name]);
+    await run('INSERT INTO profiles (id, name, avatar) VALUES (?, ?, ?)', [
+      id,
+      name,
+      data.profile.avatar ?? null,
+    ]);
   }
 
   if (data.suivi.length > 0) {
@@ -118,8 +133,9 @@ export async function importProfile(data) {
       data.suivi.map((s) => ({
         sql: `INSERT OR REPLACE INTO suivi
                 (profile_id, tmdb_id, media_type, title, year, release_date,
-                 poster_url, status, added_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+                 poster_url, status, note, rating, runtime, release_region,
+                 added_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
         params: [
           id,
           s.tmdbId,
@@ -129,6 +145,11 @@ export async function importProfile(data) {
           s.releaseDate ?? null,
           s.posterUrl ?? null,
           s.status || 'a_voir',
+          // Absents d'une sauvegarde d'avant la note : simplement vides.
+          s.note ?? null,
+          s.rating ?? null,
+          s.runtime ?? null,
+          s.releaseRegion ?? null,
           s.addedAt ?? null,
         ],
       }))
@@ -186,7 +207,9 @@ function csvCell(value) {
 // l'annonce à l'utilisateur plutôt que de les perdre en silence.
 export function toLetterboxdCsv(suivi) {
   const films = suivi.filter((s) => s.mediaType === 'movie');
-  const lignes = [['Title', 'Year', 'tmdbID', 'WatchedDate'].join(',')];
+  const lignes = [
+    ['Title', 'Year', 'tmdbID', 'WatchedDate', 'Rating', 'Review'].join(','),
+  ];
   for (const f of films) {
     lignes.push(
       [
@@ -196,6 +219,10 @@ export function toLetterboxdCsv(suivi) {
         // Letterboxd attend une date de visionnage : on ne la connaît pas,
         // on ne fournit donc que celle des titres marqués « vu ».
         csvCell(CSV_STATUS_VU.has(f.status) ? (f.addedAt || '').slice(0, 10) : ''),
+        // Letterboxd lit la note sur 5 et l'avis : nos deux champs y trouvent
+        // leur place telle quelle.
+        csvCell(f.rating ?? ''),
+        csvCell(f.note ?? ''),
       ].join(',')
     );
   }
@@ -219,6 +246,7 @@ import {
   listDriveFiles,
   uploadDriveFile,
   downloadDriveFile,
+  getAccessToken,
   getAccount,
 } from './google.js';
 
@@ -244,6 +272,20 @@ function writeLocal(key, value) {
   }
 }
 
+// L'écran doit savoir *quand* l'état « à sauvegarder » bouge. Sans ça, le
+// bandeau n'apparaissait qu'au lancement suivant : on pouvait cocher dix
+// épisodes sans jamais être prévenu qu'il y avait du nouveau à envoyer.
+const abonnes = new Set();
+
+export function surChangementDeSauvegarde(callback) {
+  abonnes.add(callback);
+  return () => abonnes.delete(callback);
+}
+
+function prevenir() {
+  for (const callback of abonnes) callback(hasPendingChanges());
+}
+
 // Signale qu'une donnée a changé depuis la dernière sauvegarde. Appelé par
 // `api.js` à chaque modification (titre ajouté, épisode coché, statut changé).
 // Volontairement sans effet si aucun compte n'est relié : on ne réclame rien
@@ -251,11 +293,87 @@ function writeLocal(key, value) {
 export function markChanged() {
   if (!getAccount()) return;
   writeLocal(PENDING_KEY, new Date().toISOString());
+  prevenir();
 }
 
 // Vrai s'il y a des modifications non sauvegardées dans le Drive.
 export function hasPendingChanges() {
   return !!getAccount() && !!readLocal(PENDING_KEY);
+}
+
+// --- Sauvegarde automatique ---
+//
+// Déclenchée quand on quitte l'application, et de nouveau au retour si la
+// précédente n'a pas abouti. Trois règles, qui font tout le comportement :
+//
+//  1. **Rien à sauvegarder, rien ne part.** Aucun envoi inutile, aucune donnée
+//     mobile consommée pour rien.
+//  2. **Jamais d'écran.** `interactive: false` : si Google réclame un accord,
+//     on renonce en silence plutôt que de faire surgir un écran de compte
+//     pendant que l'utilisateur fait autre chose.
+//  3. **Un échec ne s'efface pas.** Le drapeau « à sauvegarder » n'est levé que
+//     par une sauvegarde réussie : réseau coupé, autorisation révoquée, ou
+//     Android qui coupe l'application avant la fin de l'envoi, et le bandeau
+//     revient. Une sauvegarde ratée ne peut donc pas passer inaperçue.
+//
+// Android ne garantit pas de laisser une application finir un envoi quand on la
+// quitte : c'est « la plupart du temps », pas « toujours ». D'où la règle 3, et
+// d'où la seconde tentative au retour — celle-là a tout son temps.
+const LAST_AUTO_KEY = 'cloud-last-auto';
+const AUTO_OFF_KEY = 'cloud-auto-off';
+
+// Activée par défaut dès qu'un compte Google est relié : personne ne relie un
+// compte pour *ne pas* être sauvegardé. On range donc le refus, pas l'accord —
+// ainsi une installation neuve, ou une sauvegarde restaurée, part protégée.
+export function sauvegardeAutoActive() {
+  return readLocal(AUTO_OFF_KEY) !== '1';
+}
+
+export function reglerSauvegardeAuto(active) {
+  writeLocal(AUTO_OFF_KEY, active ? null : '1');
+  prevenir();
+}
+
+let autoEnCours = false;
+
+// Ce qu'a donné la dernière tentative automatique, affiché dans l'écran de
+// sauvegarde. Une tentative qui échoue en silence n'est pas diagnosticable
+// autrement : l'application tourne sur un téléphone, pas sous nos yeux.
+function noterEssai(resultat) {
+  writeLocal(
+    LAST_AUTO_KEY,
+    JSON.stringify({ ...resultat, quand: new Date().toISOString() })
+  );
+  return resultat;
+}
+
+export function dernierEssaiAutomatique() {
+  try {
+    const brut = readLocal(LAST_AUTO_KEY);
+    return brut ? JSON.parse(brut) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function sauvegardeAutomatique() {
+  // L'interrupteur est lu ici, à chaque tentative : le couper doit avoir effet
+  // tout de suite, sans relancer l'application.
+  if (!sauvegardeAutoActive()) return { fait: false, raison: 'desactivee' };
+  if (!hasPendingChanges()) return { fait: false, raison: 'rien-a-sauvegarder' };
+  if (autoEnCours) return { fait: false, raison: 'deja-en-cours' };
+
+  autoEnCours = true;
+  try {
+    const jeton = await getAccessToken({ interactive: false });
+    if (!jeton) return noterEssai({ fait: false, raison: 'autorisation-indisponible' });
+    const { profils } = await backupToDrive(jeton);
+    return noterEssai({ fait: true, profils });
+  } catch (error) {
+    return noterEssai({ fait: false, raison: 'echec', message: error.message });
+  } finally {
+    autoEnCours = false;
+  }
 }
 
 // Date de la dernière sauvegarde réussie, ou null. Affichée en clair : c'est
@@ -268,6 +386,9 @@ export function lastCloudBackup() {
 export function forgetCloudState() {
   writeLocal(PENDING_KEY, null);
   writeLocal(LAST_BACKUP_KEY, null);
+  writeLocal(LAST_AUTO_KEY, null);
+  writeLocal(AUTO_OFF_KEY, null);
+  prevenir();
 }
 
 // Envoie **tous** les profils de l'appareil dans le Drive. Sauvegarder à
@@ -294,6 +415,7 @@ export async function backupToDrive(token) {
 
   writeLocal(LAST_BACKUP_KEY, new Date().toISOString());
   writeLocal(PENDING_KEY, null);
+  prevenir();
   return { profils: envoyes };
 }
 

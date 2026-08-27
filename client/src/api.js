@@ -49,12 +49,27 @@ export async function getProfiles() {
   return store.listProfiles();
 }
 
-export async function createProfile(name) {
-  return ecriture(store.createProfile(name));
+export async function createProfile(name, avatar) {
+  return ecriture(store.createProfile(name, avatar));
 }
 
 export async function renameProfile(id, name) {
   return ecriture(store.renameProfile(id, name));
+}
+
+export async function setProfileAvatar(id, avatar) {
+  return ecriture(store.setProfileAvatar(id, avatar));
+}
+
+// Ce que la suppression emporterait : à montrer avant de demander confirmation.
+export async function countProfileData(id) {
+  return store.countProfileData(id);
+}
+
+// Supprime un profil et tout son contenu. Renvoie l'id du profil sur lequel se
+// rabattre. La sauvegarde Drive du profil n'est pas touchée.
+export async function deleteProfile(id) {
+  return ecriture(store.deleteProfile(id));
 }
 
 // --- Langue du catalogue ---
@@ -129,6 +144,11 @@ export async function getSeasons(seriesId) {
   return tmdb.getSeasons(seriesId);
 }
 
+// Saisons enrichies de l'avancement du profil : [{ ..., aired, watched }].
+export async function getSeasonsProgress(seriesId) {
+  return store.getSeasonsProgress(requireProfile(), seriesId);
+}
+
 // --- Suggestions (base locale + TMDB) ---
 
 export async function getSuggestions() {
@@ -152,6 +172,35 @@ export async function removeFromSuivi(mediaType, id) {
 // Change le statut d'un titre : 'a_voir' | 'en_cours' | 'vu' | 'abandonne'.
 export async function setStatus(mediaType, id, status) {
   return ecriture(store.setStatus(requireProfile(), mediaType, id, status));
+}
+
+// Met les dates de sortie à jour : celles qui manquent (fiches d'avant que
+// l'application ne les retienne) et celles qui viennent d'un autre pays que
+// celui de la langue choisie. Renvoie le nombre de fiches complétées.
+export async function mettreAJourDatesDeSortie() {
+  return store.backfillReleaseDates();
+}
+
+// --- Statistiques ---
+
+// Complète les durées manquantes (appels TMDB) : appelé par l'écran des
+// statistiques, jamais au démarrage. `onProgress` reçoit { done, total }.
+export async function completeRuntimes(onProgress) {
+  return store.backfillRuntimes(onProgress);
+}
+
+export async function getStats() {
+  return store.getStats(requireProfile());
+}
+
+// --- Note personnelle (avis écrit + étoiles) ---
+
+export async function getNote(mediaType, id) {
+  return store.getNote(requireProfile(), mediaType, id);
+}
+
+export async function setNote(mediaType, id, valeur) {
+  return ecriture(store.setNote(requireProfile(), mediaType, id, valeur));
 }
 
 // --- Séries : épisodes et progression ---
@@ -179,6 +228,20 @@ export async function markWholeSeason(seriesId, season, episodeNumbers) {
 
 export async function unmarkWholeSeason(seriesId, season) {
   return ecriture(store.unmarkWholeSeason(requireProfile(), seriesId, season));
+}
+
+// Raccourcis : cocher une saison entière sans la déplier, ou toute la série.
+// Ne cochent que les épisodes déjà diffusés.
+export async function markSeasonWatched(seriesId, season) {
+  return ecriture(store.markSeasonWatched(requireProfile(), seriesId, season));
+}
+
+export async function markSeriesWatched(seriesId) {
+  return ecriture(store.markSeriesWatched(requireProfile(), seriesId));
+}
+
+export async function unmarkSeriesWatched(seriesId) {
+  return ecriture(store.unmarkSeriesWatched(requireProfile(), seriesId));
 }
 
 // --- Listes personnalisées ---

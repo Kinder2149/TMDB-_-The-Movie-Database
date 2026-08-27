@@ -17,6 +17,15 @@ export const LANGUAGES = [
 // Code attendu par TMDB pour chaque langue proposée.
 export const TMDB_LANG = { fr: 'fr-FR', en: 'en-US' };
 
+// Pays dont on retient les dates de sortie. Il découle de la langue plutôt que
+// d'un réglage de plus : « Français » va avec la France, « English » avec les
+// États-Unis — c'est déjà ce que disent les codes ci-dessus.
+export const TMDB_REGION = { fr: 'FR', en: 'US' };
+
+export function getCatalogRegion(value = getCatalogLanguage()) {
+  return TMDB_REGION[value] || TMDB_REGION.fr;
+}
+
 // Vrai tant que l'utilisateur n'a jamais choisi : l'écran de bienvenue s'affiche.
 export function hasCatalogLanguage() {
   try {

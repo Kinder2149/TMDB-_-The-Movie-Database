@@ -1,5 +1,5 @@
 import Icon from './Icon.jsx';
-import ProfileSelector from './ProfileSelector.jsx';
+import Avatar from './Avatar.jsx';
 
 // Écran « Réglages ». Regroupe tout ce qui n'est pas du contenu : profils,
 // thème, sauvegarde, à propos. Avant, ces contrôles occupaient en permanence
@@ -7,36 +7,33 @@ import ProfileSelector from './ProfileSelector.jsx';
 export default function Settings({
   profiles,
   activeProfile,
-  onSelectProfile,
-  onCreateProfile,
-  onRenameProfile,
+  onOpenProfiles,
   theme,
   onToggleTheme,
   catalogLangLabel,
   onOpenLanguage,
   onOpenBackup,
   onOpenAbout,
+  onOpenStats,
   suiviCount,
 }) {
+  const actif = profiles.find((p) => p.id === activeProfile);
+
   return (
     <div className="settings">
       <h2 className="settings__title">Réglages</h2>
 
       <p className="settings__group">Profil</p>
       <div className="settings__card">
-        <div className="settings__line">
+        <button className="settings__line settings__line--btn" onClick={onOpenProfiles}>
           <Icon name="user" size={20} className="settings__ico" />
-          <span>Profil actif</span>
+          <span>Mes profils</span>
           <span className="settings__value">
-            <ProfileSelector
-              profiles={profiles}
-              activeId={activeProfile}
-              onSelect={onSelectProfile}
-              onCreate={onCreateProfile}
-              onRename={onRenameProfile}
-            />
+            <Avatar name={actif?.name} value={actif?.avatar} size={24} />
+            {actif?.name || '—'}
+            <Icon name="chevron" size={14} />
           </span>
-        </div>
+        </button>
       </div>
 
       <p className="settings__group">Affichage</p>
@@ -72,11 +69,14 @@ export default function Settings({
             <Icon name="chevron" size={14} />
           </span>
         </button>
-        <div className="settings__line">
+        <button className="settings__line settings__line--btn" onClick={onOpenStats}>
           <Icon name="chart" size={20} className="settings__ico" />
-          <span>Titres suivis</span>
-          <span className="settings__value">{suiviCount}</span>
-        </div>
+          <span>Statistiques</span>
+          <span className="settings__value">
+            {suiviCount} titres
+            <Icon name="chevron" size={14} />
+          </span>
+        </button>
       </div>
 
       <p className="settings__group">À propos</p>

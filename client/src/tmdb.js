@@ -38,6 +38,31 @@ async function tmdbGet(path, params = {}, language) {
   return response.json();
 }
 
+// --- Mémoire de séance ---
+//
+// Une même page redemande sans cesse la structure d'une série et les épisodes
+// d'une saison : la page « Ce soir » le fait pour chaque série en cours, la
+// fiche à chaque case cochée. On garde donc la *promesse* de chaque appel le
+// temps de la séance — garder la promesse (et pas seulement le résultat) évite
+// aussi de lancer deux fois le même appel en parallèle. La clé porte la langue :
+// changer de langue repart proprement sur des fiches traduites. Un appel raté
+// n'est pas gardé, il sera retenté.
+const cacheSeries = new Map();
+const cacheEpisodes = new Map();
+
+function memo(cache, key, charge) {
+  if (!cache.has(key)) {
+    cache.set(
+      key,
+      charge().catch((e) => {
+        cache.delete(key);
+        throw e;
+      })
+    );
+  }
+  return cache.get(key);
+}
+
 // Normalise une entrée de catalogue TMDB (film ou série) au format de l'UI.
 // Les listes (recherche, tendances, genre, acteur, recommandations) partagent
 // toutes cette forme : un seul endroit à corriger si TMDB change.
@@ -180,17 +205,48 @@ export async function getRecommendations(mediaType, id) {
   }));
 }
 
-// Saisons d'une série. On masque la saison 0 (« Épisodes spéciaux »,
-// fourre-tout non pertinent pour le suivi) et les saisons vides.
-export async function getSeasons(seriesId) {
+// Structure d'une série : ses saisons, et le dernier épisode *réellement
+// diffusé*. Les deux viennent du même appel TMDB — c'est pour ça qu'ils sont
+// renvoyés ensemble plutôt que par deux fonctions.
+//
+// Cette distinction compte : le nombre d'épisodes annoncé par saison inclut
+// les épisodes déjà programmés mais pas encore diffusés. Compter la
+// progression dessus donnait « 6 vus sur 10 » à quelqu'un qui a tout vu de ce
+// qui est sorti — et laissait la série dans « Reprendre » alors qu'il n'y
+// avait rien à reprendre.
+//
+// On masque la saison 0 (« Épisodes spéciaux », fourre-tout non pertinent pour
+// le suivi) et les saisons vides.
+export async function getSeriesStructure(seriesId) {
+  return memo(cacheSeries, `${getCatalogLanguage()}:${seriesId}`, () =>
+    chargeStructure(seriesId)
+  );
+}
+
+async function chargeStructure(seriesId) {
   const data = await tmdbGet(`/tv/${seriesId}`);
-  return (data.seasons || [])
+  const seasons = (data.seasons || [])
     .filter((s) => s.season_number >= 1 && s.episode_count > 0)
     .map((s) => ({
       seasonNumber: s.season_number,
       name: s.name,
       episodeCount: s.episode_count,
     }));
+
+  // `null` = rien n'est encore sorti. Un dernier épisode diffusé rangé en
+  // saison 0 (un spécial) ne dit rien de la progression : on l'ignore.
+  const dernier = data.last_episode_to_air;
+  const lastAired =
+    dernier && dernier.season_number >= 1
+      ? { season: dernier.season_number, episode: dernier.episode_number }
+      : null;
+
+  return { seasons, lastAired };
+}
+
+// Saisons seules : ce dont l'écran de la fiche a besoin pour lister.
+export async function getSeasons(seriesId) {
+  return (await getSeriesStructure(seriesId)).seasons;
 }
 
 // Fiche détaillée d'un film ou d'une série (infos + acteurs), normalisée pour l'UI.
@@ -268,19 +324,113 @@ export async function getDetails(mediaType, id) {
   };
 }
 
+// Durée d'un titre, en minutes :
+//   - film  : sa durée ;
+//   - série : la durée d'un épisode (c'est elle qu'on multipliera par le
+//             nombre d'épisodes cochés).
+// `null` quand TMDB ne la connaît pas — on préfère ne rien compter plutôt que
+// d'inventer une moyenne.
+export async function getRuntime(mediaType, id) {
+  if (mediaType === 'movie') {
+    const data = await tmdbGet(`/movie/${id}`);
+    return data.runtime || null;
+  }
+  const data = await tmdbGet(`/tv/${id}`);
+  const annonces = (data.episode_run_time || []).filter((n) => n > 0);
+  if (annonces.length > 0) {
+    return Math.round(annonces.reduce((a, b) => a + b, 0) / annonces.length);
+  }
+
+  // Beaucoup de séries récentes laissent ce champ vide. On regarde alors la
+  // durée réelle des épisodes d'une saison, et on prend la **médiane** : les
+  // finales et les pilotes sont souvent rallongés, et une moyenne les laisserait
+  // tirer le chiffre vers le haut. (Constaté sur Severance : dernier épisode
+  // 80 min, épisode courant ~50 — l'estimation partait 60 % trop haut.)
+  const saison = (data.seasons || []).find(
+    (x) => x.season_number >= 1 && x.episode_count > 0
+  );
+  if (saison) {
+    try {
+      const durees = (await getEpisodes(id, saison.season_number))
+        .map((e) => e.runtime)
+        .filter((n) => n > 0)
+        .sort((a, b) => a - b);
+      if (durees.length > 0) return durees[Math.floor(durees.length / 2)];
+    } catch {
+      /* saison indisponible : on retombe sur le repli ci-dessous */
+    }
+  }
+
+  // Dernier repli : la durée du dernier épisode diffusé. Imparfaite, mais
+  // toujours meilleure que rien.
+  return data.last_episode_to_air?.runtime || null;
+}
+
+// --- Date de sortie d'un pays ---
+//
+// TMDB range plusieurs dates par pays, chacune avec son type. On retient la
+// sortie en salle, et à défaut ce qui s'en rapproche le plus.
+const TYPES_PAR_PREFERENCE = [
+  3, // sortie en salle : la mieux remplie, et ce que « sorti » veut dire
+  2, // sortie limitée
+  4, // sortie numérique
+  1, // avant-première
+];
+
+// La **plus ancienne** date du type retenu, jamais la plus récente : un pays
+// peut lister des ressorties en salle. Matrix a trois séances de reprise en
+// France en 2026 — prendre la dernière ferait passer un film de 1999 pour
+// « pas encore sorti ».
+export function dateDeSortieRegionale(releaseDates, region) {
+  const pays = (releaseDates?.results || []).find((r) => r.iso_3166_1 === region);
+  if (!pays) return null;
+  for (const type of TYPES_PAR_PREFERENCE) {
+    const dates = (pays.release_dates || [])
+      .filter((d) => d.type === type && d.release_date)
+      .map((d) => d.release_date.slice(0, 10))
+      .sort();
+    if (dates.length > 0) return dates[0];
+  }
+  return null;
+}
+
 // Champs de carte d'un titre (titre, année, date, affiche) dans une langue
-// explicite. Sert uniquement à la migration de langue du catalogue.
-export async function getCardInfo(mediaType, id, language) {
-  const data = await tmdbGet(`/${mediaType}/${id}`, {}, language);
-  return toCardItem(data, mediaType);
+// explicite, et — pour un film — avec la date de sortie du pays demandé.
+//
+// Les dates par pays arrivent **dans la même requête** que la fiche : passer à
+// une date française ne coûte donc pas un appel de plus.
+//
+// Une série n'a pas de date par pays chez TMDB : elle garde sa date de première
+// diffusion mondiale, quel que soit le réglage.
+//
+// L'**année** reste celle de la sortie d'origine, même quand la date française
+// est plus tardive : Matrix est « 1999 » pour tout le monde, ce n'est pas au
+// réglage de langue de le changer.
+export async function getCardInfo(mediaType, id, language, region) {
+  const params = mediaType === 'movie' ? { append_to_response: 'release_dates' } : {};
+  const data = await tmdbGet(`/${mediaType}/${id}`, params, language);
+  const carte = toCardItem(data, mediaType);
+
+  if (mediaType === 'movie' && region) {
+    const locale = dateDeSortieRegionale(data.release_dates, region);
+    if (locale) carte.releaseDate = locale;
+  }
+  return carte;
 }
 
 // Épisodes d'une saison donnée.
 export async function getEpisodes(seriesId, seasonNumber) {
-  const data = await tmdbGet(`/tv/${seriesId}/season/${seasonNumber}`);
-  return (data.episodes || []).map((e) => ({
-    episodeNumber: e.episode_number,
-    name: e.name,
-    airDate: e.air_date || null,
-  }));
+  return memo(
+    cacheEpisodes,
+    `${getCatalogLanguage()}:${seriesId}:${seasonNumber}`,
+    async () => {
+      const data = await tmdbGet(`/tv/${seriesId}/season/${seasonNumber}`);
+      return (data.episodes || []).map((e) => ({
+        episodeNumber: e.episode_number,
+        name: e.name,
+        airDate: e.air_date || null,
+        runtime: e.runtime || null, // sert à estimer la durée d'un épisode
+      }));
+    }
+  );
 }

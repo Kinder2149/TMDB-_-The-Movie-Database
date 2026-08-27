@@ -10,6 +10,9 @@ import {
   listCloudBackups,
   restoreFromDrive,
   lastCloudBackup,
+  dernierEssaiAutomatique,
+  sauvegardeAutoActive,
+  reglerSauvegardeAuto,
   hasPendingChanges,
   forgetCloudState,
   cloudRestoreSuggestions,
@@ -20,6 +23,7 @@ import {
   disconnect as disconnectGoogle,
   getAccount as getGoogleAccount,
   getAccessToken as getGoogleAccessToken,
+  dernierModeAutorisation,
   isConfigured as googleConfigured,
   isSupported as googleSupported,
 } from '../google.js';
@@ -36,6 +40,22 @@ const dateLisible = (d) =>
     hour: '2-digit',
     minute: '2-digit',
   });
+// Traduit le résultat brut de la dernière tentative automatique.
+function texteEssaiAuto(essai) {
+  if (!essai) return 'aucune tentative pour l’instant.';
+  const quand = essai.quand ? dateLisible(new Date(essai.quand)) : '';
+  if (essai.fait) return `réussie${quand ? ` le ${quand}` : ''}.`;
+  const raisons = {
+    'rien-a-sauvegarder': 'rien de nouveau à envoyer',
+    desactivee: 'sauvegarde automatique désactivée',
+    'autorisation-indisponible':
+      'Google n’a pas renouvelé l’autorisation sans écran — à refaire à la main',
+    'deja-en-cours': 'un envoi était déjà en cours',
+    echec: `échec${essai.message ? ` : ${essai.message}` : ''}`,
+  };
+  return `${raisons[essai.raison] || essai.raison}${quand ? ` (${quand})` : ''}.`;
+}
+
 export default function Backup({ profileId, profileName, onRestored, onClose }) {
   const [busy, setBusy] = useState('');
   const [note, setNote] = useState('');
@@ -51,6 +71,11 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
   const [pendingChanges, setPendingChanges] = useState(hasPendingChanges);
   // Contenu du Drive lu, en attente de confirmation avant d'écraser le local.
   const [cloudPending, setCloudPending] = useState(null);
+  // Ce qu'a donné la dernière tentative automatique. Sans cette ligne, une
+  // sauvegarde qui échoue en silence reste indiagnosticable : le téléphone
+  // n'est pas sous nos yeux.
+  const [essaiAuto] = useState(dernierEssaiAutomatique);
+  const [autoActive, setAutoActive] = useState(sauvegardeAutoActive);
 
   function reset() {
     setNote('');
@@ -97,9 +122,11 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
     }
   }
 
-  // Envoi dans le Drive. Google réaffichant son écran de compte à chaque
-  // nouvelle autorisation, ce départ est toujours déclenché par un geste de
-  // l'utilisateur — jamais dans son dos.
+  // Envoi dans le Drive, déclenché par un geste de l'utilisateur.
+  //
+  // On dit ensuite **comment** l'autorisation a été obtenue : c'est ce qui
+  // permet de constater, sur son propre téléphone, que le renouvellement se
+  // fait bien sans écran Google — la condition d'une sauvegarde automatique.
   async function handleCloudBackup() {
     reset();
     setBusy('cloud');
@@ -109,8 +136,15 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
       const { profils } = await backupToDrive(jeton);
       setLastBackup(lastCloudBackup());
       setPendingChanges(false);
+      const mode = {
+        memoire: 'autorisation déjà valide',
+        silencieux: 'autorisation renouvelée sans écran Google',
+        ecran: 'Google a demandé de confirmer le compte',
+      }[dernierModeAutorisation()];
       setNote(
-        `Sauvegarde envoyée dans votre Drive (${profils} profil${profils > 1 ? 's' : ''}).`
+        `Sauvegarde envoyée dans votre Drive (${profils} profil${
+          profils > 1 ? 's' : ''
+        })${mode ? ` — ${mode}.` : '.'}`
       );
     } catch (e) {
       setError(e.message);
@@ -270,6 +304,31 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
                 <strong>{lastBackup ? dateLisible(lastBackup) : 'jamais'}</strong>
                 {pendingChanges && ' — des modifications ne sont pas encore sauvegardées.'}
               </p>
+              <div className="reglage-auto">
+                <div className="reglage-auto__texte">
+                  <strong>Sauvegarde automatique</strong>
+                  <span className="hint">
+                    {autoActive
+                      ? 'Envoyée toute seule quand tu quittes l’application, s’il y a du nouveau. Jamais d’écran Google.'
+                      : 'Désactivée : rien ne part sans le bouton ci-dessous.'}
+                  </span>
+                </div>
+                <button
+                  className={`chip-toggle ${autoActive ? 'on' : ''}`}
+                  role="switch"
+                  aria-checked={autoActive}
+                  onClick={() => {
+                    const suivant = !autoActive;
+                    reglerSauvegardeAuto(suivant);
+                    setAutoActive(suivant);
+                  }}
+                >
+                  {autoActive ? 'Activée' : 'Désactivée'}
+                </button>
+              </div>
+              {autoActive && (
+                <p className="hint">Dernière tentative : {texteEssaiAuto(essaiAuto)}</p>
+              )}
               <div className="backup__actions">
                 <button className="btn" onClick={handleCloudBackup} disabled={!!busy}>
                   {busy === 'cloud' ? 'En cours…' : 'Sauvegarder maintenant'}

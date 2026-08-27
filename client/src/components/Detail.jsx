@@ -1,14 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   getDetails,
-  getSeasons,
+  getSeasonsProgress,
   getSeasonEpisodes,
   getProgress,
   markEpisode,
   unmarkEpisode,
   markWholeSeason,
   unmarkWholeSeason,
+  markSeasonWatched,
+  markSeriesWatched,
+  unmarkSeriesWatched,
   getItemListes,
+  getNote,
+  setNote,
 } from '../api.js';
 import { STATUSES, deriveSeriesStatus } from '../status.js';
 import Icon from './Icon.jsx';
@@ -57,12 +62,82 @@ export default function Detail({
     }
   }
 
+  // --- Note personnelle ---
+  //
+  // Deux champs indépendants : des étoiles (1 à 5) et un avis écrit. On peut
+  // n'en remplir qu'un. La note appartient au suivi : elle n'apparaît que sur
+  // un titre suivi, et disparaît avec lui.
+  const [rating, setRating] = useState(null);
+  const [avis, setAvis] = useState('');
+  const [noteEnregistree, setNoteEnregistree] = useState(true);
+
+  // Les étoiles s'enregistrent au clic ; l'avis écrit, lui, part tout seul peu
+  // après qu'on a arrêté de taper. Attendre que le champ perde le focus ne
+  // suffirait pas : fermer la fiche avec le bouton retour d'Android ne le
+  // déclenche pas, et l'avis serait perdu sans que rien ne le dise.
+  const ratingRef = useRef(null);
+  const avisTimer = useRef(null);
+  const avisEnAttente = useRef(null); // texte tapé, pas encore enregistré
+  const sauveRef = useRef(() => {});
+
+  useEffect(() => {
+    if (!isFollowed) return;
+    getNote(item.mediaType, item.id)
+      .then((n) => {
+        setRating(n?.rating ?? null);
+        ratingRef.current = n?.rating ?? null;
+        setAvis(n?.note ?? '');
+        setNoteEnregistree(true);
+      })
+      .catch(() => {});
+  }, [item.id, item.mediaType, isFollowed]);
+
+  async function ecritNote(nouvelleNote, nouvelAvis) {
+    setNoteEnregistree(false);
+    try {
+      await setNote(item.mediaType, item.id, { note: nouvelAvis, rating: nouvelleNote });
+      setNoteEnregistree(true);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Recliquer sur l'étoile déjà donnée retire la note : c'est le seul moyen de
+  // revenir à « pas encore noté » sans un bouton de plus.
+  function cliqueEtoile(n) {
+    const valeur = n === rating ? null : n;
+    setRating(valeur);
+    ratingRef.current = valeur;
+    ecritNote(valeur, avisEnAttente.current ?? avis);
+  }
+
+  function tapeAvis(texte) {
+    setAvis(texte);
+    setNoteEnregistree(false);
+    avisEnAttente.current = texte;
+    clearTimeout(avisTimer.current);
+    avisTimer.current = setTimeout(() => sauveRef.current(), 800);
+  }
+
+  function sauveAvis() {
+    clearTimeout(avisTimer.current);
+    const texte = avisEnAttente.current;
+    if (texte == null) return; // rien de neuf depuis le dernier enregistrement
+    avisEnAttente.current = null;
+    ecritNote(ratingRef.current, texte);
+  }
+  sauveRef.current = sauveAvis;
+
+  // Filet de sécurité : ce qui reste en attente part à la fermeture de la fiche.
+  useEffect(() => () => sauveRef.current(), []);
+
   // --- Épisodes (séries suivies uniquement) ---
   const [seasons, setSeasons] = useState([]);
   const [progress, setProgress] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+  const [busy, setBusy] = useState(false); // un raccourci est en cours
 
   useEffect(() => {
     getDetails(item.mediaType, item.id).then(setInfo).catch((e) => setError(e.message));
@@ -74,6 +149,7 @@ export default function Detail({
     try {
       const p = await getProgress(item.id);
       setProgress(p);
+      getSeasonsProgress(item.id).then(setSeasons).catch(() => {});
       const cur = status || 'a_voir';
       if (cur !== 'abandonne') {
         const derived = deriveSeriesStatus(p);
@@ -87,10 +163,54 @@ export default function Detail({
   // Charger saisons + progression dès qu'une série est suivie.
   useEffect(() => {
     if (isSeries && isFollowed) {
-      getSeasons(item.id).then(setSeasons).catch((e) => setError(e.message));
+      getSeasonsProgress(item.id).then(setSeasons).catch((e) => setError(e.message));
       refreshProgress();
     }
   }, [item.id, isSeries, isFollowed]);
+
+  // --- Raccourcis « déjà vu » ---
+  //
+  // Ajouter une série qu'on a déjà regardée demandait de déplier chaque saison
+  // et de cocher chaque épisode. Ces deux raccourcis ne cochent que les
+  // épisodes *déjà diffusés* : une série en cours de diffusion devient « à
+  // jour », pas « terminée ».
+
+  // Cocher une saison depuis sa ligne, sans avoir à la déplier.
+  async function toggleSaisonDepuisLaListe(saison, event) {
+    event.stopPropagation(); // ne pas déplier/replier la saison au passage
+    setBusy(true);
+    try {
+      if (saisonVue(saison)) await unmarkWholeSeason(item.id, saison.seasonNumber);
+      else await markSeasonWatched(item.id, saison.seasonNumber);
+      if (expanded === saison.seasonNumber) {
+        setEpisodes(await getSeasonEpisodes(item.id, saison.seasonNumber));
+      }
+      await refreshProgress();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleSerieEntiere() {
+    setBusy(true);
+    try {
+      if (serieVue) await unmarkSeriesWatched(item.id);
+      else await markSeriesWatched(item.id);
+      if (expanded != null) setEpisodes(await getSeasonEpisodes(item.id, expanded));
+      await refreshProgress();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Une saison est « vue » quand tout ce qui en est sorti est coché.
+  const saisonVue = (s) => s.aired > 0 && s.watched >= s.aired;
+  const serieVue =
+    progress != null && progress.watched > 0 && progress.watched >= (progress.aired ?? 0);
 
   async function openSeason(seasonNumber) {
     if (expanded === seasonNumber) {
@@ -141,10 +261,12 @@ export default function Detail({
     }
   }
 
-  const pct =
-    progress && progress.total
-      ? Math.round((progress.watched / progress.total) * 100)
-      : 0;
+  // La progression se lit sur les épisodes *diffusés* : afficher « 6 / 10 »
+  // à quelqu'un qui a vu tout ce qui est sorti lui ferait croire qu'il a du
+  // retard. Les épisodes déjà programmés sont annoncés à part, en dessous.
+  const diffuses = progress ? progress.aired ?? progress.total : 0;
+  const aVenir = progress ? Math.max(0, progress.total - diffuses) : 0;
+  const pct = diffuses ? Math.round((progress.watched / diffuses) * 100) : 0;
   const current = status || 'a_voir';
 
   // Location et achat sont souvent la même liste : on fusionne et dédoublonne.
@@ -250,10 +372,158 @@ export default function Detail({
 
         {error && <p className="error detail-pad">{error}</p>}
 
+        {/* Séries : progression + saisons/épisodes (si suivie) */}
+        {isSeries && !isFollowed && (
+          <div className="section">
+            <p className="hint">
+              Ajoute la série à ton suivi pour cocher les épisodes.
+            </p>
+          </div>
+        )}
+
+        {isSeries && isFollowed && (
+          <>
+            {progress && (
+              <div className="progress">
+                <div className="progress__bar">
+                  <div className="progress__fill" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="progress__text">
+                  {progress.watched} / {diffuses} épisodes vus
+                  {' · '}
+                  {progress.next ? (
+                    <span>
+                      Prochain : S{progress.next.season}E
+                      {String(progress.next.episode).padStart(2, '0')} —{' '}
+                      {progress.next.name}
+                    </span>
+                  ) : (
+                    <span className="progress__done">À jour</span>
+                  )}
+                </p>
+                {aVenir > 0 && (
+                  <p className="hint">
+                    {aVenir === 1
+                      ? '1 épisode annoncé, pas encore diffusé.'
+                      : `${aVenir} épisodes annoncés, pas encore diffusés.`}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <button
+              className="btn btn--ghost btn--wide season-all"
+              onClick={toggleSerieEntiere}
+              disabled={busy}
+            >
+              <Icon name="check" size={16} />
+              {serieVue ? "Je n'ai pas vu cette série" : "J'ai vu toute la série"}
+            </button>
+
+            <ul className="season-list">
+              {seasons.map((s) => (
+                <li key={s.seasonNumber} className="season">
+                  {/* Deux commandes distinctes sur la même ligne : ouvrir la
+                      saison, ou la marquer vue sans l'ouvrir. */}
+                  <div className="season__head">
+                    <button
+                      className="season__open"
+                      onClick={() => openSeason(s.seasonNumber)}
+                    >
+                      <span>{s.name}</span>
+                      <span className="season__count">
+                        {s.watched} / {s.aired} ép.
+                      </span>
+                    </button>
+                    <button
+                      className={`season__tick ${saisonVue(s) ? 'on' : ''}`}
+                      disabled={busy}
+                      title={saisonVue(s) ? 'Décocher la saison' : 'Marquer la saison vue'}
+                      aria-label={
+                        saisonVue(s) ? 'Décocher la saison' : 'Marquer la saison vue'
+                      }
+                      onClick={(e) => toggleSaisonDepuisLaListe(s, e)}
+                    >
+                      <Icon name="check" size={15} />
+                    </button>
+                  </div>
+
+                  {expanded === s.seasonNumber && (
+                    <div className="season__body">
+                      {loadingEpisodes ? (
+                        <p className="hint">Chargement des épisodes…</p>
+                      ) : (
+                        <>
+                          <button className="season__all" onClick={toggleWholeSeason}>
+                            {allWatched
+                              ? 'Décocher toute la saison'
+                              : 'Cocher toute la saison'}
+                          </button>
+                          <ul className="episode-list">
+                            {episodes.map((ep) => (
+                              <li key={ep.episodeNumber}>
+                                <label className="episode">
+                                  <input
+                                    type="checkbox"
+                                    checked={ep.watched}
+                                    onChange={() => toggleEpisode(ep)}
+                                  />
+                                  <span className="episode__num">
+                                    E{String(ep.episodeNumber).padStart(2, '0')}
+                                  </span>
+                                  <span className="episode__name">{ep.name}</span>
+                                </label>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
         {info?.overview && (
           <div className="section">
             <h4>Synopsis</h4>
             <p className="synopsis">{info.overview}</p>
+          </div>
+        )}
+
+        {isFollowed && (
+          <div className="section">
+            <h4>Ma note</h4>
+            <div className="rating" role="group" aria-label="Note en étoiles">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  className={`rating__star ${rating >= n ? 'on' : ''}`}
+                  aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
+                  aria-pressed={rating >= n}
+                  onClick={() => cliqueEtoile(n)}
+                >
+                  <Icon name="star" size={26} />
+                </button>
+              ))}
+              <span className="rating__value">
+                {rating ? `${rating} / 5` : 'Pas encore noté'}
+              </span>
+            </div>
+
+            <textarea
+              className="avis"
+              rows={3}
+              placeholder="Ce que j'en ai pensé…"
+              value={avis}
+              onChange={(e) => tapeAvis(e.target.value)}
+              onBlur={sauveAvis}
+            />
+            <p className="hint rating__state">
+              {noteEnregistree ? 'Enregistré' : 'Non enregistré'}
+            </p>
           </div>
         )}
 
@@ -334,83 +604,6 @@ export default function Detail({
           </div>
         )}
 
-        {/* Séries : progression + saisons/épisodes (si suivie) */}
-        {isSeries && !isFollowed && (
-          <div className="section">
-            <p className="hint">
-              Ajoute la série à ton suivi pour cocher les épisodes.
-            </p>
-          </div>
-        )}
-
-        {isSeries && isFollowed && (
-          <>
-            {progress && (
-              <div className="progress">
-                <div className="progress__bar">
-                  <div className="progress__fill" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="progress__text">
-                  {progress.watched} / {progress.total} épisodes vus
-                  {' · '}
-                  {progress.next ? (
-                    <span>
-                      Prochain : S{progress.next.season}E
-                      {String(progress.next.episode).padStart(2, '0')} —{' '}
-                      {progress.next.name}
-                    </span>
-                  ) : (
-                    <span className="progress__done">À jour</span>
-                  )}
-                </p>
-              </div>
-            )}
-
-            <ul className="season-list">
-              {seasons.map((s) => (
-                <li key={s.seasonNumber} className="season">
-                  <button className="season__head" onClick={() => openSeason(s.seasonNumber)}>
-                    <span>{s.name}</span>
-                    <span className="season__count">{s.episodeCount} ép.</span>
-                  </button>
-
-                  {expanded === s.seasonNumber && (
-                    <div className="season__body">
-                      {loadingEpisodes ? (
-                        <p className="hint">Chargement des épisodes…</p>
-                      ) : (
-                        <>
-                          <button className="season__all" onClick={toggleWholeSeason}>
-                            {allWatched
-                              ? 'Décocher toute la saison'
-                              : 'Cocher toute la saison'}
-                          </button>
-                          <ul className="episode-list">
-                            {episodes.map((ep) => (
-                              <li key={ep.episodeNumber}>
-                                <label className="episode">
-                                  <input
-                                    type="checkbox"
-                                    checked={ep.watched}
-                                    onChange={() => toggleEpisode(ep)}
-                                  />
-                                  <span className="episode__num">
-                                    E{String(ep.episodeNumber).padStart(2, '0')}
-                                  </span>
-                                  <span className="episode__name">{ep.name}</span>
-                                </label>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
       </div>
     </div>
   );

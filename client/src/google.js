@@ -38,6 +38,46 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 let token = null; // { value, expiresAt }
 let initialized = null; // promesse d'initialisation, partagée
 
+// Comment la dernière autorisation a été obtenue : 'memoire' (encore valide),
+// 'silencieux' (renouvelée sans rien afficher) ou 'ecran' (Google a montré son
+// écran de compte). Affiché après une sauvegarde — c'est la seule façon pour
+// l'utilisateur de constater que le renouvellement silencieux fonctionne
+// vraiment sur son téléphone.
+let dernierMode = null;
+
+export function dernierModeAutorisation() {
+  return dernierMode;
+}
+
+// Renouvellement **silencieux** de l'autorisation Drive.
+//
+// Google sépare deux étapes : « qui es-tu » (écran de compte, toujours affiché)
+// et « as-tu le droit d'écrire ici » (silencieuse une fois accordée). Le
+// composant de connexion enchaîne les deux et ne propose que le paquet complet,
+// d'où l'écran à chaque renouvellement — et donc l'impossibilité de sauvegarder
+// sans déranger l'utilisateur.
+//
+// `DriveAuth` (code Android du projet, `DriveAuthPlugin.java`) n'ouvre que la
+// deuxième étape. Il n'affiche jamais rien : quand Google réclame un accord, il
+// le dit (`needsConsent`) et on repart sans jeton, à l'appelant de décider s'il
+// a le droit d'interrompre.
+async function renouvellementSilencieux() {
+  if (!isSupported()) return null;
+  try {
+    const { registerPlugin } = await import('@capacitor/core');
+    const DriveAuth = registerPlugin('DriveAuth');
+    const res = await DriveAuth.authorize({ scope: DRIVE_SCOPE });
+    if (!res?.granted || !res.accessToken) return null;
+    token = { value: res.accessToken, expiresAt: Date.now() + TOKEN_LIFETIME_MS };
+    dernierMode = 'silencieux';
+    return token.value;
+  } catch {
+    // Version de l'application sans ce code natif, ou refus de Google :
+    // on retombe simplement sur le comportement d'avant.
+    return null;
+  }
+}
+
 function plugin() {
   return import('@capawesome/capacitor-google-sign-in');
 }
@@ -172,7 +212,16 @@ export async function disconnect() {
 // se déclenche pendant qu'il fait autre chose.
 export async function getAccessToken({ interactive = true } = {}) {
   if (!getAccount()) return null;
-  if (token && token.expiresAt > Date.now()) return token.value;
+  if (token && token.expiresAt > Date.now()) {
+    dernierMode = 'memoire';
+    return token.value;
+  }
+
+  // D'abord sans rien afficher. C'est ce qui rend une sauvegarde automatique
+  // possible, et ce qui évite l'écran de compte au bout d'une heure d'usage.
+  const silencieux = await renouvellementSilencieux();
+  if (silencieux) return silencieux;
+
   if (!interactive) return null;
   await ensureInitialized();
   const { GoogleSignIn } = await plugin();
@@ -180,6 +229,7 @@ export async function getAccessToken({ interactive = true } = {}) {
     const result = await GoogleSignIn.signIn();
     keepToken(result);
     rememberAccount(result);
+    dernierMode = 'ecran';
     if (!token) {
       // Connexion réussie, mais Google n'a pas délivré le droit d'écrire :
       // l'autorisation Drive n'a pas été accordée ou pas demandée.
@@ -208,10 +258,11 @@ export function hasFreshToken() {
 // autres applications, et compté dans *son* quota — pas dans un quelconque
 // hébergement. C'est ce qui permet une sauvegarde en ligne sans serveur.
 //
-// Constaté à la mise au point du 2026-08-22 : redemander l'autorisation
-// réaffiche toujours l'écran de compte Google. Aucune écriture ne part donc
-// d'elle-même — c'est l'appel qui décide s'il a le droit de déranger
-// l'utilisateur, jamais ce fichier.
+// Historique : jusqu'au 2026-08-27, redemander l'autorisation réaffichait
+// toujours l'écran de compte Google, car le composant de connexion ne sait pas
+// faire l'un sans l'autre. Le renouvellement silencieux (voir plus haut) lève
+// cette limite. Ce fichier ne décide toujours pas d'interrompre l'utilisateur :
+// c'est l'appelant qui dit s'il en a le droit.
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';

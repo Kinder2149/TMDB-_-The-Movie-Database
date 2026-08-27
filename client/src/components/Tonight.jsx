@@ -3,7 +3,9 @@ import MovieCard from './MovieCard.jsx';
 import Icon from './Icon.jsx';
 import Upcoming from './Upcoming.jsx';
 import Suggestions from './Suggestions.jsx';
+import Bloc from './Bloc.jsx';
 import { getProgress } from '../api.js';
+import { isUpcoming } from '../status.js';
 
 // Page « Quoi regarder ce soir ? », en deux sous-onglets :
 //   - « En attente »  : ce qui est déjà dans le suivi et reste à regarder
@@ -22,6 +24,35 @@ export default function Tonight({
   subTab,
   onSubTab,
 }) {
+  // Blocs repliés, retenus d'un lancement à l'autre : replier « Pas encore
+  // sorti » une fois doit valoir pour les fois suivantes.
+  const [replies, setReplies] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('tonight-replies') || '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+
+  function basculeBloc(cle) {
+    setReplies((prev) => {
+      const next = new Set(prev);
+      if (next.has(cle)) next.delete(cle);
+      else next.add(cle);
+      try {
+        localStorage.setItem('tonight-replies', JSON.stringify([...next]));
+      } catch {
+        /* stockage indisponible : le pli vaut pour la session */
+      }
+      return next;
+    });
+  }
+
+  const blocProps = (cle) => ({
+    ouvert: !replies.has(cle),
+    onToggle: () => basculeBloc(cle),
+  });
+
   // Position de lecture de chaque sous-onglet (la page entière défile).
   const scrollPos = useRef({ attente: 0, suggestions: 0 });
 
@@ -55,8 +86,14 @@ export default function Tonight({
   };
 
   const enCours = items.filter((i) => i.mediaType === 'tv' && i.status === 'en_cours');
-  const aVoirFilms = items.filter((i) => i.mediaType === 'movie' && i.status === 'a_voir');
-  const aVoirSeries = items.filter((i) => i.mediaType === 'tv' && i.status === 'a_voir');
+
+  // « À voir » ne montre que ce qu'on peut regarder ce soir : les titres pas
+  // encore sortis en sont écartés, ils ont leur propre section « Pas encore
+  // sorti » juste au-dessus. Sans ce filtre le même film apparaissait deux
+  // fois sur la page. Même règle que dans « Mes listes ».
+  const aVoir = items.filter((i) => i.status === 'a_voir' && !isUpcoming(i));
+  const aVoirFilms = aVoir.filter((i) => i.mediaType === 'movie');
+  const aVoirSeries = aVoir.filter((i) => i.mediaType === 'tv');
 
   // Prochain épisode de chaque série en cours.
   const [progress, setProgress] = useState({});
@@ -78,6 +115,17 @@ export default function Tonight({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids]);
 
+  // « Reprendre » ne montre que ce qu'on peut vraiment reprendre : une série
+  // où l'on est à jour n'a pas d'épisode suivant, elle sort donc de la
+  // section. Elle reste « En cours » dans « Mes listes » — elle n'est pas
+  // finie, il n'y a simplement rien à regarder ce soir.
+  // Tant que la progression n'est pas connue (chargement, ou erreur réseau),
+  // on garde la série affichée plutôt que de la faire disparaître.
+  const aReprendre = enCours.filter((s) => {
+    const p = progress[s.id];
+    return p == null || !!p.next;
+  });
+
   const byKey = new Map(items.map((i) => [`${i.mediaType}-${i.id}`, i]));
   const grid = (list) => (
     <section className="grid">
@@ -97,8 +145,14 @@ export default function Tonight({
     </section>
   );
 
+  // Le message « ton suivi est vide » ne doit pas s'afficher au-dessus d'une
+  // section « Pas encore sorti » qui, elle, a bien quelque chose à montrer.
+  const aDesSorties = items.some((i) => (i.status || 'a_voir') === 'a_voir' && isUpcoming(i));
   const nothing =
-    enCours.length === 0 && aVoirFilms.length === 0 && aVoirSeries.length === 0;
+    aReprendre.length === 0 &&
+    aVoirFilms.length === 0 &&
+    aVoirSeries.length === 0 &&
+    !aDesSorties;
 
   return (
     <div className="tonight" {...swipe}>
@@ -133,11 +187,15 @@ export default function Tonight({
         </p>
       )}
 
-      {enCours.length > 0 && (
-        <section className="tonight__section">
-          <h3 className="tonight__title">Reprendre — séries en cours</h3>
+      {aReprendre.length > 0 && (
+        <Bloc
+          titre="Reprendre"
+          couleur="var(--encours)"
+          compte={aReprendre.length}
+          {...blocProps('reprendre')}
+        >
           <div className="resume-row">
-            {enCours.map((s) => {
+            {aReprendre.map((s) => {
               const p = progress[s.id];
               return (
                 <div className="resume" key={s.id}>
@@ -155,13 +213,11 @@ export default function Tonight({
                   <div className="resume__info">
                     <span className="resume__title">{s.title}</span>
                     <span className="resume__next">
-                      {p == null
-                        ? 'Chargement…'
-                        : p.next
+                      {p?.next
                         ? `Prochain : S${p.next.season}E${String(
                             p.next.episode
                           ).padStart(2, '0')} — ${p.next.name}`
-                        : 'À jour'}
+                        : 'Chargement…'}
                     </span>
                     <button
                       className="btn btn--primary resume__btn"
@@ -175,23 +231,40 @@ export default function Tonight({
               );
             })}
           </div>
-        </section>
+        </Bloc>
       )}
 
-      <Upcoming items={items} cardProps={cardProps} embedded />
+      <Upcoming
+        items={items}
+        cardProps={cardProps}
+        embedded
+        blocProps={blocProps('sorties')}
+      />
 
-      {aVoirFilms.length > 0 && (
-        <section className="tonight__section">
-          <h3 className="tonight__title">À voir — Films</h3>
-          {grid(aVoirFilms)}
-        </section>
-      )}
-
-      {aVoirSeries.length > 0 && (
-        <section className="tonight__section">
-          <h3 className="tonight__title">À voir — Séries</h3>
-          {grid(aVoirSeries)}
-        </section>
+      {aVoir.length > 0 && (
+        <Bloc
+          titre="À voir"
+          couleur="var(--avoir)"
+          compte={aVoir.length}
+          {...blocProps('avoir')}
+        >
+          {aVoirFilms.length > 0 && (
+            <section className="media-section">
+              <h4 className="subhead">
+                Films <span className="subhead__count">{aVoirFilms.length}</span>
+              </h4>
+              {grid(aVoirFilms)}
+            </section>
+          )}
+          {aVoirSeries.length > 0 && (
+            <section className="media-section">
+              <h4 className="subhead">
+                Séries <span className="subhead__count">{aVoirSeries.length}</span>
+              </h4>
+              {grid(aVoirSeries)}
+            </section>
+          )}
+        </Bloc>
       )}
 
       </div>

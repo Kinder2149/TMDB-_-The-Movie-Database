@@ -90,10 +90,13 @@ button { font-family: inherit; }
   background: radial-gradient(circle at 35% 28%, var(--gold), color-mix(in srgb, var(--gold) 55%, #000));
 }
 .brand__name { font-family: var(--serif); font-size: 1.08rem; font-weight: 700; }
+/* Le bouton n'est qu'une zone tactile : c'est l'avatar qu'il contient qui
+   porte la couleur. Sans `background: transparent`, la pastille dorée du
+   bouton dépassait derrière l'avatar — deux ronds l'un sur l'autre. */
 .appbar__profile {
   margin-left: auto; width: 32px; height: 32px; border-radius: 50%; border: 0;
-  display: grid; place-items: center; cursor: pointer;
-  background: var(--gold); color: #20180A; font-size: .82rem; font-weight: 700;
+  padding: 0; display: grid; place-items: center; cursor: pointer;
+  background: transparent;
 }
 
 /* ---------- Navigation basse ----------
@@ -305,6 +308,38 @@ button { font-family: inherit; }
   font-family: var(--serif); font-size: 1.15rem; margin: 0 0 .9rem;
   display: flex; align-items: center; gap: .5rem;
 }
+/* Blocs de « Ce soir » : une barre pleine largeur par bloc, teintée de sa
+   couleur, qui reste visible même repliée. C'est elle qui dit qu'on change de
+   bloc — un simple titre au fil du texte se noyait dans le défilement. */
+.bloc { margin-bottom: 1.4rem; }
+.bloc__head {
+  width: 100%; display: flex; align-items: center; gap: .6rem;
+  padding: .75rem .9rem; min-height: 52px; cursor: pointer; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--bloc-c) 35%, transparent);
+  border-left: 5px solid var(--bloc-c);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bloc-c) 12%, var(--surface));
+  color: var(--text);
+}
+.bloc__titre {
+  flex: 1; font-family: var(--serif); font-size: 1.2rem; font-weight: 600;
+  line-height: 1.2;
+}
+.bloc__compte {
+  min-width: 26px; padding: .1rem .45rem; border-radius: 999px;
+  background: var(--bloc-c); color: #fff;
+  font-size: .8rem; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* La flèche pointe vers le bas quand le bloc est ouvert, vers la droite
+   quand il est replié — la convention des menus déroulants. */
+.bloc__fleche {
+  display: grid; place-items: center; color: var(--bloc-c);
+  transition: transform .15s ease;
+}
+.bloc__fleche.on { transform: rotate(90deg); }
+.bloc__corps { padding-top: .9rem; }
+
 .upcoming-item__date {
   margin: .35rem 0 0; font-size: .8rem; color: var(--gold); text-align: center;
 }
@@ -592,15 +627,180 @@ button { font-family: inherit; }
 .progress__done { color: var(--vu); font-weight: 600; }
 .progress span > b, .progress .progress__text b { color: var(--encours); }
 
+/* Ajouter des titres à une liste : choix multiple dans la bibliothèque */
+.pick-list { list-style: none; margin: 0; padding: 0 1rem 5rem; }
+.pick {
+  width: 100%; display: flex; align-items: center; gap: .7rem;
+  padding: .5rem .2rem; min-height: 60px; border: 0; background: transparent;
+  border-bottom: 1px solid var(--border);
+  color: var(--text); cursor: pointer; text-align: left;
+}
+.pick:disabled { opacity: .5; cursor: default; }
+.pick__box {
+  flex: none; width: 22px; height: 22px; border-radius: 6px;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--border); color: #fff;
+}
+.pick__box.on { background: var(--vu); border-color: var(--vu); }
+.pick__poster {
+  flex: none; width: 34px; height: 50px; border-radius: 4px; object-fit: cover;
+}
+.pick__poster--vide {
+  display: grid; place-items: center; background: var(--surface2); color: var(--faint);
+}
+.pick__info { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.pick__titre { font-size: .93rem; font-weight: 600; }
+.pick__sous { font-size: .78rem; color: var(--faint); }
+.pick-bar {
+  position: sticky; bottom: 0; display: flex; align-items: center; gap: .8rem;
+  padding: .7rem 1rem; background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.pick-bar__compte { flex: 1; font-size: .85rem; color: var(--muted); }
+.sechead__add {
+  margin-left: .5rem; padding: .35rem .7rem; min-height: 36px;
+  display: inline-flex; align-items: center; gap: .3rem;
+  border: 1px solid var(--avoir); border-radius: 8px;
+  background: transparent; color: var(--avoir); font-size: .82rem; cursor: pointer;
+}
+
+/* Interrupteur de la sauvegarde automatique */
+.reglage-auto {
+  display: flex; align-items: center; gap: .8rem; margin: .8rem 0 .4rem;
+  padding: .8rem; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.reglage-auto__texte { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
+
+/* Statistiques */
+.stat-grid {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.stat-case {
+  display: flex; flex-direction: column; gap: .2rem;
+  padding: .8rem .9rem; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.stat-case--fort { border-color: var(--gold); background: var(--gold-soft); }
+.stat-case__valeur {
+  font-family: var(--serif); font-size: 1.35rem; font-weight: 600;
+  font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.stat-case--fort .stat-case__valeur { color: var(--gold-strong); }
+.stat-case__label { font-size: .8rem; color: var(--faint); }
+
+.stat-lignes { list-style: none; margin: 0; padding: 0; }
+.stat-ligne {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .65rem .2rem; border-bottom: 1px solid var(--border);
+}
+.stat-ligne__led {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--sc, var(--faint));
+}
+.stat-ligne__label { flex: 1; }
+.stat-ligne b { font-variant-numeric: tabular-nums; }
+
+/* Avatar de profil : pastille de couleur, initiale ou symbole dessiné */
+.avatar {
+  display: grid; place-items: center; border-radius: 50%; flex: none;
+  color: #fff; font-weight: 700; line-height: 1;
+}
+.avatar--photo { object-fit: cover; }
+.avatar-pick__fichier { display: none; }
+
+/* Écran « Mes profils » */
+.profil-list { list-style: none; margin: 0; padding: 0 1rem 1rem; }
+.profil { border-bottom: 1px solid var(--border); padding: .6rem 0; }
+.profil__main {
+  width: 100%; display: flex; align-items: center; gap: .7rem;
+  padding: .4rem .2rem; min-height: 52px; border: 0; background: transparent;
+  color: var(--text); cursor: pointer; text-align: left;
+}
+.profil__nom { font-size: 1rem; font-weight: 600; }
+.profil__actif {
+  margin-left: auto; display: inline-flex; align-items: center; gap: .25rem;
+  color: var(--vu); font-size: .8rem;
+}
+.profil__actions { display: flex; flex-wrap: wrap; gap: .4rem; padding: .1rem .2rem .2rem; }
+.chip-toggle--danger { color: var(--danger); border-color: var(--danger); }
+.chip-toggle:disabled { opacity: .45; cursor: default; }
+
+.avatar-pick { padding: .5rem .2rem .3rem; }
+.avatar-pick__label {
+  margin: .5rem 0 .3rem; color: var(--faint); font-size: .78rem;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.avatar-pick__row { display: flex; flex-wrap: wrap; gap: .5rem; }
+.avatar-pick__col, .avatar-pick__sym {
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; border: 2px solid transparent;
+}
+.avatar-pick__col.on, .avatar-pick__sym.on { border-color: var(--text); }
+.avatar-pick__sym {
+  background: var(--surface2); color: var(--text);
+  font-weight: 700; font-size: .9rem;
+}
+.avatar-pick__sym.on { color: #fff; }
+
+/* Confirmation d'une suppression : la seule action irréversible de l'app */
+.overlay--confirm { z-index: 60; align-items: center; }
+.confirm {
+  margin: auto; max-width: 420px; width: calc(100% - 2rem);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.1rem; box-shadow: var(--shadow);
+}
+.confirm h3 { margin: 0 0 .6rem; font-family: var(--serif); font-size: 1.05rem; }
+.confirm__list { margin: .4rem 0 .8rem 1.1rem; font-size: .9rem; }
+.confirm__actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .9rem; }
+.btn--danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+/* Ma note : étoiles + avis écrit */
+.rating { display: flex; align-items: center; gap: .15rem; margin-bottom: .6rem; }
+.rating__star {
+  display: grid; place-items: center;
+  padding: .25rem; min-width: 40px; min-height: 40px;
+  border: 0; background: transparent; color: var(--faint); cursor: pointer;
+}
+.rating__star.on { color: var(--gold); }
+.rating__star.on .icon { fill: currentColor; }
+.rating__value {
+  margin-left: .5rem; color: var(--faint); font-size: .85rem;
+  font-variant-numeric: tabular-nums;
+}
+.avis {
+  width: 100%; padding: .7rem .8rem; border-radius: 10px; resize: vertical;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: inherit; font-size: .92rem;
+}
+.avis:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+.rating__state { margin-top: .35rem; }
+
 /* Saisons & épisodes */
 .season-list { list-style: none; margin: 0; padding: .2rem 1rem 2rem; }
 .season { border-bottom: 1px solid var(--border); }
-.season__head {
-  width: 100%; display: flex; justify-content: space-between; align-items: center;
+.season__head { display: flex; align-items: center; gap: .5rem; }
+.season__open {
+  flex: 1; display: flex; justify-content: space-between; align-items: center;
+  gap: .6rem;
   padding: .9rem .2rem; min-height: 48px; border: 0; background: transparent;
-  color: var(--text); font-size: .95rem; cursor: pointer;
+  color: var(--text); font-size: .95rem; cursor: pointer; text-align: left;
 }
 .season__count { color: var(--faint); font-size: .85rem; font-variant-numeric: tabular-nums; }
+
+/* Marquer une saison vue sans la déplier. Éteint = contour discret ;
+   allumé = saison à jour. */
+.season__tick {
+  flex: none; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--faint);
+}
+.season__tick:hover { border-color: var(--vu); color: var(--vu); }
+.season__tick.on { border-color: var(--vu); background: var(--vu); color: #fff; }
+.season__tick:disabled { opacity: .5; cursor: default; }
+
+/* « J'ai vu toute la série » : au-dessus de la liste des saisons. */
+.season-all { margin: 0 1rem .6rem; width: calc(100% - 2rem); }
 .season__body { padding: 0 .2rem .8rem; }
 .season__all {
   margin: .2rem 0 .8rem; padding: .5rem .8rem; min-height: 42px;

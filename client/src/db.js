@@ -93,7 +93,14 @@ async function createWebEngine() {
   const saved = await idb.get(STORE_KEY);
   const database = saved ? new SQL.Database(new Uint8Array(saved)) : new SQL.Database();
 
-  const save = () => idb.set(STORE_KEY, database.export());
+  // `export()` referme et rouvre la base pour en produire l'image. Les
+  // réglages de connexion repartent alors à zéro — dont `foreign_keys`, qui
+  // retombe à OFF. Sans ce rappel, les suppressions en cascade cesseraient
+  // silencieusement dès la première écriture (constaté par les tests).
+  const save = async () => {
+    await idb.set(STORE_KEY, database.export());
+    database.exec('PRAGMA foreign_keys = ON;');
+  };
 
   return {
     execute: async (sql) => {
@@ -213,6 +220,33 @@ async function migrateSchema() {
   // bases d'avant ce réglage : elles seront renseignées au premier choix de
   // langue, sans re-télécharger quoi que ce soit si la langue ne change pas.
   await addColumnIfMissing('suivi', 'lang', 'TEXT');
+
+  // Note personnelle : un avis écrit et une note en étoiles (1 à 5). Les deux
+  // sont facultatifs et indépendants — on peut mettre 4 étoiles sans écrire un
+  // mot, ou écrire un avis sans noter. Vide pour tout ce qui existait avant.
+  await addColumnIfMissing('suivi', 'note', 'TEXT');
+  await addColumnIfMissing('suivi', 'rating', 'INTEGER');
+
+  // Durée en minutes : celle du film, ou celle d'un épisode pour une série.
+  // Enregistrée une fois pour toutes, elle évite de redemander à TMDB à chaque
+  // ouverture de l'écran des statistiques.
+  await addColumnIfMissing('suivi', 'runtime', 'INTEGER');
+
+  // Avatar du profil : une couleur et un symbole, rangés en un seul texte
+  // (« or:film »). Vide = la pastille par défaut, avec l'initiale du nom.
+  await addColumnIfMissing('profiles', 'avatar', 'TEXT');
+
+  // Durée en minutes : celle du film, ou celle d'un épisode moyen pour une
+  // série. Sert aux statistiques. Vide tant qu'on ne l'a pas demandée à TMDB —
+  // on ne va pas chercher 400 durées pour un écran qu'on n'ouvrira peut-être
+  // jamais.
+  await addColumnIfMissing('suivi', 'runtime', 'INTEGER');
+
+  // Pays de la date de sortie enregistrée ('FR', 'US'…), ou 'monde' pour les
+  // séries — TMDB ne connaît qu'une seule date de première diffusion pour
+  // elles. Vide = date jamais mise à jour depuis ce réglage. C'est ce qui
+  // permet au rattrapage de ne toucher que ce qui n'est pas à jour.
+  await addColumnIfMissing('suivi', 'release_region', 'TEXT');
 }
 
 async function addColumnIfMissing(table, column, type) {
