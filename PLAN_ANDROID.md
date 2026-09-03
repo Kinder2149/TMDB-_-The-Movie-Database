@@ -240,16 +240,25 @@ confidentialité, puis la phase de **test fermé imposée par Google (12 testeur
 - **Mentions obligatoires** : formulaire *Sécurité des données* → « aucune donnée
   collectée » ; attribution TMDB déjà présente dans l'app (écran « À propos »).
 
-#### Captures d'écran ✅ prêtes (2026-08-17)
-Cinq captures **1080 × 1920 (9:16)**, au format exigé par Google, prises sur émulateur
-en **thème sombre** (direction visuelle V2), avec un **profil de démonstration neutre** —
-aucune donnée personnelle de Kinder n'y figure.
+#### Captures d'écran ✅ refaites au nom « Vault Watch » (2026-09-03)
+Cinq captures **1080 × 1920 (9:16)**, au format exigé par Google, en **thème sombre**
+(direction visuelle V2), avec un **profil de démonstration neutre** — aucune donnée
+personnelle de Kinder n'y figure.
+
+Elles ne sont plus prises à la main : `client/scripts/captures-play-store.mjs` lance
+l'application, fabrique le profil de démonstration depuis TMDB (titres, années et
+affiches exacts, une série laissée au milieu d'une saison pour que « Prochain épisode »
+apparaisse) puis photographie les cinq écrans. À relancer après tout changement visuel :
+
+```
+npm run dev --prefix client          # dans un terminal
+node client/scripts/captures-play-store.mjs
+```
+
 Ordre conseillé dans la fiche : « Quoi regarder ce soir ? » (la fonction qui distingue
 l'app) → fiche série → mes listes → recherche → suggestions.
 
-> Le profil de démo (19 titres grand public, 107 épisodes, 2 listes) est fabriqué depuis
-> TMDB pour que titres, années et affiches soient exacts. Une série est volontairement
-> laissée au milieu d'une saison, pour que « Prochain épisode » apparaisse à l'écran.
+**Bannière** `play-store/presentation-1024x500.png` : régénérée au nouveau nom.
 
 #### Ce qui ne peut être fait que par Kinder (compte, paiement, secrets)
 1. ~~Créer le compte développeur Google Play~~ — **déjà en place**.
