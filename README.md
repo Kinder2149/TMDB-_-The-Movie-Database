@@ -1,4 +1,4 @@
-# Suivi Films & Séries
+# Vault Watch
 
 Application Android de suivi personnel de films et séries. Publiée sur le Play Store
 (version 2.0). Voir `PROJET_CONTEXTE.md` (vision, périmètre, décisions figées) et

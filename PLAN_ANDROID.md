@@ -1,4 +1,4 @@
-# PLAN ANDROID — Suivi Films & Séries
+# PLAN ANDROID — Vault Watch
 
 > Cadrage du passage en **application Android autonome**, publiée sur le Play Store.
 > Écrit après la V2 bouclée (voir `PLAN_V2.md`). Complète `PROJET_CONTEXTE.md` (vision)
@@ -118,7 +118,7 @@ mention TMDB obligatoire.
 **Testable** : installer l'app sur le téléphone et s'en servir réellement.
 
 - `client/capacitor.config.json` : identifiant `com.kinder.suivifilmsseries`,
-  nom « Suivi Films & Séries ». Projet Android dans `client/android/`.
+  nom « Vault Watch ». Projet Android dans `client/android/`.
 - **Icône et écran de démarrage entièrement vectoriels**, repris de
   `client/public/icon.svg` (projecteur doré, direction visuelle V2) : nets à toutes
   les tailles, aucune image à régénérer. Les PNG du gabarit Capacitor sont supprimés.
@@ -219,7 +219,7 @@ confidentialité, puis la phase de **test fermé imposée par Google (12 testeur
   (aucune collecte, aucun compte, aucune publicité, aucun traceur).
 
 #### Textes de la fiche Play Store (prêts à coller)
-- **Nom** : Suivi Films & Séries
+- **Nom** : Vault Watch
 - **Description courte** (80 car. max) :
   `Suivez vos films et séries, épisode par épisode. Sans compte, sans publicité.`
 - **Description complète** :

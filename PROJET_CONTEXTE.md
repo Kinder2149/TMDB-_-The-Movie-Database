@@ -1,4 +1,4 @@
-# PROJET_CONTEXTE — Suivi Films & Séries
+# PROJET_CONTEXTE — Vault Watch
 
 ## But du projet
 Application personnelle de suivi de films et séries, en remplacement de TVShowTime (arrêté).

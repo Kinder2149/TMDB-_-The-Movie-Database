@@ -1,4 +1,4 @@
-# PLAN V2 — Suivi Films & Séries
+# PLAN V2 — Vault Watch
 
 > Cadrage de la V2, écrit après la V1 bouclée. Sert de cible avant tout découpage
 > en tranches. Complète `PROJET_CONTEXTE.md` (vision) et `STACK_STANDARD.md` (stack).

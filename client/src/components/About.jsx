@@ -16,7 +16,7 @@ export default function About({ onClose }) {
 
         <div className="detail-pad about">
           <p className="about__lead">
-            <strong>Suivi Films &amp; Séries</strong> — application personnelle de suivi
+            <strong>Vault Watch</strong> — application personnelle de suivi
             de films et de séries.
           </p>
 

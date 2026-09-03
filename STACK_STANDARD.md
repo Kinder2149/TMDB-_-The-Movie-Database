@@ -1,4 +1,4 @@
-# STACK_STANDARD — Suivi Films & Séries (V1)
+# STACK_STANDARD — Vault Watch (V1)
 
 Stack figée pour la V1. Toute déviation doit être signalée et validée avant d'être codée.
 

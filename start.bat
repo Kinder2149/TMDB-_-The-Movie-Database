@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title Suivi Films et Series - Lanceur
+title Vault Watch - Lanceur
 cd /d "%~dp0"
 
 echo ============================================
-echo   Suivi Films et Series - demarrage
+echo   Vault Watch - demarrage
 echo ============================================
 echo.
 echo Ouverture de deux fenetres : Back (API) et Front (interface).

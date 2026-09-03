@@ -1,9 +1,9 @@
 services:
-  suivi-films-series:
+  vault-watch:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: suivi-films-series
+    container_name: vault-watch
     restart: unless-stopped
     ports:
       - "3001:3001"

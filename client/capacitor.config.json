@@ -1,6 +1,6 @@
 {
   "appId": "com.kinder.suivifilmsseries",
-  "appName": "Suivi Films & Séries",
+  "appName": "Vault Watch",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false
