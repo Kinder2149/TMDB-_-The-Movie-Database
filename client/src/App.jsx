@@ -652,7 +652,7 @@ export default function App() {
     <div className="app">
       <header className="appbar">
         <span className="brand__dot" aria-hidden="true"></span>
-        <span className="brand__name">Suivi</span>
+        <span className="brand__name">Vault Watch</span>
         <button
           className="appbar__profile"
           onClick={() => goTo('settings')}
