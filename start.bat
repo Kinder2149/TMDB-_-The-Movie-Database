@@ -13,8 +13,8 @@ echo Pour tout arreter : fermez les deux fenetres qui s'ouvrent.
 echo.
 
 REM Les sous-dossiers "server" et "client" n'ont pas d'espace : le cd relatif suffit.
-start "Suivi - Back (API)"  cmd /k "cd server & npm run dev"
-start "Suivi - Front (UI)"  cmd /k "cd client & npm run dev"
+start "Vault Watch - Back (API)"  cmd /k "cd server & npm run dev"
+start "Vault Watch - Front (UI)"  cmd /k "cd client & npm run dev"
 
 REM Laisse le temps aux serveurs de demarrer avant d'ouvrir le navigateur.
 timeout /t 5 /nobreak >nul
