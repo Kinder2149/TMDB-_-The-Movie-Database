@@ -93,3 +93,10 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
   décision de projet, pas comme une tranche de développement.
 - Les idées de fonctions notées dans `PLAN_V2.md` (onglet « Découvrir », suggestions moins
   redondantes, ordre des blocs), chacune à cadrer séparément.
+- **Retours d'usage du 2026-09-10**, notés dans `PLAN_V2.md` (points 6 à 11), à cadrer un par un :
+  masquer les titres déjà en base dans la découverte par genre / acteur / top ; un bouton
+  « Actualiser » en haut **et** en bas des suggestions ; le mélange films / séries des suggestions
+  rendu stable (quota explicite) ; les autres films d'une saga dans la fiche, dans l'ordre et avec
+  le film ouvert repéré à sa place ; le même appui long d'ajout rapide dans ce rayon saga. Le
+  point 11 n'est pas une idée mais un **bug d'affichage** de la grille après un long défilement
+  par genre : à reproduire et corriger.

@@ -191,6 +191,10 @@ d'être visible en France).
 > Notées après la publication de la 2.0. **Aucune n'est cadrée** : chaque point demande sa
 > propre discussion avant tout code. Aucune n'est commencée — la mission s'est arrêtée à la
 > publication de la 2.0 (2026-08-27).
+>
+> **Points 6 à 11 ajoutés le 2026-09-10** — retours d'usage de Kinder sur l'application publiée.
+> Notés seulement : rien n'est cadré ni commencé. Le point 11 est un **bug d'affichage** constaté
+> sur l'appareil, pas une idée de fonction.
 
 ### 1. Bloc « Pas encore sorti » en dernier dans « Ce soir »
 Trivial : c'est l'ordre des blocs dans `Tonight.jsx`. À faire au prochain passage.
@@ -248,6 +252,59 @@ API publique comme **Trakt** — et ce serait un nouveau cadrage, pas la reprise
 > À noter : le rayon « disponible sur mes plateformes » de l'onglet « Découvrir » (point 3)
 > couvre une partie du besoin d'origine — filtrer sur Netflix, Disney+ ou Canal+ — **sans
 > relier aucun compte**.
+
+### 6. Masquer les titres déjà en base dans les listes de découverte (2026-09-10)
+Dans la recherche **par genre, par acteur/réalisateur et dans les tops**, ne plus afficher les
+titres déjà présents dans ma base (suivis, vus, listes). Aujourd'hui `tmdb.js` (`discoverByGenre`,
+listes acteur/genre) renvoie tout et `MovieCard` se contente de marquer l'état — les titres connus
+occupent donc la place de titres à découvrir.
+À trancher avant code : filtrage **dur** (le titre disparaît) ou **repli** (« déjà chez moi »,
+repliable) ? Le filtrage dur vide des pages entières côté TMDB (pagination faussée : une page de
+20 peut n'en garder que 3) — il faudra sans doute charger la page suivante automatiquement.
+La recherche par titre, elle, **garde** les titres déjà en base : on y cherche souvent un titre
+précis pour l'ouvrir.
+
+### 7. Bouton « Actualiser » en haut **et** en bas des suggestions (2026-09-10)
+`Suggestions.jsx` n'a qu'un bouton (ligne ~70). Après avoir parcouru la liste jusqu'en bas, il faut
+remonter pour retirer. Ajouter le même bouton en pied de liste. Purement UI, aucune logique.
+
+### 8. Suggestions : mélange films / séries instable (2026-09-10)
+Retour de Kinder, complète le point 2 : « parfois que des films, parfois que des séries, jamais le
+même nombre de chaque quand c'est un mélange ». La composition du tirage n'est pas garantie parce
+qu'elle est **héritée des graines** (les titres vus/en cours qui servent de source) et du tri par
+nombre de recommandations : si les graines tirées sont des films, le résultat est un bloc de films.
+Pistes à cadrer : **quota explicite** (par exemple moitié films / moitié séries, ou deux rayons
+séparés « Films suggérés » / « Séries suggérées » comme dans « À voir »), et tirage des graines
+équilibré entre les deux types. À traiter avec le point 2 (mêmes titres qui reviennent) : c'est le
+même mécanisme de tirage et de tri.
+
+### 9. Sagas : les autres films dans la fiche, dans l'ordre (2026-09-10)
+Aujourd'hui **rien** n'existe : `belongs_to_collection` n'est lu nulle part et `Detail.jsx` ignore
+les collections. À ajouter dans la fiche d'un film appartenant à une saga : la liste des **autres
+films de la saga**, **dans l'ordre** (ordre de sortie ; l'ordre chronologique de fiction n'est pas
+dans TMDB, ne pas le promettre), avec le film ouvert **repéré à sa place** dans la suite.
+Données : `/movie/{id}` renvoie `belongs_to_collection`, puis `/collection/{id}` donne les parties.
+À trancher : afficher aussi l'état de chaque film (vu / suivi / absent) — c'est ce qui rend le rayon
+utile pour compléter une saga (rejoint le point 3, « compléter une saga » de l'onglet Découvrir).
+
+### 10. Sagas : le même appui long d'ajout rapide (2026-09-10)
+Dans le rayon saga de la fiche, réutiliser **le même** appui long que les grilles
+(`MovieCard`, `onLongPress`) pour marquer un film « vu » ou l'ajouter directement, sans ouvrir sa
+fiche. Rien de nouveau à inventer : c'est le composant existant, à condition que le rayon saga
+soit fait de `MovieCard` et pas d'une liste maison.
+
+### 11. Bug d'affichage après un long défilement par genre (2026-09-10)
+Constaté sur l'appareil (capture du 2026-09-10, écran « Suivi » atteint depuis un genre) : après un
+défilement long, la grille se **désaligne** — les cartes d'une même rangée ne partent plus de la
+même hauteur, la colonne du milieu a des affiches plus hautes que les autres, les titres se
+retrouvent décalés d'une ligne à l'autre, et la rangée du haut n'affiche qu'un titre
+(« Point Break : Extrême limite ») sans son affiche.
+C'est un **bug, pas une idée** : à reproduire et corriger, pas à cadrer.
+Piste : `.grid` (`styles.css` ~239) est une grille simple et `.card` est un flex colonne ; l'affiche
+a bien `aspect-ratio: 2/3`, donc la hauteur ne devrait pas varier — vérifier ce que devient une
+carte étirée à la hauteur de sa rangée quand un titre voisin passe sur deux lignes, et ce que
+donnent les images encore en cours de chargement pendant l'ajout de pages (`discoverByGenre` est
+paginé). Vérifier aussi si le défilement est conservé au retour sur l'écran.
 
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties / notifications de nouvel épisode.
