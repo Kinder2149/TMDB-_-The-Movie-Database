@@ -67,6 +67,13 @@ function creerFauxDrive() {
       return { ok: true, status: 200, json: async () => ({ id: nouveau.id }) };
     }
 
+    // Suppression d'un fichier
+    if (options.method === 'DELETE') {
+      const id = adresse.match(/files\/([^?]+)$/)[1];
+      drive.fichiers = drive.fichiers.filter((f) => f.id !== id);
+      return { ok: true, status: 204 };
+    }
+
     // Liste du dossier caché
     return {
       ok: true,
@@ -290,6 +297,49 @@ describe('restaurer depuis le Drive', () => {
     await expect(backup.restoreFromDrive(JETON, sauvegardes)).rejects.toThrow(
       "n'est pas une sauvegarde"
     );
+  });
+});
+
+// Constaté par Kinder le 2026-09-11 : les profils supprimés revenaient à
+// chaque restauration, parce que leur fichier restait dans le Drive.
+describe('profil supprimé', () => {
+  beforeEach(() => {
+    localStorage.setItem('google-account', JSON.stringify(COMPTE));
+  });
+
+  it('n’est plus proposé à la restauration, même avant la sauvegarde suivante', async () => {
+    const marie = await store.createProfile('Marie');
+    await backup.backupToDrive(JETON);
+    await store.deleteProfile(marie.id);
+    backup.oublierProfil(marie.id);
+
+    const sauvegardes = await backup.listCloudBackups(JETON);
+    expect(sauvegardes.map((s) => s.profileId)).toEqual([profil.id]);
+  });
+
+  it('quitte le Drive à la sauvegarde suivante', async () => {
+    const marie = await store.createProfile('Marie');
+    await backup.backupToDrive(JETON);
+    await store.deleteProfile(marie.id);
+    backup.oublierProfil(marie.id);
+    expect(backup.hasPendingChanges()).toBe(true); // la suppression est à envoyer
+
+    await backup.backupToDrive(JETON);
+
+    expect(drive.fichiers.map((f) => f.name)).toEqual([`profil-${profil.id}.json`]);
+  });
+
+  it('ne retire jamais un profil simplement absent de l’appareil', async () => {
+    // Téléphone neuf pas encore restauré : les profils du Drive y sont absents,
+    // une sauvegarde ne doit surtout pas les effacer.
+    drive.fichiers.push({
+      id: 'id-9',
+      name: 'profil-autre-appareil.json',
+      appProperties: { profileId: 'autre-appareil', profileName: 'Marie' },
+      contenu: '{}',
+    });
+    await backup.backupToDrive(JETON);
+    expect(drive.fichiers.map((f) => f.name)).toContain('profil-autre-appareil.json');
   });
 });
 

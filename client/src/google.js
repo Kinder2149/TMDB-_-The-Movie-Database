@@ -337,6 +337,11 @@ export async function uploadDriveFile(token, { fileId, name, contents, appProper
   return response.json();
 }
 
+// Retire un fichier du dossier caché (sauvegarde d'un profil supprimé).
+export async function deleteDriveFile(token, fileId) {
+  await driveFetch(`${DRIVE_API}/${fileId}`, token, { method: 'DELETE' });
+}
+
 export async function downloadDriveFile(token, fileId) {
   const response = await driveFetch(`${DRIVE_API}/${fileId}?alt=media`, token);
   return response.json();

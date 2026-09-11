@@ -8,7 +8,7 @@
 import * as tmdb from './tmdb.js';
 import * as store from './store.js';
 import * as lang from './lang.js';
-import { markChanged } from './backup.js';
+import { markChanged, oublierProfil } from './backup.js';
 
 // Toute écriture passe par ici : la sauvegarde cloud doit savoir qu'il y a du
 // nouveau à envoyer. Sans compte Google relié, `markChanged` ne fait rien —
@@ -67,9 +67,12 @@ export async function countProfileData(id) {
 }
 
 // Supprime un profil et tout son contenu. Renvoie l'id du profil sur lequel se
-// rabattre. La sauvegarde Drive du profil n'est pas touchée.
+// rabattre. Sa sauvegarde Drive est retirée à la sauvegarde suivante, et il
+// n'est plus proposé à la restauration.
 export async function deleteProfile(id) {
-  return ecriture(store.deleteProfile(id));
+  const repli = await ecriture(store.deleteProfile(id));
+  oublierProfil(id);
+  return repli;
 }
 
 // --- Langue du catalogue ---

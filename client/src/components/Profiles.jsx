@@ -155,8 +155,8 @@ export default function Profiles({
                 <li>{aSupprimer.contenu.listes} liste(s) personnalisée(s)</li>
               </ul>
               <p className="hint">
-                La sauvegarde de ce profil dans ton Drive, elle, n'est pas
-                touchée : elle reste disponible pour le restaurer.
+                Sa sauvegarde dans ton Drive sera retirée à la prochaine
+                sauvegarde : le profil ne reviendra pas en restaurant.
               </p>
               <div className="confirm__actions">
                 <button className="btn btn--ghost" onClick={() => setASupprimer(null)}>

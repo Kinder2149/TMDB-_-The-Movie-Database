@@ -246,12 +246,42 @@ import {
   listDriveFiles,
   uploadDriveFile,
   downloadDriveFile,
+  deleteDriveFile,
   getAccessToken,
   getAccount,
 } from './google.js';
 
 const PENDING_KEY = 'cloud-pending';
 const LAST_BACKUP_KEY = 'cloud-last-backup';
+
+// --- Profils supprimés ---
+//
+// Supprimer un profil ne touchait pas sa sauvegarde Drive (filet de sécurité).
+// Conséquence constatée par Kinder le 2026-09-11 : « Restaurer depuis Drive »
+// ramenait tous les profils du Drive, et les profils supprimés revenaient à
+// chaque fois, sauvegarde ou pas.
+//
+// Désormais une suppression est **retenue** : le profil n'est plus proposé à
+// la restauration, et son fichier est retiré du Drive à la sauvegarde
+// suivante. On ne retire que ce qui a été explicitement supprimé — jamais
+// « tout ce qui n'est pas sur l'appareil », qui viderait le Drive depuis un
+// téléphone neuf pas encore restauré.
+const SUPPRIMES_KEY = 'cloud-profils-supprimes';
+
+function profilsSupprimes() {
+  try {
+    return new Set(JSON.parse(readLocal(SUPPRIMES_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+export function oublierProfil(profileId) {
+  const ids = profilsSupprimes();
+  ids.add(profileId);
+  writeLocal(SUPPRIMES_KEY, JSON.stringify([...ids]));
+  markChanged(); // la sauvegarde suivante retire son fichier du Drive
+}
 
 const cloudFileName = (profileId) => `profil-${profileId}.json`;
 
@@ -413,6 +443,18 @@ export async function backupToDrive(token) {
     envoyes += 1;
   }
 
+  // Profils supprimés sur l'appareil : leur fichier quitte le Drive. Un profil
+  // recréé depuis (même identifiant, restauré par fichier) est gardé.
+  const supprimes = profilsSupprimes();
+  const locaux = new Set(profils.map((p) => p.id));
+  for (const f of existants) {
+    const id = f.appProperties?.profileId || f.name.slice(7, -5);
+    if (f.name.startsWith('profil-') && supprimes.has(id) && !locaux.has(id)) {
+      await deleteDriveFile(token, f.id);
+    }
+  }
+  writeLocal(SUPPRIMES_KEY, null);
+
   writeLocal(LAST_BACKUP_KEY, new Date().toISOString());
   writeLocal(PENDING_KEY, null);
   prevenir();
@@ -423,6 +465,9 @@ export async function backupToDrive(token) {
 // l'utilisateur ce qu'il s'apprête à restaurer.
 export async function listCloudBackups(token) {
   const fichiers = await listDriveFiles(token);
+  // Un profil supprimé sur l'appareil n'est plus proposé, même si la
+  // sauvegarde qui retirera son fichier n'est pas encore partie.
+  const supprimes = profilsSupprimes();
   return fichiers
     .filter((f) => f.name.startsWith('profil-'))
     .map((f) => ({
@@ -430,7 +475,8 @@ export async function listCloudBackups(token) {
       profileId: f.appProperties?.profileId || f.name.slice(7, -5),
       profileName: f.appProperties?.profileName || 'Profil',
       modifiedAt: f.modifiedTime ? new Date(f.modifiedTime) : null,
-    }));
+    }))
+    .filter((s) => !supprimes.has(s.profileId));
 }
 
 // Restaure tout ce que contient le Drive. Chaque profil restauré **remplace**
