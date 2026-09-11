@@ -100,10 +100,16 @@ export async function searchMulti(query) {
   return (data.results || []).filter(isFilmOrSerie).map((item) => toCardItem(item));
 }
 
-// Tendances de la semaine (films + séries), pour l'écran de recherche à vide.
-export async function getTrending() {
-  const data = await tmdbGet('/trending/all/week');
-  return (data.results || []).filter(isFilmOrSerie).map((item) => toCardItem(item));
+// Tendances du moment, pour l'écran de recherche à vide. `mediaType` : 'all',
+// 'movie' ou 'tv' — filtrer « Films » demande les tendances films elles-mêmes,
+// plutôt que de trier une liste mixte qui n'en garderait que la moitié.
+// Paginé : TMDB rend 20 titres par page.
+export async function getTrending({ mediaType = 'all', page = 1 } = {}) {
+  const data = await tmdbGet(`/trending/${mediaType}/week`, { page });
+  return (data.results || [])
+    .map((item) => ({ ...item, media_type: item.media_type || mediaType }))
+    .filter(isFilmOrSerie)
+    .map((item) => toCardItem(item));
 }
 
 // Recherche par acteur : on résout la personne la plus notable, puis on

@@ -138,9 +138,9 @@ export async function discoverGenre({ movieGenre, tvGenre, page = 1 }) {
   });
 }
 
-// Tendances de la semaine (films + séries) : proposées quand le champ est vide.
-export async function getTrending() {
-  return tmdb.getTrending();
+// Tendances du moment : proposées quand le champ est vide. { mediaType, page }.
+export async function getTrending(options) {
+  return tmdb.getTrending(options);
 }
 
 export async function searchTitles(query) {

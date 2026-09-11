@@ -326,6 +326,18 @@ carte étirée à la hauteur de sa rangée quand un titre voisin passe sur deux 
 donnent les images encore en cours de chargement pendant l'ajout de pages (`discoverByGenre` est
 paginé). Vérifier aussi si le défilement est conservé au retour sur l'écran.
 
+### 12. Retours du 2026-09-11, au premier essai de l'APK ✅
+- **Profils supprimés qui revenaient** : chaque profil a son fichier dans le Drive, et
+  « Restaurer » les reprenait tous. Une suppression est maintenant retenue
+  (`backup.oublierProfil`) : le profil n'est plus proposé, et son fichier quitte le Drive à
+  la sauvegarde suivante. Revient sur la décision du 2026-08-26 (« la suppression ne touche
+  pas le Drive »), à la demande de Kinder. On ne retire **que** les profils supprimés, jamais
+  ceux simplement absents de l'appareil (un téléphone neuf viderait sinon le Drive).
+- **Recherche dans « Mes listes »** : un champ en haut cherche dans toute la bibliothèque,
+  sans accents ni majuscules (`status.titreCorrespond`, aussi utilisé par l'ajout groupé).
+- **« Tendances du moment »** : 3 pages TMDB d'un coup (~60 titres) au lieu d'une, « Voir
+  plus » pour 3 de plus, et le filtre Films / Séries demande les tendances du type choisi.
+
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties / notifications de nouvel épisode.
 - Fonctions sociales.

@@ -185,11 +185,47 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
 
-  // Genres et tendances chargés une fois (indépendants du profil).
+  // Tendances du moment. Une page TMDB (20 titres), une fois masqué ce qu'on a
+  // déjà, n'en laissait parfois qu'une poignée : on en charge 3 d'un coup, et
+  // « Voir plus » en ajoute 3 autres.
+  const [tendancesPage, setTendancesPage] = useState(0); // dernière page chargée
+  const [tendancesPlus, setTendancesPlus] = useState(true);
+  const tendancesSeq = useRef(0);
+
+  async function chargerTendances(filtre, ajouter = false) {
+    const seq = ++tendancesSeq.current;
+    const depuis = ajouter ? tendancesPage + 1 : 1;
+    const pages = [depuis, depuis + 1, depuis + 2];
+    try {
+      const lots = await Promise.all(
+        pages.map((page) =>
+          getTrending({ mediaType: filtre, page }).catch(() => [])
+        )
+      );
+      if (seq !== tendancesSeq.current) return; // filtre changé entre-temps
+      const nouveaux = lots.flat();
+      setTendancesPage(depuis + 2);
+      setTendancesPlus(lots[2].length > 0);
+      setTrending((prev) => {
+        const base = ajouter ? prev : [];
+        const vus = new Set(base.map(keyOf));
+        return [...base, ...nouveaux.filter((r) => !vus.has(keyOf(r)) && vus.add(keyOf(r)))];
+      });
+    } catch {
+      /* réseau indisponible : l'écran reste sans tendances */
+    }
+  }
+
+  // Genres chargés une fois (indépendants du profil).
   useEffect(() => {
     getGenres().then(setGenres).catch(() => {});
-    getTrending().then(setTrending).catch(() => {});
   }, []);
+
+  // Tendances : rechargées quand on passe de Tout à Films ou Séries.
+  useEffect(() => {
+    chargerTendances(mediaFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaFilter]);
 
   // En mode genre, changer le filtre Films/Séries relance la découverte.
   // Si le genre sélectionné n'existe pas pour le nouveau filtre (ex. « Action »
@@ -455,7 +491,7 @@ export default function App() {
     setSuggestions([]); // recalculées dans la nouvelle langue au prochain passage
     setResults([]);
     setTrending([]);
-    getTrending().then(setTrending).catch(() => {});
+    chargerTendances(mediaFilter);
     getGenres().then(setGenres).catch(() => {});
     return res;
   }
@@ -781,7 +817,7 @@ export default function App() {
             </div>
           )}
 
-          {hasSearched && (
+          {(hasSearched || isDefault) && (
             <div className="seg">
               {[
                 ['all', 'Tout'],
@@ -841,7 +877,7 @@ export default function App() {
           {isDefault && trendingFiltered.length > 0 && (
             <>
               <div className="sechead">
-                <h3>✨ Tendances de la semaine</h3>
+                <h3>✨ Tendances du moment</h3>
               </div>
               <section className="grid">
                 {trendingFiltered.map((item) => (
@@ -854,6 +890,16 @@ export default function App() {
                   />
                 ))}
               </section>
+              {tendancesPlus && (
+                <div className="voirplus">
+                  <button
+                    className="btn btn--ghost"
+                    onClick={() => chargerTendances(mediaFilter, true)}
+                  >
+                    Voir plus
+                  </button>
+                </div>
+              )}
             </>
           )}
 
