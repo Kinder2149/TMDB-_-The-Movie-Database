@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import { STATUS_LABEL } from '../status.js';
 
@@ -18,6 +18,7 @@ export default function MovieCard({
 }) {
   const typeLabel = item.mediaType === 'movie' ? 'Film' : 'Série';
   const current = status || 'a_voir';
+  const [posterFailed, setPosterFailed] = useState(false);
 
   // Appui long sur l'affiche : ouvre le menu des statuts (voir StatusMenu).
   // L'appui court garde son rôle — ouvrir la fiche. Le geste est posé ici,
@@ -80,8 +81,15 @@ export default function MovieCard({
           }}
           title="Voir la fiche"
         >
-          {item.posterUrl ? (
-            <img src={item.posterUrl} alt={item.title} loading="lazy" />
+          {item.posterUrl && !posterFailed ? (
+            <img
+              src={item.posterUrl}
+              alt={item.title}
+              loading="lazy"
+              // Une affiche qui ne charge pas laissait un trou sans hauteur dans
+              // la rangée : on retombe sur le cadre « Pas d'affiche ».
+              onError={() => setPosterFailed(true)}
+            />
           ) : (
             <div className="card__no-poster">Pas d'affiche</div>
           )}

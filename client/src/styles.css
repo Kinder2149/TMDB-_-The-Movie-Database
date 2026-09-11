@@ -235,8 +235,11 @@ button { font-family: inherit; }
 .error { color: var(--danger); }
 
 /* ---------- Grille & cartes ----------
-   3 colonnes sur téléphone : on voit 9 titres par écran au lieu de 2. */
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem .6rem; }
+   3 colonnes sur téléphone : on voit 9 titres par écran au lieu de 2.
+   minmax(0, 1fr) et non 1fr : avec 1fr, un titre fait d'un seul mot très long
+   élargissait sa colonne, donc toutes les affiches de cette colonne, et
+   désalignait la grille entière. */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem .6rem; }
 @media (min-width: 560px) {
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1.2rem 1rem; }
 }
@@ -250,7 +253,7 @@ button { font-family: inherit; }
 }
 .subhead__count { color: var(--gold); font-weight: 700; }
 
-.card { display: flex; flex-direction: column; }
+.card { display: flex; flex-direction: column; min-width: 0; }
 .card__poster { position: relative; }
 .card__open {
   display: block; width: 100%; padding: 0; border: 0; cursor: pointer;
@@ -293,7 +296,7 @@ button { font-family: inherit; }
 
 .card__title {
   font-family: var(--serif); font-size: .82rem; font-weight: 600;
-  margin: .4rem 0 .1rem; line-height: 1.2;
+  margin: .4rem 0 .1rem; line-height: 1.2; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .card__meta { font-size: .72rem; color: var(--faint); margin: 0; }
