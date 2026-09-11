@@ -321,7 +321,25 @@ export async function getDetails(mediaType, id) {
     cast,
     trailer,
     providers,
+    // Saga à laquelle appartient un film (TMDB n'en connaît pas pour les séries).
+    collection: data.belongs_to_collection
+      ? { id: data.belongs_to_collection.id, name: data.belongs_to_collection.name }
+      : null,
   };
+}
+
+// Films d'une saga, dans l'**ordre de sortie**. L'ordre chronologique de
+// l'histoire n'existe pas chez TMDB : on ne le promet pas. Un film sans date
+// (annoncé, pas encore daté) passe en fin de liste.
+export async function getCollection(id) {
+  const data = await tmdbGet(`/collection/${id}`);
+  return (data.parts || [])
+    .map((p) => toCardItem(p, 'movie'))
+    .sort((a, b) => {
+      if (!a.releaseDate) return 1;
+      if (!b.releaseDate) return -1;
+      return a.releaseDate < b.releaseDate ? -1 : 1;
+    });
 }
 
 // Durée d'un titre, en minutes :

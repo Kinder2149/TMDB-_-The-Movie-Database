@@ -14,9 +14,11 @@ import {
   getItemListes,
   getNote,
   setNote,
+  getCollection,
 } from '../api.js';
 import { STATUSES, deriveSeriesStatus } from '../status.js';
 import Icon from './Icon.jsx';
+import MovieCard from './MovieCard.jsx';
 
 // Fiche détail générique (film ou série). Pour une série suivie, la
 // progression et les saisons/épisodes sont intégrées ici.
@@ -31,6 +33,8 @@ export default function Detail({
   onAddToListe,
   onRemoveFromListe,
   onClose,
+  suivi, // Map des titres suivis : l'état de chaque film de la saga
+  cardProps,
 }) {
   const isSeries = item.mediaType === 'tv';
 
@@ -142,6 +146,28 @@ export default function Detail({
   useEffect(() => {
     getDetails(item.mediaType, item.id).then(setInfo).catch((e) => setError(e.message));
   }, [item.id, item.mediaType]);
+
+  // --- Saga ---
+  // Chargée après la fiche, dont on a besoin pour savoir s'il y a une saga.
+  // Une saga injoignable ne mérite pas un message d'erreur : le rayon manque, rien de plus.
+  const [saga, setSaga] = useState(null);
+  const collectionId = info?.collection?.id;
+  useEffect(() => {
+    if (!collectionId) return;
+    getCollection(collectionId).then(setSaga).catch(() => setSaga(null));
+  }, [collectionId]);
+
+  // Dans une longue saga, le film ouvert peut être hors de l'écran : on fait
+  // défiler la rangée (et elle seule) jusqu'à lui.
+  const sagaRef = useRef(null);
+  useEffect(() => {
+    const rangee = sagaRef.current;
+    const ici = rangee?.querySelector('.is-here');
+    if (ici) {
+      rangee.scrollLeft +=
+        ici.getBoundingClientRect().left - rangee.getBoundingClientRect().left - 16;
+    }
+  }, [saga]);
 
   // Recharge la progression ET aligne le statut de la série dessus
   // (à voir / en cours / vu), sauf si la série est marquée « abandonné ».
@@ -490,6 +516,38 @@ export default function Detail({
           <div className="section">
             <h4>Synopsis</h4>
             <p className="synopsis">{info.overview}</p>
+          </div>
+        )}
+
+        {/* Saga : les films dans l'ordre de sortie, celui qu'on regarde repéré
+            à sa place. Ce sont les cartes des grilles — même liseré d'état, même
+            pastille d'ajout, même appui long — pour compléter une saga sans
+            ouvrir chaque fiche. */}
+        {saga?.length > 1 && (
+          <div className="section">
+            <h4>{info.collection.name}</h4>
+            <p className="hint saga__hint">
+              {saga.length} films, dans l'ordre de sortie.
+            </p>
+            <div className="saga" ref={sagaRef}>
+              {saga.map((film, i) => {
+                const cle = `movie-${film.id}`;
+                const ici = film.id === item.id;
+                return (
+                  <div key={cle} className={`saga__item ${ici ? 'is-here' : ''}`}>
+                    <span className="saga__rank">{ici ? 'Ce film' : `${i + 1}`}</span>
+                    <MovieCard
+                      item={film}
+                      isFollowed={suivi.has(cle)}
+                      status={suivi.get(cle)?.status}
+                      {...cardProps}
+                      // Toucher le film ouvert ne rouvre pas la même fiche.
+                      onOpenDetail={ici ? () => {} : cardProps.onOpenDetail}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

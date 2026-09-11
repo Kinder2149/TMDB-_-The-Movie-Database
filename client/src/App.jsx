@@ -904,7 +904,12 @@ export default function App() {
 
       {openDetail && (
         <Detail
+          // Passer d'un film de la saga à un autre repart d'une fiche neuve
+          // (note, listes, épisodes, défilement en haut).
+          key={keyOf(openDetail)}
           item={openDetail}
+          suivi={suivi}
+          cardProps={cardProps}
           isFollowed={suivi.has(keyOf(openDetail))}
           status={suivi.get(keyOf(openDetail))?.status}
           listes={listes}

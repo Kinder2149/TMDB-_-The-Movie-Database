@@ -604,6 +604,21 @@ button { font-family: inherit; }
 /* Acteurs */
 /* Distribution : defilement horizontal plutot que trois rangees de visages
    empilees sur un ecran de telephone. */
+/* Saga : rangée qui défile de côté, comme les acteurs. Le film ouvert porte un
+   cadre doré et « Ce film » à la place de son rang. */
+.saga__hint { margin: -.4rem 0 .8rem; font-size: .8rem; }
+.saga {
+  display: flex; gap: .7rem; overflow-x: auto;
+  margin: 0 -1rem; padding: 0 1rem .3rem; scrollbar-width: none;
+}
+.saga::-webkit-scrollbar { display: none; }
+.saga__item { flex: 0 0 104px; display: flex; flex-direction: column; gap: .3rem; }
+.saga__rank { font-size: .72rem; font-weight: 700; color: var(--faint); }
+.saga__item.is-here .saga__rank { color: var(--gold); }
+.saga__item.is-here .card img, .saga__item.is-here .card__no-poster {
+  border: 2px solid var(--gold);
+}
+
 .cast {
   display: flex; gap: .9rem; overflow-x: auto;
   margin: 0 -1rem; padding: 0 1rem .3rem; scrollbar-width: none;

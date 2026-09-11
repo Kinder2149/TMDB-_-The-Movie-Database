@@ -111,6 +111,11 @@ export async function getDetails(mediaType, id) {
   return tmdb.getDetails(mediaType, id);
 }
 
+// Films d'une saga, dans l'ordre de sortie.
+export async function getCollection(id) {
+  return tmdb.getCollection(id);
+}
+
 // Recherche par acteur : renvoie { person, results (filmographie) }.
 export async function searchByActor(query) {
   return tmdb.searchByActor(query);
