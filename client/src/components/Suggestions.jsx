@@ -57,20 +57,32 @@ export default function Suggestions({
     </>
   );
 
+  const actualiser = (enBas) => (
+    <button
+      className="btn btn--ghost tonight__refresh"
+      onClick={() => {
+        // Depuis le pied de liste, on remonte : la nouvelle liste commence en haut.
+        if (enBas) window.scrollTo({ top: 0, behavior: 'smooth' });
+        onRefreshSuggestions();
+      }}
+      disabled={suggestionsLoading}
+    >
+      <Icon name="refresh" size={14} />
+      Actualiser
+    </button>
+  );
+
   return (
     <section className={embedded ? 'tonight__section' : 'tonight'}>
       <h3 className="tonight__title">
         Parce que vous avez aimé…
-        <button
-          className="btn btn--ghost tonight__refresh"
-          onClick={onRefreshSuggestions}
-          disabled={suggestionsLoading}
-        >
-          <Icon name="refresh" size={14} />
-          Actualiser
-        </button>
+        {actualiser(false)}
       </h3>
       {body}
+      {/* Même bouton en pied de liste : on n'a pas à remonter pour relancer. */}
+      {!suggestionsLoading && suggestions.length > 0 && (
+        <div className="suggestions__foot">{actualiser(true)}</div>
+      )}
     </section>
   );
 }

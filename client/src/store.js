@@ -699,7 +699,11 @@ export async function getSuggestions(profileId) {
     const j = Math.floor(Math.random() * (i + 1));
     [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
   }
-  seeds = seeds.slice(0, 12); // borne le nombre d'appels TMDB
+  // 12 graines au plus (borne le nombre d'appels TMDB), moitié films moitié
+  // séries : un film ne recommande que des films, une série que des séries.
+  // Tirées au hasard dans tout le suivi, les graines donnaient parfois un bloc
+  // de films seuls, parfois de séries seules.
+  seeds = moitieMoitie(seeds, 12);
 
   const lists = await Promise.all(
     seeds.map((s) =>
@@ -724,8 +728,21 @@ export async function getSuggestions(profileId) {
     }
   }
 
-  return [...agg.values()]
-    .sort((a, b) => b.score - a.score || b._pop - a._pop)
-    .slice(0, 30)
-    .map(({ _pop, score, ...rest }) => rest);
+  const classees = [...agg.values()].sort(
+    (a, b) => b.score - a.score || b._pop - a._pop
+  );
+  // Même règle au résultat : 15 films et 15 séries, et si un type manque, l'autre
+  // comble — on ne rend jamais moins que ce qu'on a.
+  return moitieMoitie(classees, 30).map(({ _pop, score, ...rest }) => rest);
+}
+
+// Prend `n` éléments, autant de films que de séries, en gardant l'ordre de
+// chaque type. Quand un type n'en a pas assez, l'autre complète.
+export function moitieMoitie(liste, n) {
+  const films = liste.filter((i) => i.mediaType === 'movie');
+  const series = liste.filter((i) => i.mediaType !== 'movie');
+  const partFilms = Math.min(films.length, Math.max(Math.ceil(n / 2), n - series.length));
+  const partSeries = Math.min(series.length, n - partFilms);
+  const garde = new Set([...films.slice(0, partFilms), ...series.slice(0, partSeries)]);
+  return liste.filter((i) => garde.has(i));
 }

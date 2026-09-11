@@ -220,6 +220,8 @@ button { font-family: inherit; }
   display: inline-flex; align-items: center; gap: .35rem;
 }
 .tonight__refresh:disabled { opacity: .5; cursor: default; }
+.suggestions__foot { display: flex; justify-content: center; margin: .4rem 0 1.4rem; }
+.suggestions__foot .tonight__refresh { margin-left: 0; }
 
 /* Sous-onglets de « Ce soir ». Les deux volets restent montés : celui qui
    n'est pas affiché est simplement masqué, ce qui préserve son défilement. */

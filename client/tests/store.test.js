@@ -602,3 +602,28 @@ describe('suggestions', () => {
     await expect(store.getSuggestions(profil.id)).resolves.toEqual([]);
   });
 });
+
+// Suggestions : autant de films que de séries, l'un comblant l'autre s'il manque.
+describe('moitieMoitie', () => {
+  const liste = (films, series) => [
+    ...Array.from({ length: films }, (_, i) => ({ id: i, mediaType: 'movie' })),
+    ...Array.from({ length: series }, (_, i) => ({ id: 1000 + i, mediaType: 'tv' })),
+  ];
+  const compte = (l) => [
+    l.filter((i) => i.mediaType === 'movie').length,
+    l.filter((i) => i.mediaType === 'tv').length,
+  ];
+
+  it('partage à égalité quand les deux types suffisent', () => {
+    expect(compte(store.moitieMoitie(liste(40, 40), 30))).toEqual([15, 15]);
+  });
+
+  it("comble avec l'autre type quand l'un manque", () => {
+    expect(compte(store.moitieMoitie(liste(20, 2), 12))).toEqual([10, 2]);
+    expect(compte(store.moitieMoitie(liste(1, 20), 12))).toEqual([1, 11]);
+  });
+
+  it('garde tout quand il y a moins que demandé', () => {
+    expect(compte(store.moitieMoitie(liste(3, 4), 30))).toEqual([3, 4]);
+  });
+});

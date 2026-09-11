@@ -53,6 +53,14 @@ export default function Tonight({
     onToggle: () => basculeBloc(cle),
   });
 
+  // « Pas encore sorti » part replié : rien à y regarder ce soir. On retient
+  // donc l'inverse — qu'il a été ouvert — sous une clé à part, pour ne pas
+  // hériter du pli enregistré par les versions d'avant.
+  const blocSorties = {
+    ouvert: replies.has('sorties-ouvert'),
+    onToggle: () => basculeBloc('sorties-ouvert'),
+  };
+
   // Position de lecture de chaque sous-onglet (la page entière défile).
   const scrollPos = useRef({ attente: 0, suggestions: 0 });
 
@@ -89,7 +97,7 @@ export default function Tonight({
 
   // « À voir » ne montre que ce qu'on peut regarder ce soir : les titres pas
   // encore sortis en sont écartés, ils ont leur propre section « Pas encore
-  // sorti » juste au-dessus. Sans ce filtre le même film apparaissait deux
+  // sorti » en bas de page. Sans ce filtre le même film apparaissait deux
   // fois sur la page. Même règle que dans « Mes listes ».
   const aVoir = items.filter((i) => i.status === 'a_voir' && !isUpcoming(i));
   const aVoirFilms = aVoir.filter((i) => i.mediaType === 'movie');
@@ -234,13 +242,6 @@ export default function Tonight({
         </Bloc>
       )}
 
-      <Upcoming
-        items={items}
-        cardProps={cardProps}
-        embedded
-        blocProps={blocProps('sorties')}
-      />
-
       {aVoir.length > 0 && (
         <Bloc
           titre="À voir"
@@ -266,6 +267,9 @@ export default function Tonight({
           )}
         </Bloc>
       )}
+
+      {/* En dernier : ce qui n'est pas encore sorti ne se regarde pas ce soir. */}
+      <Upcoming items={items} cardProps={cardProps} embedded blocProps={blocSorties} />
 
       </div>
 
