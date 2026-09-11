@@ -26,6 +26,16 @@ export function isUpcoming(item) {
   return item.releaseDate > today;
 }
 
+// Vrai si le titre contient le texte cherché, sans tenir compte des accents
+// ni des majuscules : « amelie » doit trouver « Le Fabuleux Destin d'Amélie ».
+const plat = (s) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+export function titreCorrespond(titre, recherche) {
+  const q = plat(recherche.trim());
+  return !q || plat(titre || '').includes(q);
+}
+
 export function formatReleaseDate(releaseDate) {
   if (!releaseDate) return null;
   const [y, m, d] = releaseDate.split('-');

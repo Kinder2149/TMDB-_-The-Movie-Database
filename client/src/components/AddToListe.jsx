@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from './Icon.jsx';
+import { titreCorrespond } from '../status.js';
 
 // « Ajouter des titres » à une liste, depuis ce qu'on suit déjà.
 //
@@ -16,10 +17,9 @@ export default function AddToListe({ liste, items, dejaDedans, onValider, onClos
 
   const presents = new Set(dejaDedans.map((i) => `${i.mediaType}-${i.id}`));
 
-  const q = recherche.trim().toLowerCase();
   const visibles = items
     .filter((i) => mediaFilter === 'all' || i.mediaType === mediaFilter)
-    .filter((i) => !q || i.title.toLowerCase().includes(q))
+    .filter((i) => titreCorrespond(i.title, recherche))
     .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 
   function bascule(item) {

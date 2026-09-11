@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import MovieCard from './MovieCard.jsx';
 import Icon from './Icon.jsx';
 import AddToListe from './AddToListe.jsx';
-import { STATUSES, isUpcoming } from '../status.js';
+import { STATUSES, isUpcoming, titreCorrespond } from '../status.js';
 import { getListeItems } from '../api.js';
 
 // Mes listes. Les 4 statuts en grille, les listes créées à la main en dessous :
@@ -24,6 +24,10 @@ export default function Lists({
   const [loadingItems, setLoadingItems] = useState(false);
   const [mediaFilter, setMediaFilter] = useState('all');
   const [ajoutOuvert, setAjoutOuvert] = useState(false); // ajout en masse
+  // Recherche dans toute la bibliothèque, quels que soient le statut ou la
+  // liste sélectionnés : on cherche un titre qu'on a, pas un rayon.
+  const [recherche, setRecherche] = useState('');
+  const cherche = recherche.trim().length > 0;
 
   // Charger les éléments quand une liste perso est sélectionnée.
   function chargeListe(id) {
@@ -61,8 +65,11 @@ export default function Lists({
     items.filter((i) => (i.status || 'a_voir') === v && !(v === 'a_voir' && isUpcoming(i)))
       .length;
 
-  const mainItems =
-    selected.type === 'status'
+  const mainItems = cherche
+    ? items
+        .filter((i) => titreCorrespond(i.title, recherche))
+        .sort((a, b) => a.title.localeCompare(b.title, 'fr'))
+    : selected.type === 'status'
       ? items.filter(
           (i) =>
             (i.status || 'a_voir') === selected.value &&
@@ -72,8 +79,9 @@ export default function Lists({
 
   const selectedListe =
     selected.type === 'liste' ? listes.find((l) => l.id === selected.value) : null;
-  const title =
-    selected.type === 'status'
+  const title = cherche
+    ? 'Dans ma bibliothèque'
+    : selected.type === 'status'
       ? STATUSES.find((s) => s.value === selected.value).label
       : selectedListe?.name || '';
 
@@ -109,6 +117,32 @@ export default function Lists({
 
   return (
     <div className="lists">
+      <div className="search-bar lists__search">
+        <span className="search-bar__icon" aria-hidden="true">
+          🔍
+        </span>
+        <input
+          type="text"
+          value={recherche}
+          placeholder="Chercher dans mes titres…"
+          aria-label="Chercher dans mes titres"
+          onChange={(e) => setRecherche(e.target.value)}
+        />
+        {cherche && (
+          <button
+            className="lists__search-clear"
+            onClick={() => setRecherche('')}
+            aria-label="Effacer la recherche"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Pendant une recherche, statuts et listes s'effacent : les résultats
+          viennent juste sous le champ, sans avoir à défiler. */}
+      {!cherche && (
+        <>
       {/* Où j'en suis : les 4 statuts, avec leur compteur. */}
       <p className="lists__group">Où j'en suis</p>
       <div className="lists__statuses">
@@ -147,6 +181,8 @@ export default function Lists({
           Nouvelle
         </button>
       </div>
+        </>
+      )}
 
       <div className="seg">
         {[
@@ -167,13 +203,13 @@ export default function Lists({
       <div className="sechead">
         <h3>{title}</h3>
         <span className="sechead__count">{filteredItems.length}</span>
-        {selectedListe && (
+        {selectedListe && !cherche && (
           <button className="sechead__add" onClick={() => setAjoutOuvert(true)}>
             <Icon name="plus" size={14} />
             Ajouter
           </button>
         )}
-        {selectedListe && (
+        {selectedListe && !cherche && (
           <button
             className="lists__delete"
             onClick={() => {
@@ -191,7 +227,9 @@ export default function Lists({
         <p className="hint">Chargement…</p>
       ) : filteredItems.length === 0 ? (
         <p className="hint">
-          {mainItems.length === 0
+          {cherche
+            ? `Aucun titre « ${recherche.trim()} » dans ta bibliothèque.`
+            : mainItems.length === 0
               ? 'Rien ici pour le moment.'
               : 'Aucun résultat pour ce filtre.'}
         </p>
