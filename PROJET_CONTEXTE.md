@@ -4,8 +4,10 @@
 Application personnelle de suivi de films et séries, en remplacement de TVShowTime (arrêté).
 Permet de savoir, pour chaque film ou série, ce qu'on a vu, ce qu'on veut voir, et — pour les séries — d'en suivre la progression épisode par épisode.
 
-## Où en est le projet (2026-08-27)
-**Application Android publiée, version 2.0.** Elle tourne entièrement sur le téléphone :
+## Où en est le projet (2026-09-11)
+**Application Android publiée sous le nom « Vault Watch », version 2.1** (2026-09-03 — la 2.0 du
+2026-08-27 portait l'ancien nom). Une passe de corrections issue des retours du 10 septembre est
+faite et attend l'essai sur l'appareil avant d'être publiée en 2.2. Elle tourne entièrement sur le téléphone :
 plus aucun serveur, plus aucun back. Le catalogue vient de TMDB en direct, le suivi vit
 dans un SQLite embarqué, et la sauvegarde va dans le Google Drive de l'utilisateur.
 
@@ -35,7 +37,8 @@ sortie, disponibilité en streaming) proviennent de l'API **TMDB**, dans la lang
 Les services de streaming n'exposent pas ces données : TMDB est la seule source.
 
 ## Périmètre construit
-1. **Chercher** un film ou une série : par titre, par acteur, par genre.
+1. **Chercher** un film ou une série : par titre, par acteur, par genre. Par acteur, par genre
+   et dans les tendances, les titres déjà suivis sont masqués.
 2. **Suivre** un titre, avec 4 statuts : à voir, en cours, vu, abandonné.
 3. **Marquer vu** : film binaire ; série = épisodes cochés, avec raccourcis « toute la
    saison » et « toute la série » (qui ne cochent que ce qui est **diffusé**).
@@ -44,10 +47,11 @@ Les services de streaming n'exposent pas ces données : TMDB est la seule source
 5. **Listes personnalisées**, remplissables en masse depuis la bibliothèque.
 6. **Note personnelle** : étoiles et avis écrit.
 7. **Statistiques** : temps passé, bibliothèque, répartition, note moyenne.
-8. **« Quoi regarder ce soir ? »** : reprendre une série, pas encore sorti, à voir,
-   suggestions.
+8. **« Quoi regarder ce soir ? »** : reprendre une série, à voir, pas encore sorti (en
+   dernier, replié), et suggestions à parts égales films / séries.
 9. **Sauvegarde** : fichier local, export CSV Letterboxd, et Drive de l'utilisateur —
    manuelle ou automatique en quittant l'application.
+10. **Saga** : dans la fiche d'un film, les autres films de sa saga dans l'ordre de sortie.
 
 ## Architecture (3 couches, strict)
 Tout tient dans `client/`, il n'y a plus de séparation par processus :
@@ -91,12 +95,7 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
   fonction de plus : c'est le moment où l'application cesse d'être locale, avec hébergement,
   comptes, base PostgreSQL, données partagées, RGPD et modération. À trancher comme une
   décision de projet, pas comme une tranche de développement.
-- Les idées de fonctions notées dans `PLAN_V2.md` (onglet « Découvrir », suggestions moins
-  redondantes, ordre des blocs), chacune à cadrer séparément.
-- **Retours d'usage du 2026-09-10**, notés dans `PLAN_V2.md` (points 6 à 11), à cadrer un par un :
-  masquer les titres déjà en base dans la découverte par genre / acteur / top ; un bouton
-  « Actualiser » en haut **et** en bas des suggestions ; le mélange films / séries des suggestions
-  rendu stable (quota explicite) ; les autres films d'une saga dans la fiche, dans l'ordre et avec
-  le film ouvert repéré à sa place ; le même appui long d'ajout rapide dans ce rayon saga. Le
-  point 11 n'est pas une idée mais un **bug d'affichage** de la grille après un long défilement
-  par genre : à reproduire et corriger.
+- Les idées notées dans `PLAN_V2.md` et pas encore faites : l'onglet « Découvrir » (à cadrer)
+  et les suggestions qui reviennent trop souvent (attend une capture de Kinder).
+- **Retours d'usage du 2026-09-10** : tous traités le 2026-09-11 (détail dans `PLAN_V2.md`),
+  **en attente de l'essai sur l'appareil**, puis publication en 2.2.

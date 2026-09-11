@@ -175,11 +175,7 @@ de la langue).
   lancement suivant — corriger tout de suite coûterait un appel par ajout.
 
 ## Avant publication Play Store
-Faire monter `versionCode` / `versionName` (dépôt sur 3 / 1.2, jamais publié).
-
-Reporté, à cadrer : ~~la **date de sortie française**~~ (fait) (TMDB renvoie la date de sortie
-principale, souvent mondiale ou festival — un film peut donc basculer en « sorti » avant
-d'être visible en France).
+Faire monter `versionCode` / `versionName` (publié : 5 / 2.1 ; la prochaine sera 6 / 2.2).
 
 ## Décisions figées
 - On **relève volontairement** le plafond V1 « 20 modules / rien pour le futur » : il protégeait la V1, la V2 assume plus de modules (proprement).
@@ -193,12 +189,14 @@ d'être visible en France).
 > publication de la 2.0 (2026-08-27).
 >
 > **Points 6 à 11 ajoutés le 2026-09-10** — retours d'usage de Kinder sur l'application publiée.
-> Notés seulement : rien n'est cadré ni commencé. Le point 11 est un **bug d'affichage** constaté
-> sur l'appareil, pas une idée de fonction.
+>
+> **Passe du 2026-09-11** : points 1, 6, 7, 8, 9, 10 et 11 **faits**, en attente de l'essai de
+> Kinder sur l'appareil (tout est livré d'un bloc, à sa demande). Restent : 2 (attend une capture),
+> 3 et 4 (non cadrés).
 
-### 1. Bloc « Pas encore sorti » en dernier dans « Ce soir »
-Trivial : c'est l'ordre des blocs dans `Tonight.jsx`. À faire au prochain passage.
-Question à trancher : le laisser replié par défaut ? Le pli est déjà mémorisé.
+### 1. Bloc « Pas encore sorti » en dernier dans « Ce soir » ✅ (2026-09-11)
+Déplacé en bas de page et **replié au départ** (décision de Kinder). Son ouverture est retenue
+sous une clé à part (`sorties-ouvert`), pour ne pas hériter du pli enregistré par la 2.1.
 
 ### 2. Suggestions redondantes — à diagnostiquer
 Le code écarte déjà les doublons exacts (`agg` est indexé par titre) **et** ce qui est
@@ -211,6 +209,8 @@ déjà suivi. La redondance ressentie vient donc d'ailleurs. Trois causes plausi
 - **aucune mémoire** : un titre écarté est reproposé indéfiniment. Il manque un « pas
   intéressé ».
 → Demander à Kinder une capture d'une liste jugée redondante avant de choisir.
+**Toujours ouvert (2026-09-11)** : le partage films / séries (point 8) est fait, mais la cause
+de la redondance n'est pas tranchée — la capture manque encore.
 
 ### 3. Onglet « Découvrir » dans « Ce soir »
 Ce que TMDB permet réellement, du plus générique au plus personnel :
@@ -253,7 +253,13 @@ API publique comme **Trakt** — et ce serait un nouveau cadrage, pas la reprise
 > couvre une partie du besoin d'origine — filtrer sur Netflix, Disney+ ou Canal+ — **sans
 > relier aucun compte**.
 
-### 6. Masquer les titres déjà en base dans les listes de découverte (2026-09-10)
+### 6. Masquer les titres déjà en base dans les listes de découverte (2026-09-10) ✅
+**Fait (2026-09-11)** — filtrage **dur**, décision de Kinder. Par genre, par acteur et dans les
+tendances, ce qui est déjà suivi est masqué, avec la mention « N titres que tu as déjà sont
+masqués ». Deux précautions : un titre **ajouté pendant la séance** reste affiché jusqu'au
+prochain lancement (sinon il disparaîtrait sous le doigt) ; par genre, les pages TMDB
+s'enchaînent seules jusqu'à 12 titres nouveaux (4 pages au plus par appui). Tout est dans
+`App.jsx` (`dejaChezMoi`, `runDiscover`).
 Dans la recherche **par genre, par acteur/réalisateur et dans les tops**, ne plus afficher les
 titres déjà présents dans ma base (suivis, vus, listes). Aujourd'hui `tmdb.js` (`discoverByGenre`,
 listes acteur/genre) renvoie tout et `MovieCard` se contente de marquer l'état — les titres connus
@@ -264,11 +270,15 @@ repliable) ? Le filtrage dur vide des pages entières côté TMDB (pagination fa
 La recherche par titre, elle, **garde** les titres déjà en base : on y cherche souvent un titre
 précis pour l'ouvrir.
 
-### 7. Bouton « Actualiser » en haut **et** en bas des suggestions (2026-09-10)
+### 7. Bouton « Actualiser » en haut **et** en bas des suggestions (2026-09-10) ✅
+**Fait (2026-09-11)** : le bouton du bas remonte aussi en haut de page, où commence la nouvelle liste.
 `Suggestions.jsx` n'a qu'un bouton (ligne ~70). Après avoir parcouru la liste jusqu'en bas, il faut
 remonter pour retirer. Ajouter le même bouton en pied de liste. Purement UI, aucune logique.
 
-### 8. Suggestions : mélange films / séries instable (2026-09-10)
+### 8. Suggestions : mélange films / séries instable (2026-09-10) ✅
+**Fait (2026-09-11)** — quota explicite, deux fois : graines tirées moitié films / moitié séries
+(6 + 6), résultat 15 films + 15 séries. Si un type manque, l'autre comble (`store.moitieMoitie`,
+testé).
 Retour de Kinder, complète le point 2 : « parfois que des films, parfois que des séries, jamais le
 même nombre de chaque quand c'est un mélange ». La composition du tirage n'est pas garantie parce
 qu'elle est **héritée des graines** (les titres vus/en cours qui servent de source) et du tri par
@@ -277,6 +287,12 @@ Pistes à cadrer : **quota explicite** (par exemple moitié films / moitié sér
 séparés « Films suggérés » / « Séries suggérées » comme dans « À voir »), et tirage des graines
 équilibré entre les deux types. À traiter avec le point 2 (mêmes titres qui reviennent) : c'est le
 même mécanisme de tirage et de tri.
+
+### 9 et 10. Saga dans la fiche ✅ (2026-09-11)
+Rangée « nom de la saga » sous le synopsis, dans l'ordre de sortie, le film ouvert marqué
+« Ce film » et cadré de doré. Faite de `MovieCard` : état visible (décision de Kinder), pastille
+d'ajout et appui long compris. Toucher un autre film ouvre sa fiche (le retour ferme la fiche,
+il ne revient pas au film précédent). Données : `getDetails` → `collection`, `getCollection`.
 
 ### 9. Sagas : les autres films dans la fiche, dans l'ordre (2026-09-10)
 Aujourd'hui **rien** n'existe : `belongs_to_collection` n'est lu nulle part et `Detail.jsx` ignore
@@ -293,7 +309,11 @@ Dans le rayon saga de la fiche, réutiliser **le même** appui long que les gril
 fiche. Rien de nouveau à inventer : c'est le composant existant, à condition que le rayon saga
 soit fait de `MovieCard` et pas d'une liste maison.
 
-### 11. Bug d'affichage après un long défilement par genre (2026-09-10)
+### 11. Bug d'affichage après un long défilement par genre (2026-09-10) ✅
+**Corrigé (2026-09-11)** — cause reproduite : colonnes en `1fr`, donc un titre fait d'un seul
+mot très long élargissait sa colonne et toutes ses affiches. Colonnes en `minmax(0, 1fr)`, titres
+coupables n'importe où, et une affiche qui ne charge pas retombe sur « Pas d'affiche ».
+Constat d'origine :
 Constaté sur l'appareil (capture du 2026-09-10, écran « Suivi » atteint depuis un genre) : après un
 défilement long, la grille se **désaligne** — les cartes d'une même rangée ne partent plus de la
 même hauteur, la colonne du milieu a des affiches plus hautes que les autres, les titres se
@@ -308,8 +328,8 @@ paginé). Vérifier aussi si le défilement est conservé au retour sur l'écran
 
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties / notifications de nouvel épisode.
-- Notes / avis / statistiques personnelles.
 - Fonctions sociales.
+(Notes, avis et statistiques, notés ici à l'origine, ont été construits le 2026-08-26.)
 
 ## Prochaine étape
 Les 6 chantiers sont terminés (voir état réel ci-dessus).
@@ -319,11 +339,5 @@ Les 6 chantiers sont terminés (voir état réel ci-dessus).
 devient l'usage unique ; la version PC n'est plus maintenue. Le code serveur reste dans le dépôt
 comme base d'une mise en ligne éventuelle, non planifiée à ce jour.
 
-## Audit de reprise (2026-08-06)
-**Constat :** du travail V2 est **en cours et non commité** — `git status` montre `Detail.jsx`, `Tonight.jsx`, `status.js`, `server/src/db/listes.repo.js`, `server/src/routes/browse.js` ajoutés (non trackés) et `SeriesDetail.jsx` supprimé, plus des modifications sur `App.jsx`, `api.js`, `Lists.jsx`, `MovieCard.jsx`, `SearchBar.jsx`, plusieurs fichiers serveur. Cela correspond visiblement aux chantiers 2 (page détail), 3 (listes) et 6 (« Quoi regarder ce soir ? » — `Tonight.jsx`) amorcés en parallèle, sans qu'aucun ne soit marqué terminé ici. Pas de `CHANGELOG.md` dans le projet pour tracer ce qui a été réellement livré.
-
-**Backlog (reprise) :**
-1. Committer ou clarifier l'état du travail en cours avant de reprendre — plusieurs chantiers V2 semblent démarrés en parallèle (Detail, Tonight, listes), contrairement à la règle « une tranche à la fois, testée avant la suivante » énoncée plus haut dans ce fichier.
-2. Créer `CHANGELOG.md` — absent malgré un historique de sessions déjà riche (V1 bouclée + début V2).
-3. Vérifier que `server/src/db/listes.repo.js` et `browse.js` correspondent bien au chantier 3/4 prévu, et mettre à jour la section « Chantiers V2 » avec leur statut réel (aucun n'est encore marqué ✅).
-4. Rafraîchir `graphify-out/` après le prochain commit — le graphe actuel ne reflète pas ces fichiers non commités.
+**2026-09-11** : passe de corrections issue des retours du 10 septembre (voir « Idées pour les
+versions suivantes »), à essayer sur l'appareil puis à publier en 2.2.
