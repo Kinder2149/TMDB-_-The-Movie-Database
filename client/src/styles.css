@@ -234,6 +234,7 @@ button { font-family: inherit; }
 .actor-head b { font-weight: 700; }
 
 .hint { color: var(--muted); }
+.hint--small { font-size: .78rem; margin: 0 0 .8rem; }
 .error { color: var(--danger); }
 
 /* ---------- Grille & cartes ----------

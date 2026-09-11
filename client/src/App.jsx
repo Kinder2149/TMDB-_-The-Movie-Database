@@ -337,10 +337,26 @@ export default function App() {
     }
     if (!append) setStatus('loading');
     try {
-      const found = await discoverGenre(params);
-      if (seq !== searchSeq.current) return;
-      setGenrePage(page);
-      setGenreMore(found.length > 0);
+      // Les titres déjà suivis sont masqués à l'affichage : une page TMDB de
+      // 40 titres peut n'en laisser que 3. On enchaîne donc les pages jusqu'à
+      // avoir de quoi remplir l'écran (12 nouveaux), 4 pages au plus par appui.
+      const found = [];
+      let p = page;
+      let more = true;
+      for (let essais = 1; ; essais++) {
+        const lot = await discoverGenre({ ...params, page: p });
+        if (seq !== searchSeq.current) return;
+        if (lot.length === 0) {
+          more = false;
+          break;
+        }
+        found.push(...lot);
+        const nouveaux = found.filter((r) => !suivi.has(keyOf(r))).length;
+        if (nouveaux >= 12 || essais >= 4) break;
+        p++;
+      }
+      setGenrePage(p);
+      setGenreMore(more);
       setResults((prev) => {
         if (!append) return found;
         const seen = new Set(prev.map((r) => `${r.mediaType}-${r.id}`));
@@ -362,6 +378,15 @@ export default function App() {
     runDiscover(genre, mediaFilter, 1, false);
   }
 
+  // Titres ajoutés pendant cette séance. La découverte (genre, acteur,
+  // tendances) masque ce qu'on a déjà — mais un titre qu'on vient d'ajouter
+  // ne doit pas disparaître sous le doigt : il reste affiché, avec sa pastille
+  // dorée, jusqu'au prochain lancement.
+  const [ajoutsSeance, setAjoutsSeance] = useState(() => new Set());
+  const garderAffiche = (key) => setAjoutsSeance((prev) => new Set(prev).add(key));
+  const dejaChezMoi = (item) =>
+    suivi.has(keyOf(item)) && !ajoutsSeance.has(keyOf(item));
+
   async function handleToggleFollow(item) {
     const key = keyOf(item);
     try {
@@ -369,6 +394,7 @@ export default function App() {
         await removeFromSuivi(item.mediaType, item.id);
       } else {
         await addToSuivi(item);
+        garderAffiche(key);
       }
       loadSuivi();
     } catch (err) {
@@ -391,7 +417,10 @@ export default function App() {
   async function handlePickStatus(item, newStatus) {
     setStatusMenu(null);
     try {
-      if (!suivi.has(keyOf(item))) await addToSuivi(item);
+      if (!suivi.has(keyOf(item))) {
+        await addToSuivi(item);
+        garderAffiche(keyOf(item));
+      }
       await apiSetStatus(item.mediaType, item.id, newStatus);
       loadSuivi();
     } catch (err) {
@@ -594,10 +623,19 @@ export default function App() {
     onLongPress: setStatusMenu,
   };
 
-  const filteredResults =
+  const resultsDuType =
     mediaFilter === 'all'
       ? results
       : results.filter((r) => r.mediaType === mediaFilter);
+
+  // Par genre et par acteur, on cherche à découvrir : ce qu'on a déjà est
+  // masqué. Par titre, on le garde — on y cherche souvent un titre précis
+  // pour l'ouvrir.
+  const decouverte = searchMode === 'genre' || searchMode === 'actor';
+  const filteredResults = decouverte
+    ? resultsDuType.filter((r) => !dejaChezMoi(r))
+    : resultsDuType;
+  const masques = resultsDuType.length - filteredResults.length;
 
   // Certains genres TMDB n'existent que côté films ou que côté séries
   // (ex. « Action » n'a pas d'équivalent séries, qui a « Action & Aventure »).
@@ -612,10 +650,11 @@ export default function App() {
   // Écran de recherche à vide (titre / acteur, avant toute frappe) : on propose
   // les tendances plutôt qu'un écran vide.
   const isDefault = searchMode !== 'genre' && !hasSearched;
-  const trendingFiltered =
+  const trendingFiltered = (
     mediaFilter === 'all'
       ? trending
-      : trending.filter((r) => r.mediaType === mediaFilter);
+      : trending.filter((r) => r.mediaType === mediaFilter)
+  ).filter((r) => !dejaChezMoi(r));
 
   // Passage d'un onglet à l'autre : on rafraîchit les données dont il a besoin.
   // `push` alimente l'historique de navigation ; on le laisse à false quand
@@ -787,8 +826,17 @@ export default function App() {
             hasSearched &&
             filteredResults.length === 0 &&
             !(searchMode === 'actor' && !person) && (
-              <p className="hint">Aucun résultat.</p>
+              <p className="hint">
+                {masques > 0 ? 'Tu as déjà tous ces titres.' : 'Aucun résultat.'}
+              </p>
             )}
+          {status === 'done' && decouverte && masques > 0 && filteredResults.length > 0 && (
+            <p className="hint hint--small">
+              {masques === 1
+                ? '1 titre que tu as déjà est masqué.'
+                : `${masques} titres que tu as déjà sont masqués.`}
+            </p>
+          )}
 
           {isDefault && trendingFiltered.length > 0 && (
             <>
