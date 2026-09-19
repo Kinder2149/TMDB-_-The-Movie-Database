@@ -1,8 +1,8 @@
 # Vault Watch
 
 Application Android de suivi personnel de films et séries. Publiée sur le Play Store
-(version 2.0). Voir `PROJET_CONTEXTE.md` (vision, périmètre, décisions figées) et
-la section Décisions figées de PROJET_CONTEXTE.md (stack).
+(version 2.1). Voir `PROJET_CONTEXTE.md` (vision, périmètre, décisions figées, stack) et
+`CHANGELOG.md` (ce qui a changé, version par version).
 
 ## Architecture (3 couches)
 

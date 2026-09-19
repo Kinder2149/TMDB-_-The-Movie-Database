@@ -338,8 +338,32 @@ paginé). Vérifier aussi si le défilement est conservé au retour sur l'écran
 - **« Tendances du moment »** : 3 pages TMDB d'un coup (~60 titres) au lieu d'une, « Voir
   plus » pour 3 de plus, et le filtre Films / Séries demande les tendances du type choisi.
 
+### 13. Essai du 2026-09-19 — validation dans le navigateur
+Passe du 11/09 essayée par Claude Code dans le navigateur intégré, en **largeur téléphone**
+(375×812), avec le vrai catalogue TMDB et un suivi de test (30 titres, hors des vraies
+données). **Aucun défaut relevé.**
+- **Validé à l'écran** : « Pas encore sorti » en dernier, replié au départ, pli retenu après
+  rechargement (1) ; grille par genre poussée à 236 cartes — une seule largeur de colonne, une
+  seule hauteur d'affiche, aucun débordement (11), avec la mention « N titres que tu as déjà
+  sont masqués » et le chargement continu (6) ; suggestions 15 films + 15 séries à chaque
+  tirage, aucun titre déjà suivi, bouton en haut et en bas, remontée en haut de page (7, 8) ;
+  saga de Matrix Reloaded en ordre de sortie, film ouvert cadré de doré (9) ; recherche de
+  « Mes listes » sans accents ni majuscules (12) ; tendances ~60 titres, « Voir plus », filtre
+  Films / Séries sans mélange (12) ; suppression de profil avec confirmation, dernier profil
+  protégé (12).
+- **Reste à confirmer sur le téléphone** (non testable dans un navigateur) : l'appui long sur
+  une carte de saga (10), la photo d'avatar depuis la galerie (11), le bouton retour d'Android,
+  et « un profil supprimé ne revient pas en restaurant » (12), qui demande le vrai Drive.
+- **Constats de confort, non traités** : le sous-titre de la saga chevauche le bord de la bande
+  grise ; la liste des genres met côte à côte « Action » et « Action & Adventure »,
+  « Science-Fiction » et « Science-Fiction & Fantastique » sans dire lequel vaut pour les films
+  ou les séries ; d'un tirage de suggestions à l'autre, 4 à 11 titres sur 30 reviennent
+  (point 2, toujours ouvert).
+
 ## Hors périmètre V2 (noté, pas construit)
-- Calendrier des prochaines sorties / notifications de nouvel épisode.
+- Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.
+  *(Le bloc « Pas encore sorti » de « Ce soir » — `Upcoming.jsx` — existe : il liste les
+  titres suivis dont la sortie est à venir, sans calendrier ni notification.)*
 - Fonctions sociales.
 (Notes, avis et statistiques, notés ici à l'origine, ont été construits le 2026-08-26.)
 

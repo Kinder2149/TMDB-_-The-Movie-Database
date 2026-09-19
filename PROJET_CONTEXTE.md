@@ -4,10 +4,13 @@
 Application personnelle de suivi de films et séries, en remplacement de TVShowTime (arrêté).
 Permet de savoir, pour chaque film ou série, ce qu'on a vu, ce qu'on veut voir, et — pour les séries — d'en suivre la progression épisode par épisode.
 
-## Où en est le projet (2026-09-11)
+## Où en est le projet (2026-09-19)
 **Application Android publiée sous le nom « Vault Watch », version 2.1** (2026-09-03 — la 2.0 du
 2026-08-27 portait l'ancien nom). Une passe de corrections issue des retours du 10 septembre est
-faite et attend l'essai sur l'appareil avant d'être publiée en 2.2. Elle tourne entièrement sur le téléphone :
+faite ; elle a été **validée à l'écran dans un navigateur en largeur téléphone le 2026-09-19**
+(aucun défaut). Restent à confirmer sur l'appareil les seuls gestes propres au téléphone
+(appui long, photo d'avatar, bouton retour, restauration Drive), puis publication en 2.2.
+Elle tourne entièrement sur le téléphone :
 plus aucun serveur, plus aucun back. Le catalogue vient de TMDB en direct, le suivi vit
 dans un SQLite embarqué, et la sauvegarde va dans le Google Drive de l'utilisateur.
 
@@ -86,7 +89,7 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
 ## Contraintes projet
 - 3 couches uniquement (UI / Logique / Données).
 - Maximum 5 fichiers de documentation : `PROJET_CONTEXTE.md`, `PLAN_V2.md`,
-  `PLAN_ANDROID.md`, `README.md`.
+  `PLAN_ANDROID.md`, `README.md`, `CHANGELOG.md`.
 - Aucune structure créée « pour le futur ».
 - Le plafond V1 « 20 modules » a été volontairement relevé pour la V2 (voir `PLAN_V2.md`).
 
@@ -98,5 +101,10 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
   décision de projet, pas comme une tranche de développement.
 - Les idées notées dans `PLAN_V2.md` et pas encore faites : l'onglet « Découvrir » (à cadrer)
   et les suggestions qui reviennent trop souvent (attend une capture de Kinder).
-- **Retours d'usage du 2026-09-10** : tous traités le 2026-09-11 (détail dans `PLAN_V2.md`),
-  **en attente de l'essai sur l'appareil**, puis publication en 2.2.
+- **Retours d'usage du 2026-09-10** : tous traités le 2026-09-11 et validés à l'écran le
+  2026-09-19 (détail dans `PLAN_V2.md`, point 13). **Reste l'essai sur l'appareil** pour les
+  gestes propres au téléphone, puis publication en 2.2.
+- **Sauvegarde automatique d'Android** (`allowBackup`, activée dans l'application) : à décider
+  si voulue ou non. Elle peut copier la base de suivi vers le compte Google du téléphone, en
+  plus du Drive choisi, ce qui dépasse la décision « les données ne quittent l'appareil que
+  par sauvegarde demandée ».

@@ -28,8 +28,10 @@ Ce fichier porte en tête : *« Seul point de contact entre l'UI et le back. L'U
 C'est la totalité de la surface à réécrire : **30 fonctions**. Les 12 composants d'écran
 ignorent l'existence d'un serveur — la refonte visuelle V2, les 4 statuts, les listes
 personnalisées et la page « Ce soir » ne sont **pas touchés**.
+*(Chiffres du cadrage, 2026-08-17. Au 2026-09-19 : 18 composants d'écran et ~7 100 lignes
+de code applicatif — les écrans ajoutés depuis sont décrits dans `PLAN_V2.md`.)*
 
-Sur ~3 200 lignes de code, ~900 changent de côté :
+Sur ~3 200 lignes de code (au cadrage), ~900 changent de côté :
 
 | Ce qui bouge | Destination | Difficulté |
 |---|---|---|
