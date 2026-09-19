@@ -148,45 +148,91 @@ export async function searchByActor(query) {
   };
 }
 
-// Liste des genres (films + séries fusionnés par nom). Un même nom peut avoir
-// un id film et/ou un id série (ils diffèrent chez TMDB).
+// --- Genres : une seule liste, valable pour les films comme pour les séries ---
+//
+// TMDB n'a pas les mêmes genres côté films et côté séries (« Action » et
+// « Aventure » d'un côté, « Action & Adventure » de l'autre ; « Horreur »,
+// « Romance », « Histoire » n'existent que pour les films). Plutôt que d'afficher
+// les 27 et de griser ceux qui ne marchent pas, on propose une liste unique où
+// chaque entrée sait quoi demander pour un film et pour une série. Plusieurs
+// genres TMDB s'additionnent (« au choix parmi »). Pas de « Horreur », « Romance »
+// ni « Musique » : TMDB ne les connaît pas pour les séries.
+//
+// « Histoire & Époques » n'est pas un genre TMDB côté séries : elle se reconstitue
+// par mots-clés (antiquité, vikings, moyen âge, Renaissance, drame historique). Le mot-clé
+// plus large « period drama » est écarté : il ramène Mad Men ou La Petite Maison dans la
+// prairie devant les Vikings et Rome. Le
+// genre « Histoire » des films de TMDB, lui, est surtout fait de biographies et de
+// guerres du XXe siècle — ce n'est pas ce que cette entrée promet.
+const MOTS_CLES_EPOQUES = [
+  363879, // vikings
+  355987, // middle ages
+  41406, // middle ages (476-1453)
+  161257, // medieval
+  5049, // ancient rome
+  162861, // ancient greece
+  157894, // ancient egypt
+  1405, // roman empire
+  197963, // renaissance
+  192772, // historical drama
+];
+
+export const GENRES = [
+  { key: 'action', fr: 'Action & Aventure', en: 'Action & Adventure', movie: { genres: [28, 12] }, tv: { genres: [10759] } },
+  { key: 'animation', fr: 'Animation', en: 'Animation', movie: { genres: [16] }, tv: { genres: [16] } },
+  { key: 'comedie', fr: 'Comédie', en: 'Comedy', movie: { genres: [35] }, tv: { genres: [35] } },
+  { key: 'crime', fr: 'Crime', en: 'Crime', movie: { genres: [80] }, tv: { genres: [80] } },
+  { key: 'documentaire', fr: 'Documentaire', en: 'Documentary', movie: { genres: [99] }, tv: { genres: [99] } },
+  { key: 'drame', fr: 'Drame', en: 'Drama', movie: { genres: [18] }, tv: { genres: [18] } },
+  { key: 'famille', fr: 'Famille & Enfants', en: 'Family & Kids', movie: { genres: [10751] }, tv: { genres: [10751, 10762] } },
+  { key: 'scifi', fr: 'Science-Fiction & Fantastique', en: 'Sci-Fi & Fantasy', movie: { genres: [878, 14] }, tv: { genres: [10765] } },
+  { key: 'mystere', fr: 'Mystère & Thriller', en: 'Mystery & Thriller', movie: { genres: [9648, 53] }, tv: { genres: [9648] } },
+  { key: 'guerre', fr: 'Guerre & Politique', en: 'War & Politics', movie: { genres: [10752] }, tv: { genres: [10768] } },
+  { key: 'western', fr: 'Western', en: 'Western', movie: { genres: [37] }, tv: { genres: [37] } },
+  {
+    key: 'histoire',
+    fr: 'Histoire & Époques',
+    en: 'History & Period',
+    movie: { keywords: MOTS_CLES_EPOQUES, votesMin: 20 },
+    // Sans animation : le mot-clé « medieval » ramène aussi des animés fantastiques
+    // (Re:ZERO, Frieren) qui n'ont rien d'historique.
+    tv: { keywords: MOTS_CLES_EPOQUES, votesMin: 30, sansGenres: [16] },
+  },
+];
+
+const ou = (ids) => ids.join('|');
+
+// Liste affichée dans la barre de recherche, dans la langue du catalogue.
 export async function getGenres() {
-  const [mv, tv] = await Promise.all([
-    tmdbGet('/genre/movie/list'),
-    tmdbGet('/genre/tv/list'),
-  ]);
-  const map = new Map();
-  for (const g of mv.genres || []) {
-    map.set(g.name, { name: g.name, movieId: g.id, tvId: null });
-  }
-  for (const g of tv.genres || []) {
-    const e = map.get(g.name) || { name: g.name, movieId: null, tvId: null };
-    e.tvId = g.id;
-    map.set(g.name, e);
-  }
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const langue = getCatalogLanguage() === 'en' ? 'en' : 'fr';
+  return GENRES.map((g) => ({ key: g.key, name: g[langue] }));
+}
+
+// Paramètres TMDB pour un genre de la liste, côté films ou côté séries.
+export function parametresDeGenre(key, mediaType) {
+  const genre = GENRES.find((g) => g.key === key);
+  const regle = genre?.[mediaType];
+  if (!regle) return null;
+  const params = { sort_by: 'popularity.desc' };
+  if (regle.genres) params.with_genres = ou(regle.genres);
+  if (regle.keywords) params.with_keywords = ou(regle.keywords);
+  if (regle.sansGenres) params.without_genres = ou(regle.sansGenres);
+  if (regle.votesMin) params['vote_count.gte'] = regle.votesMin;
+  return params;
 }
 
 // Découverte par genre : films et/ou séries, triés par popularité. Paginé.
-export async function discoverByGenre({ movieGenreId, tvGenreId, page = 1 }) {
+export async function discoverByGenre({ genre, movie = true, tv = true, page = 1 }) {
   const calls = [];
-  if (movieGenreId) {
+  for (const [mediaType, voulu] of [['movie', movie], ['tv', tv]]) {
+    const params = voulu && parametresDeGenre(genre, mediaType);
+    if (!params) continue;
     calls.push(
-      tmdbGet('/discover/movie', {
-        with_genres: movieGenreId,
-        sort_by: 'popularity.desc',
-        include_adult: 'false',
+      tmdbGet(`/discover/${mediaType}`, {
+        ...params,
+        ...(mediaType === 'movie' ? { include_adult: 'false' } : {}),
         page,
-      }).then((d) => ['movie', d])
-    );
-  }
-  if (tvGenreId) {
-    calls.push(
-      tmdbGet('/discover/tv', {
-        with_genres: tvGenreId,
-        sort_by: 'popularity.desc',
-        page,
-      }).then((d) => ['tv', d])
+      }).then((d) => [mediaType, d])
     );
   }
   const parts = await Promise.all(calls);

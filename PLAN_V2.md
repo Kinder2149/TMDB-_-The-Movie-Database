@@ -355,10 +355,40 @@ données). **Aucun défaut relevé.**
   une carte de saga (10), la photo d'avatar depuis la galerie (11), le bouton retour d'Android,
   et « un profil supprimé ne revient pas en restaurant » (12), qui demande le vrai Drive.
 - **Constats de confort, non traités** : le sous-titre de la saga chevauche le bord de la bande
-  grise ; la liste des genres met côte à côte « Action » et « Action & Adventure »,
-  « Science-Fiction » et « Science-Fiction & Fantastique » sans dire lequel vaut pour les films
-  ou les séries ; d'un tirage de suggestions à l'autre, 4 à 11 titres sur 30 reviennent
+  grise ; la liste des genres mettait côte à côte « Action » et « Action & Adventure »,
+  « Science-Fiction » et « Science-Fiction & Fantastique » (**traité au point 14**) ; d'un tirage de suggestions à l'autre, 4 à 11 titres sur 30 reviennent
   (point 2, toujours ouvert).
+
+### 14. Genres unifiés films + séries (2026-09-19) ✅
+**Retour de Kinder** : en parcourant les genres avec le filtre Films ou Séries, certains ne
+marchaient que pour l'un des deux. Cause : TMDB n'a pas la même liste de genres côté films
+et côté séries (« Action » + « Aventure » contre « Action & Adventure » ; « Horreur »,
+« Romance », « Histoire », « Musique » n'existent que pour les films ; « Kids », « News »,
+« Reality » restaient en anglais). L'écran affichait les 27 et grisait ceux qui ne marchaient pas.
+
+**Fait** : une **liste unique de 12 genres**, valable pour les deux (`GENRES` dans `tmdb.js`) —
+Action & Aventure, Animation, Comédie, Crime, Documentaire, Drame, Famille & Enfants,
+Science-Fiction & Fantastique, Mystère & Thriller, Guerre & Politique, Western, et
+**Histoire & Époques**. Chaque entrée sait quoi demander pour un film et pour une série ; les
+genres TMDB voisins s'additionnent (« au choix parmi »). Plus aucun bouton grisé, plus de nom
+anglais ; les noms suivent la langue du catalogue.
+- **Retirés volontairement** (choix de Kinder, pour garder une liste uniforme) : Horreur,
+  Romance, Histoire (TMDB), Musique, Téléfilm, Talk, News, Reality, Soap. On retrouve ces titres
+  par la recherche par titre.
+- **« Histoire & Époques »** (ajout de Kinder : antiquité, vikings, moyen âge…) : TMDB n'a
+  pas ce genre côté séries. Reconstitué par **mots-clés** (vikings, moyen âge, Rome, Grèce,
+  Égypte, empire romain, Renaissance, drame historique). Côté séries on écarte l'animation :
+  le mot-clé « medieval » ramène sinon des animés fantastiques (Re:ZERO, Frieren). Le mot-clé
+  « period drama » est écarté : il mettait Mad Men et La Petite Maison dans la prairie
+  devant Vikings et Rome. Le genre « Histoire » de TMDB pour les films, lui, est surtout fait
+  de biographies et de guerres du XXe siècle : ce n'est pas ce que l'entrée promet.
+- **Validé à l'écran** (largeur téléphone, vrai catalogue) : 12 genres sur 12 renvoient des
+  résultats en Films, en Séries et en Tout, sans mélange ; « Histoire & Époques » donne Gladiator,
+  Troie, La Momie côté films, Vikings, Spartacus, The Last Kingdom, Les Tudors, Shōgun côté séries.
+- **Limite connue** : la liste « Histoire & Époques » reste bornée (~130 séries, ~370 films) ;
+  elle dépend des mots-clés que les contributeurs de TMDB ont posés.
+- **Tests** : `tests/genres.test.js` (8 tests) — chaque genre vaut pour les deux types, aucune
+  des entrées retirées ne revient, l'animation est exclue des séries d'époque seulement.
 
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.

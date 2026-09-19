@@ -129,13 +129,9 @@ export async function getGenres() {
   return tmdb.getGenres();
 }
 
-// Titres d'un genre (films et/ou séries selon les ids fournis).
-export async function discoverGenre({ movieGenre, tvGenre, page = 1 }) {
-  return tmdb.discoverByGenre({
-    movieGenreId: movieGenre,
-    tvGenreId: tvGenre,
-    page,
-  });
+// Titres d'un genre de la liste unique (`key`), côté films et/ou séries.
+export async function discoverGenre({ genre, movie = true, tv = true, page = 1 }) {
+  return tmdb.discoverByGenre({ genre, movie, tv, page });
 }
 
 // Tendances du moment : proposées quand le champ est vide. { mediaType, page }.
