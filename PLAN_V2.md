@@ -175,7 +175,8 @@ de la langue).
   lancement suivant — corriger tout de suite coûterait un appel par ajout.
 
 ## Avant publication Play Store
-Faire monter `versionCode` / `versionName` (publié : 5 / 2.1 ; la prochaine sera 6 / 2.2).
+`versionCode` / `versionName` montés à **6 / 2.2** le 2026-09-19 (publié : 5 / 2.1). Paquet
+prêt, publication en attente de l'essai sur téléphone (voir `PLAN_ANDROID.md`).
 
 ## Décisions figées
 - On **relève volontairement** le plafond V1 « 20 modules / rien pour le futur » : il protégeait la V1, la V2 assume plus de modules (proprement).

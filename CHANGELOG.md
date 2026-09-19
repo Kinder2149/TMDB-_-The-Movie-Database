@@ -23,7 +23,9 @@ l'écran dans un navigateur en largeur téléphone le 2026-09-19 (`PLAN_V2.md`, 
   plus que vers le Drive de l'utilisateur, comme la décision l'exige.
 - **À confirmer sur téléphone avant publication** : appui long sur la saga, photo d'avatar,
   bouton retour, restauration Drive.
-- Version à porter : `versionCode 6` / `versionName 2.2` (publié aujourd'hui : 5 / 2.1).
+- Version portée à `versionCode 6` / `versionName 2.2` le 2026-09-19 ; paquet signé prêt, à déposer
+  dans la Play Console après l'essai sur téléphone (`PLAN_ANDROID.md`).
+- Fichiers d'aide du serveur (`start.bat`, Dockerfile, docker-compose.yml) marqués « inutilisé ».
 
 ## 2.1 — publiée le 2026-09-03
 Application publiée sous le nom « Vault Watch » (la 2.0 portait l'ancien nom).

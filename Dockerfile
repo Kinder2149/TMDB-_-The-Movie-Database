@@ -1,3 +1,9 @@
+# INUTILISÉ depuis la version 2.0 (2026-08-27).
+# L'application Android n'utilise plus aucun serveur : le catalogue vient de TMDB en direct,
+# le suivi vit dans la base du téléphone. Ce fichier et le dossier server/ sont conservés
+# comme base d'une éventuelle mise en ligne, non décidée (voir PROJET_CONTEXTE.md).
+# Ne pas s'en servir pour l'application actuelle.
+
 # Build du client (React/Vite) en fichiers statiques.
 FROM node:20-slim AS client-build
 WORKDIR /app/client

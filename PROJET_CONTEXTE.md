@@ -9,7 +9,7 @@ Permet de savoir, pour chaque film ou série, ce qu'on a vu, ce qu'on veut voir,
 2026-08-27 portait l'ancien nom). Une passe de corrections issue des retours du 10 septembre est
 faite ; elle a été **validée à l'écran dans un navigateur en largeur téléphone le 2026-09-19**
 (aucun défaut). Restent à confirmer sur l'appareil les seuls gestes propres au téléphone
-(appui long, photo d'avatar, bouton retour, restauration Drive), puis publication en 2.2.
+(appui long, photo d'avatar, bouton retour, restauration Drive), puis publication en 2.2 (paquet signé prêt depuis le 2026-09-19).
 Elle tourne entièrement sur le téléphone :
 plus aucun serveur, plus aucun back. Le catalogue vient de TMDB en direct, le suivi vit
 dans un SQLite embarqué, et la sauvegarde va dans le Google Drive de l'utilisateur.

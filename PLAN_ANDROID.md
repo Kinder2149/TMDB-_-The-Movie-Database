@@ -280,6 +280,29 @@ cd client/android && ./gradlew bundleRelease
 ```
 → `client/android/app/build/outputs/bundle/release/app-release.aab`
 
+#### Publication de la 2.2 — paquet préparé le 2026-09-19 (pas encore publiée)
+- **Paquet prêt** : `client/android/app/build/outputs/bundle/release/app-release.aab`, version
+  **2.2 (versionCode 6)**, signé avec la clé de publication (empreinte SHA-1 identique à celle
+  enregistrée côté Google, contrôlée par `configuration.test.js`). Le paquet n'est pas dans le
+  dépôt : on le reconstruit avec la commande ci-dessus.
+- **Fiche et politique de confidentialité : rien à changer.** Aucune donnée de plus n'est
+  collectée ; la copie automatique d'Android (`allowBackup`) est même coupée. Formulaire
+  *Sécurité des données* inchangé. Les captures ne montrent aucun écran modifié.
+- **À faire par Kinder dans la Play Console** : créer une nouvelle version, y déposer le
+  `.aab`, coller les notes de version ci-dessous, envoyer en examen.
+- **Ne pas déposer avant l'essai sur téléphone** des gestes que le navigateur ne peut pas
+  tester (appui long sur la saga, photo d'avatar, bouton retour, restauration Drive) : une
+  mise à jour publiée ne se retire pas, on ne peut que la remplacer par une 2.3.
+- **Notes de version** (500 caractères max, 488 ici) :
+  > Nouveautés de la 2.2 :
+  > • Recherche par genre plus claire : une seule liste pour les films et les séries, avec un nouveau genre « Histoire & Époques ».
+  > • Fiche d'un film : les autres films de sa saga, dans l'ordre de sortie.
+  > • « Ce soir » : suggestions équilibrées entre films et séries.
+  > • « Mes listes » : recherche dans toute votre bibliothèque.
+  > • Tendances : plus de titres, avec « Voir plus ».
+  > • Un profil supprimé ne revient plus en restaurant depuis Drive.
+  > • Corrections d'affichage.
+
 #### Décision prise (2026-08-17)
 Captures réalisées avec un **profil de démonstration neutre**, pas avec la bibliothèque
 personnelle de Kinder.

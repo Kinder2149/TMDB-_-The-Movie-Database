@@ -1,3 +1,7 @@
+# INUTILISÉ depuis la version 2.0 (2026-08-27) : l'application Android n'a plus de serveur.
+# Conservé avec server/ et le Dockerfile comme base d'une éventuelle mise en ligne, non
+# décidée (voir PROJET_CONTEXTE.md).
+
 services:
   vault-watch:
     build:

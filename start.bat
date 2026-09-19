@@ -1,4 +1,9 @@
 @echo off
+REM INUTILISE depuis la version 2.0 (2026-08-27) : ce lanceur demarre l'ancienne version PC
+REM (serveur + interface), qui n'est plus maintenue. L'application est desormais Android
+REM autonome, sans serveur. Pour developper : npm run dev --prefix client (voir README.md).
+REM Conserve avec le dossier server/ comme base d'une eventuelle mise en ligne (non decidee).
+@echo off
 chcp 65001 >nul
 title Vault Watch - Lanceur
 cd /d "%~dp0"

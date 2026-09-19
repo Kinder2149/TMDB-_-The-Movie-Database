@@ -1,3 +1,5 @@
+# INUTILISÉ depuis la version 2.0 : accompagne le Dockerfile, conservé pour une éventuelle mise en ligne.
+
 node_modules
 client/node_modules
 client/dist
