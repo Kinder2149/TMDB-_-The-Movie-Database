@@ -82,6 +82,10 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
   revient, la seule voie acceptable est l'**import d'un fichier que l'utilisateur exporte
   lui-même**, ou un intermédiaire à API publique comme Trakt. Ne pas rouvrir le sujet du
   côté « se connecter à leur place ».
+- **Pas de sauvegarde automatique d'Android (2026-09-19).** Le réglage `allowBackup` est
+  coupé : Android ne copie pas la base de suivi vers le compte Google du téléphone. La seule
+  voie de sauvegarde est celle vers le Drive de l'utilisateur, déjà en place et validée sur
+  l'appareil. Verrouillé par un test (`configuration.test.js`). Prend effet avec la 2.2.
 - **Le code serveur n'est pas supprimé** : il reste dans le dépôt comme base d'une
   éventuelle mise en ligne. Mis de côté, pas jeté.
 - **Rattachement : socle Application locale React** (D40 de la Révision Outil IA, 2026-09-18), avec l'option sauvegarde vers le Drive de l'utilisateur. L'ancienne stack V1 est archivée dans `_archives\STACK_STANDARD_V1.md`.
@@ -104,7 +108,3 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
 - **Retours d'usage du 2026-09-10** : tous traités le 2026-09-11 et validés à l'écran le
   2026-09-19 (détail dans `PLAN_V2.md`, point 13). **Reste l'essai sur l'appareil** pour les
   gestes propres au téléphone, puis publication en 2.2.
-- **Sauvegarde automatique d'Android** (`allowBackup`, activée dans l'application) : à décider
-  si voulue ou non. Elle peut copier la base de suivi vers le compte Google du téléphone, en
-  plus du Drive choisi, ce qui dépasse la décision « les données ne quittent l'appareil que
-  par sauvegarde demandée ».

@@ -15,6 +15,8 @@ l'écran dans un navigateur en largeur téléphone le 2026-09-19 (`PLAN_V2.md`, 
 - Un profil supprimé ne revient plus en restaurant depuis le Drive.
 - « Mes listes » : recherche d'un titre dans toute la bibliothèque, sans accents ni majuscules.
 - Tendances du moment : environ 60 titres, « Voir plus », filtre Films / Séries.
+- Sauvegarde automatique d'Android coupée (`allowBackup`) : les données de suivi ne partent
+  plus que vers le Drive de l'utilisateur, comme la décision l'exige.
 - **À confirmer sur téléphone avant publication** : appui long sur la saga, photo d'avatar,
   bouton retour, restauration Drive.
 - Version à porter : `versionCode 6` / `versionName 2.2` (publié aujourd'hui : 5 / 2.1).

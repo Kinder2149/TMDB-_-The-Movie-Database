@@ -95,6 +95,13 @@ describe('application Android', () => {
     );
     expect(permissions).toEqual(['android.permission.INTERNET']);
   });
+
+  it('ne laisse pas Android copier le suivi vers le compte Google du téléphone', () => {
+    // Décision : les données ne quittent l’appareil que par la sauvegarde
+    // demandée vers le Drive de l’utilisateur (PROJET_CONTEXTE.md).
+    const manifeste = lire('../android/app/src/main/AndroidManifest.xml');
+    expect(manifeste).toContain('android:allowBackup="false"');
+  });
 });
 
 describe('signature de l’application', () => {
