@@ -81,11 +81,12 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
   côté « se connecter à leur place ».
 - **Le code serveur n'est pas supprimé** : il reste dans le dépôt comme base d'une
   éventuelle mise en ligne. Mis de côté, pas jeté.
+- **Rattachement : socle Application locale React** (D40 de la Révision Outil IA, 2026-09-18), avec l'option sauvegarde vers le Drive de l'utilisateur. L'ancienne stack V1 est archivée dans `_archives\STACK_STANDARD_V1.md`.
 
 ## Contraintes projet
 - 3 couches uniquement (UI / Logique / Données).
 - Maximum 5 fichiers de documentation : `PROJET_CONTEXTE.md`, `PLAN_V2.md`,
-  `PLAN_ANDROID.md`, `README.md`, `STACK_STANDARD.md`.
+  `PLAN_ANDROID.md`, `README.md`.
 - Aucune structure créée « pour le futur ».
 - Le plafond V1 « 20 modules » a été volontairement relevé pour la V2 (voir `PLAN_V2.md`).
 

@@ -1,7 +1,7 @@
 # PLAN V2 — Vault Watch
 
 > Cadrage de la V2, écrit après la V1 bouclée. Sert de cible avant tout découpage
-> en tranches. Complète `PROJET_CONTEXTE.md` (vision) et `STACK_STANDARD.md` (stack).
+> en tranches. Complète `PROJET_CONTEXTE.md` (vision) et la section Décisions figées de PROJET_CONTEXTE.md (stack).
 
 ## But de la V2
 Enrichir l'application (design + fonctionnalités) puis, plus tard, la mettre en ligne

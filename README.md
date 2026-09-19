@@ -2,7 +2,7 @@
 
 Application Android de suivi personnel de films et séries. Publiée sur le Play Store
 (version 2.0). Voir `PROJET_CONTEXTE.md` (vision, périmètre, décisions figées) et
-`STACK_STANDARD.md` (stack).
+la section Décisions figées de PROJET_CONTEXTE.md (stack).
 
 ## Architecture (3 couches)
 

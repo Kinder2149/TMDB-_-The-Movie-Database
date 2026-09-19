@@ -1,4 +1,6 @@
-# STACK_STANDARD — Vault Watch (V1)
+Archivé le 2026-09-18 (D40) — stack de la V1, remplacée par l'architecture 100 % mobile décrite dans PROJET_CONTEXTE.md.
+
+### Stack technique — reprise de STACK_STANDARD.md le 2026-09-18 (D23)
 
 Stack figée pour la V1. Toute déviation doit être signalée et validée avant d'être codée.
 
@@ -43,3 +45,5 @@ Signalée et validée conformément à la règle « toute déviation doit être 
 - Maximum 20 modules/services.
 - Aucune dépendance superflue, aucune structure anticipée « pour le futur ».
 - Ne rien construire hors du périmètre V1 défini dans PROJET_CONTEXTE.md.
+
+Note (2026-09-18, tranchée par Kinder) : la Couche Logique (serveur Node.js + Express) décrite ci-dessus est historique, non utilisée — l'application a évolué vers une architecture 100% mobile (voir « Où en est le projet » et « Décisions figées » ci-dessus). Le code serveur reste dans le dépôt, mis de côté, pas jeté.

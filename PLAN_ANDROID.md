@@ -2,7 +2,7 @@
 
 > Cadrage du passage en **application Android autonome**, publiée sur le Play Store.
 > Écrit après la V2 bouclée (voir `PLAN_V2.md`). Complète `PROJET_CONTEXTE.md` (vision)
-> et `STACK_STANDARD.md` (stack).
+> et la section Décisions figées de PROJET_CONTEXTE.md (stack).
 
 ## But
 Transformer l'application web (client + serveur local) en **application Android autonome** :
