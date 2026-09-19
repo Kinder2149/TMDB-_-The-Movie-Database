@@ -1,11 +1,11 @@
-# Graph Report - .  (2026-09-11)
+# Graph Report - .  (2026-09-19)
 
 ## Corpus Check
 - 70 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 322 nodes · 421 edges · 64 communities detected
+- 327 nodes · 434 edges · 64 communities detected
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
@@ -13,34 +13,34 @@
 - [[_COMMUNITY_Porte API (api.js)|Porte API (api.js)]]
 - [[_COMMUNITY_Règles métier (store.js)|Règles métier (store.js)]]
 - [[_COMMUNITY_Sauvegarde (backup.js)|Sauvegarde (backup.js)]]
-- [[_COMMUNITY_Catalogue TMDB|Catalogue TMDB]]
 - [[_COMMUNITY_Connexion Google Drive|Connexion Google Drive]]
+- [[_COMMUNITY_Catalogue TMDB|Catalogue TMDB]]
 - [[_COMMUNITY_Base embarquée (db.js)|Base embarquée (db.js)]]
 - [[_COMMUNITY_Serveur  listes (archivé)|Serveur : listes (archivé)]]
 - [[_COMMUNITY_Avatars de profil|Avatars de profil]]
 - [[_COMMUNITY_Serveur  base (archivé)|Serveur : base (archivé)]]
 - [[_COMMUNITY_Langue du catalogue|Langue du catalogue]]
+- [[_COMMUNITY_Statuts et dates (status.js)|Statuts et dates (status.js)]]
 - [[_COMMUNITY_Tests  stockage simulé|Tests : stockage simulé]]
 - [[_COMMUNITY_Serveur  épisodes (archivé)|Serveur : épisodes (archivé)]]
 - [[_COMMUNITY_Serveur  profils (archivé)|Serveur : profils (archivé)]]
 - [[_COMMUNITY_Serveur  suivi (archivé)|Serveur : suivi (archivé)]]
-- [[_COMMUNITY_Autorisation Drive Android|Autorisation Drive Android]]
+- [[_COMMUNITY_Plugin Drive Android (Java)|Plugin Drive Android (Java)]]
 - [[_COMMUNITY_Écran Sauvegarde|Écran Sauvegarde]]
 - [[_COMMUNITY_Écran Statistiques|Écran Statistiques]]
 - [[_COMMUNITY_Fichiers locaux|Fichiers locaux]]
-- [[_COMMUNITY_Statuts et dates|Statuts et dates]]
-- [[_COMMUNITY_configuration.test.js|configuration.test.js]]
-- [[_COMMUNITY_MainActivity.java|MainActivity.java]]
-- [[_COMMUNITY_ExampleUnitTest.java|ExampleUnitTest.java]]
-- [[_COMMUNITY_App.jsx|App.jsx]]
-- [[_COMMUNITY_Profiles.jsx|Profiles.jsx]]
-- [[_COMMUNITY_store.test.js|store.test.js]]
-- [[_COMMUNITY_idb-keyval.js|idb-keyval.js]]
-- [[_COMMUNITY_exporter-vers-app.js|exporter-vers-app.js]]
-- [[_COMMUNITY_About.jsx|About.jsx]]
-- [[_COMMUNITY_AddToListe.jsx|AddToListe.jsx]]
-- [[_COMMUNITY_Bloc.jsx|Bloc.jsx]]
-- [[_COMMUNITY_CatalogLanguage.jsx|CatalogLanguage.jsx]]
+- [[_COMMUNITY_Test de configuration|Test de configuration]]
+- [[_COMMUNITY_Coque Android|Coque Android]]
+- [[_COMMUNITY_Test Android d exemple|Test Android d exemple]]
+- [[_COMMUNITY_Application (App.jsx)|Application (App.jsx)]]
+- [[_COMMUNITY_Écran Profils|Écran Profils]]
+- [[_COMMUNITY_Tests des règles|Tests des règles]]
+- [[_COMMUNITY_Tests  stockage simulé (idb)|Tests : stockage simulé (idb)]]
+- [[_COMMUNITY_Export vers l app|Export vers l app]]
+- [[_COMMUNITY_About()|About()]]
+- [[_COMMUNITY_AddToListe()|AddToListe()]]
+- [[_COMMUNITY_Bloc()|Bloc()]]
+- [[_COMMUNITY_CatalogLanguage()|CatalogLanguage()]]
 - [[_COMMUNITY_Detail.jsx|Detail.jsx]]
 - [[_COMMUNITY_Icon.jsx|Icon.jsx]]
 - [[_COMMUNITY_Lists.jsx|Lists.jsx]]
@@ -51,10 +51,10 @@
 - [[_COMMUNITY_Suggestions.jsx|Suggestions.jsx]]
 - [[_COMMUNITY_Tonight.jsx|Tonight.jsx]]
 - [[_COMMUNITY_Upcoming.jsx|Upcoming.jsx]]
-- [[_COMMUNITY_backup.test.js|backup.test.js]]
+- [[_COMMUNITY_remplirProfil()|remplirProfil()]]
 - [[_COMMUNITY_cloud.test.js|cloud.test.js]]
 - [[_COMMUNITY_vitest.config.js|vitest.config.js]]
-- [[_COMMUNITY_requireProfile.js|requireProfile.js]]
+- [[_COMMUNITY_requireProfile()|requireProfile()]]
 - [[_COMMUNITY_sw.js|sw.js]]
 - [[_COMMUNITY_main.jsx|main.jsx]]
 - [[_COMMUNITY_cloud.auto.test.js|cloud.auto.test.js]]
@@ -79,13 +79,13 @@
 1. `requireProfile()` - 26 edges
 2. `ecriture()` - 20 edges
 3. `tmdbGet()` - 15 edges
-4. `getAccessToken()` - 8 edges
-5. `writeLocal()` - 7 edges
-6. `prevenir()` - 6 edges
-7. `backupToDrive()` - 6 edges
-8. `ensureInitialized()` - 6 edges
-9. `connect()` - 6 edges
-10. `readLocal()` - 5 edges
+4. `writeLocal()` - 8 edges
+5. `getAccessToken()` - 8 edges
+6. `backupToDrive()` - 7 edges
+7. `readLocal()` - 6 edges
+8. `prevenir()` - 6 edges
+9. `ensureInitialized()` - 6 edges
+10. `connect()` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `chargeStructure()` --calls--> `tmdbGet()`  [EXTRACTED]
@@ -111,15 +111,15 @@ Nodes (21): addToListe(), addToSuivi(), airedOnly(), backfillReleaseDates(), cou
 
 ### Community 2 - "Sauvegarde (backup.js)"
 Cohesion: 0.17
-Nodes (22): backupToDrive(), cloudFileName(), cloudRestoreSuggestions(), csvCell(), dernierEssaiAutomatique(), exportProfile(), forgetCloudState(), hasPendingChanges() (+14 more)
+Nodes (24): backupToDrive(), cloudFileName(), cloudRestoreSuggestions(), csvCell(), dernierEssaiAutomatique(), exportProfile(), forgetCloudState(), hasPendingChanges() (+16 more)
 
-### Community 3 - "Catalogue TMDB"
+### Community 3 - "Connexion Google Drive"
+Cohesion: 0.2
+Nodes (19): connect(), deleteDriveFile(), disconnect(), downloadDriveFile(), driveFetch(), ensureInitialized(), forgetAccount(), getAccessToken() (+11 more)
+
+### Community 4 - "Catalogue TMDB"
 Cohesion: 0.23
 Nodes (19): chargeStructure(), dateDeSortieRegionale(), discoverByGenre(), getCardInfo(), getCollection(), getDetails(), getEpisodes(), getGenres() (+11 more)
-
-### Community 4 - "Connexion Google Drive"
-Cohesion: 0.21
-Nodes (18): connect(), disconnect(), downloadDriveFile(), driveFetch(), ensureInitialized(), forgetAccount(), getAccessToken(), getAccount() (+10 more)
 
 ### Community 5 - "Base embarquée (db.js)"
 Cohesion: 0.36
@@ -141,87 +141,87 @@ Nodes (5): columnExists(), ensureDefaultProfile(), initDb(), migrateToProfiles()
 Cohesion: 0.33
 Nodes (0): 
 
-### Community 10 - "Tests : stockage simulé"
+### Community 10 - "Statuts et dates (status.js)"
+Cohesion: 0.4
+Nodes (2): plat(), titreCorrespond()
+
+### Community 11 - "Tests : stockage simulé"
 Cohesion: 0.33
 Nodes (1): MemoryStorage
 
-### Community 11 - "Serveur : épisodes (archivé)"
+### Community 12 - "Serveur : épisodes (archivé)"
 Cohesion: 0.33
 Nodes (0): 
 
-### Community 12 - "Serveur : profils (archivé)"
+### Community 13 - "Serveur : profils (archivé)"
 Cohesion: 0.4
 Nodes (0): 
 
-### Community 13 - "Serveur : suivi (archivé)"
+### Community 14 - "Serveur : suivi (archivé)"
 Cohesion: 0.4
 Nodes (0): 
 
-### Community 14 - "Autorisation Drive Android"
+### Community 15 - "Plugin Drive Android (Java)"
 Cohesion: 0.67
 Nodes (1): DriveAuthPlugin
 
-### Community 15 - "Écran Sauvegarde"
+### Community 16 - "Écran Sauvegarde"
 Cohesion: 1.0
 Nodes (3): Backup(), dateLisible(), texteEssaiAuto()
 
-### Community 16 - "Écran Statistiques"
+### Community 17 - "Écran Statistiques"
 Cohesion: 0.67
 Nodes (2): formatDuree(), Stats()
 
-### Community 17 - "Fichiers locaux"
+### Community 18 - "Fichiers locaux"
 Cohesion: 0.5
 Nodes (0): 
 
-### Community 18 - "Statuts et dates"
-Cohesion: 0.5
-Nodes (0): 
-
-### Community 19 - "configuration.test.js"
+### Community 19 - "Test de configuration"
 Cohesion: 0.67
 Nodes (2): chemin(), lire()
 
-### Community 20 - "MainActivity.java"
+### Community 20 - "Coque Android"
 Cohesion: 0.67
 Nodes (1): MainActivity
 
-### Community 21 - "ExampleUnitTest.java"
+### Community 21 - "Test Android d exemple"
 Cohesion: 0.67
 Nodes (1): ExampleUnitTest
 
-### Community 22 - "App.jsx"
+### Community 22 - "Application (App.jsx)"
 Cohesion: 1.0
 Nodes (2): App(), keyOf()
 
-### Community 23 - "Profiles.jsx"
+### Community 23 - "Écran Profils"
 Cohesion: 0.67
 Nodes (0): 
 
-### Community 24 - "store.test.js"
+### Community 24 - "Tests des règles"
 Cohesion: 0.67
 Nodes (0): 
 
-### Community 25 - "idb-keyval.js"
+### Community 25 - "Tests : stockage simulé (idb)"
 Cohesion: 0.67
 Nodes (0): 
 
-### Community 26 - "exporter-vers-app.js"
+### Community 26 - "Export vers l app"
 Cohesion: 0.67
 Nodes (0): 
 
-### Community 27 - "About.jsx"
+### Community 27 - "About()"
 Cohesion: 1.0
 Nodes (0): 
 
-### Community 28 - "AddToListe.jsx"
+### Community 28 - "AddToListe()"
 Cohesion: 1.0
 Nodes (0): 
 
-### Community 29 - "Bloc.jsx"
+### Community 29 - "Bloc()"
 Cohesion: 1.0
 Nodes (0): 
 
-### Community 30 - "CatalogLanguage.jsx"
+### Community 30 - "CatalogLanguage()"
 Cohesion: 1.0
 Nodes (0): 
 
@@ -265,7 +265,7 @@ Nodes (0):
 Cohesion: 1.0
 Nodes (0): 
 
-### Community 41 - "backup.test.js"
+### Community 41 - "remplirProfil()"
 Cohesion: 1.0
 Nodes (0): 
 
@@ -277,7 +277,7 @@ Nodes (0):
 Cohesion: 1.0
 Nodes (0): 
 
-### Community 44 - "requireProfile.js"
+### Community 44 - "requireProfile()"
 Cohesion: 1.0
 Nodes (0): 
 
@@ -358,13 +358,13 @@ Cohesion: 1.0
 Nodes (0): 
 
 ## Knowledge Gaps
-- **Thin community `About.jsx`** (2 nodes): `About()`, `About.jsx`
+- **Thin community `About()`** (2 nodes): `About()`, `About.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `AddToListe.jsx`** (2 nodes): `AddToListe()`, `AddToListe.jsx`
+- **Thin community `AddToListe()`** (2 nodes): `AddToListe()`, `AddToListe.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Bloc.jsx`** (2 nodes): `Bloc()`, `Bloc.jsx`
+- **Thin community `Bloc()`** (2 nodes): `Bloc()`, `Bloc.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `CatalogLanguage.jsx`** (2 nodes): `CatalogLanguage()`, `CatalogLanguage.jsx`
+- **Thin community `CatalogLanguage()`** (2 nodes): `CatalogLanguage()`, `CatalogLanguage.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Detail.jsx`** (2 nodes): `Detail.jsx`, `Detail()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -386,13 +386,13 @@ Nodes (0):
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Upcoming.jsx`** (2 nodes): `Upcoming.jsx`, `Upcoming()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `backup.test.js`** (2 nodes): `remplirProfil()`, `backup.test.js`
+- **Thin community `remplirProfil()`** (2 nodes): `remplirProfil()`, `backup.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `cloud.test.js`** (2 nodes): `cloud.test.js`, `creerFauxDrive()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `vitest.config.js`** (2 nodes): `vitest.config.js`, `ici()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `requireProfile.js`** (2 nodes): `requireProfile()`, `requireProfile.js`
+- **Thin community `requireProfile()`** (2 nodes): `requireProfile()`, `requireProfile.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `sw.js`** (1 nodes): `sw.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
