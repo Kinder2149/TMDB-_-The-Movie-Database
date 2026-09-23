@@ -27,6 +27,12 @@
   par note (4 étoiles et plus / pas encore noté). Films et séries restent groupés. Tri et filtres
   sont gardés tant que l'application tourne. Pas de genre ni de plateforme : reporté.
 
+**M1 à M3 validées à l'écran le 2026-09-23** (fiche → acteur → filmographie → retour ; accueil ;
+Explorer avec filtres ; Mes listes filtrées), 188 tests verts. **M4 (revoir un titre, date de
+visionnage) et M5 (packs de mood) : cadrage proposé, rien codé** — voir `PLAN_V2.md`, en attente
+de réponse de Kinder sur deux questions de fond avant tout code (M4 : par titre ou par épisode ?
+M5 : quelle voie de classement ?).
+
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à
 l'écran dans un navigateur en largeur téléphone le 2026-09-19 (`PLAN_V2.md`, point 13).

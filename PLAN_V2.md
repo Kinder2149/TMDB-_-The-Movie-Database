@@ -544,6 +544,72 @@ M2 validée par Kinder le 2026-09-21.
   résultat pour ce filtre » s'affiche).
 - **Reporté** : genre et plateforme dans « Mes listes » (D3).
 
+### M4 — Journal de visionnages : cadrage proposé (2026-09-23) — À VALIDER, rien codé
+M3 validée par Kinder. **Tranche sensible** (comme la tranche 2 de `PLAN_ANDROID.md`) : c'est la
+première mission de cette série qui touche la base, la sauvegarde et l'export — une erreur ici
+abîmerait des données réelles, pas seulement un affichage. Cadrage écrit avant tout code, à
+valider avant de commencer.
+- **Ce que ça couvre** : points 1 et 2 de la liste d'origine — revoir un titre plusieurs fois, et
+  la date de visionnage.
+- **D1 — Un journal, pas un compteur.** Aujourd'hui `suivi.status = 'vu'` ne dit qu'un booléen.
+  Revoir une série suppose de garder **une ligne par visionnage** (date, et pour une série
+  laquelle regardée — tout ou en partie ?), pas juste un nombre : un nombre ne permettrait pas
+  de répondre plus tard à « la dernière fois, c'était quand ? ». Nouvelle table proposée,
+  `visionnages` (`profile_id, tmdb_id, media_type, date`), à côté de `suivi` — pas dedans : une
+  colonne compteur casserait la distinction visionnage/statut le jour où on voudrait le détail.
+- **D2 — Date automatique, un geste pour ajouter un visionnage de plus.** Cocher un épisode pose
+  la date du jour (point 2) ; un bouton sur la fiche (« Je l'ai revu ») ajoute un visionnage à la
+  date du jour, modifiable ensuite. Aucune saisie obligatoire : la fonction reste facultative,
+  comme demandé.
+- **Question pour Kinder, avant tout code** : un « revisionnage » se pose-t-il **par titre**
+  (un film revu = une ligne, sans détail des épisodes) ou **par épisode** (revoir S2E01
+  spécifiquement) ? La deuxième option est plus proche de « revoir une série », mais nettement
+  plus de travail — table, écran, sauvegarde, CSV, statistiques en quadruple. À trancher avant
+  la phase 5 (cadrage technique).
+- **Ce que ça oblige à toucher, une fois la question tranchée** :
+  - `db.js` : nouvelle table, migration (`addColumnIfMissing`/nouvelle table selon le motif déjà
+    utilisé dans `initDb`) — jamais de perte des bases déjà installées.
+  - `store.js` : lecture/écriture des visionnages, agrégation pour la fiche et les statistiques.
+  - `backup.js` : la sauvegarde et la restauration doivent emporter ce journal — **format de
+    sauvegarde à monter** (comme `BACKUP_VERSION` l'a déjà fait pour les notes) ; sinon,
+    restaurer une sauvegarde plus ancienne redonnerait un historique tronqué sans le dire.
+  - Export CSV (Letterboxd/Trakt) : ces outils attendent en général une ligne par visionnage —
+    `csvExport` devra en tenir compte plutôt que la seule date d'ajout au suivi.
+  - `Stats.jsx` : « temps passé » compterait alors les revisionnages, pas seulement les titres
+    distincts — à décider si c'est voulu (regarder deux fois un film double bien le temps passé).
+- **Hors M4, sauf décision contraire** : pas de rappel ni de suggestion basée sur « ça fait
+  longtemps » — cadré au point 9 (packs), pas ici.
+- **Prochaine étape** : réponse de Kinder à la question ci-dessus, puis rédaction des décisions
+  figées (comme M1 à M3), puis — seulement ensuite — le cadrage technique et le code.
+
+### M5 — Packs de mood : cadrage proposé (2026-09-23) — À VALIDER, rien codé
+Couvre le point 9. Dépend de M2 (réutilise les filtres) ; peut attendre après M4 sans perdre de
+valeur — aucune des deux ne dépend de l'autre.
+- **Ce que la liste d'origine demande** : des rayons prêts à l'emploi (Noël, saga, love,
+  super-héros…), remplis automatiquement.
+- **Le vrai sujet à trancher, avant tout code : comment un titre entre dans un pack.** Trois
+  pistes, aucune choisie :
+  1. **Par genre TMDB**, réutilisant directement `GENRES` de `tmdb.js` — marche tout de suite
+     pour « super-héros » (déjà proche d'Action & Aventure) mais pas pour « Noël » (aucun genre
+     TMDB ne l'identifie) ni pour « love » (Romance a été volontairement retiré des genres, cf.
+     `PLAN_V2.md` point 13).
+  2. **Par mots-clés TMDB**, comme « Histoire & Époques » l'a fait pour les genres — capable de
+     couvrir « Noël » (mot-clé `christmas` existe chez TMDB) mais demande de vérifier chaque
+     mood un par un, comme cela a été fait pour l'Histoire.
+  3. **Un pack = une recherche Explorer sauvegardée** (genre + période + mots-clés), que Kinder
+     compose lui-même depuis l'écran existant plutôt qu'une liste de moods décidée à l'avance —
+     ne demande aucune nouvelle donnée TMDB, réutilise tout M2, mais change la nature de la
+     fonction (« mes recherches favorites » plutôt que « des rayons éditorialisés »).
+  La voie 3 est la moins risquée techniquement (aucun mood mal couvert par TMDB) mais ne répond
+  pas exactement à la demande d'origine (« Noël, saga, love, super-héros » sonne comme des
+  rayons tout faits, pas des recherches personnelles).
+- **Recoupe l'onglet « Découvrir »** noté dans « Ce qui reste ouvert » de `PROJET_CONTEXTE.md` —
+  les deux mélangent « proposer ce qu'on n'a pas encore vu, groupé par thème ». À cadrer
+  ensemble plutôt que deux fois le même travail.
+- **Question pour Kinder, avant tout code** : quelle voie (1, 2 ou 3), et si 1 ou 2, la première
+  liste de moods à couvrir — 4 ou 5, pas plus, pour rester testable un par un comme le reste.
+- **Prochaine étape** : réponse de Kinder, puis décisions figées et cadrage technique.
+
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.
   *(Le bloc « Pas encore sorti » de « Ce soir » — `Upcoming.jsx` — existe : il liste les
