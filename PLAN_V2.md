@@ -602,6 +602,18 @@ validées par Kinder, code fait ensuite.
   fois, ou rouvert la fiche) — l'effet qui charge le journal ne dépendait pas du statut. Corrigé
   (`status` ajouté aux dépendances côté film ; le rechargement du journal déplacé dans
   `refreshProgress` côté épisode, déjà appelée par les quatre actions de cochage).
+- **Retour de Kinder, sur l'appareil (2026-09-23)** : « je ne vois pas le nombre de fois que j'ai
+  vu un film si je l'ai vu plusieurs fois et je ne peux pas revenir en arrière ». Le simple texte
+  (« Vu N fois, la dernière le… ») ne suffisait pas et rien ne permettait de corriger un clic de
+  trop — ni sur un film, ni sur un épisode.
+- **Corrigé (2026-09-23)** : la fiche d'un film affiche désormais un **historique**, une ligne par
+  visionnage avec sa date et une corbeille pour la retirer (le visionnage posé par erreur, pas
+  forcément le plus ancien — chaque ligne est indépendante). Sur un épisode déjà coché, la pastille
+  ↻ (ajouter un visionnage) est accompagnée d'une corbeille dès qu'il y en a un, pour retirer le
+  dernier posé sans décocher l'épisode.
+- **Vérifié dans un navigateur en largeur téléphone** : Matrix avec 3 visionnages (dont un posé à
+  la date du jour) affiche « Vu 3 fois » et les 3 lignes ; retirer celle du jour ramène le journal
+  à 2 lignes, vérifié par lecture directe de la base.
 - **Reste à confirmer sur l'appareil** : rien de spécifique à M4 au-delà des gestes déjà en
   attente (appui long, photo d'avatar, bouton retour, restauration Drive).
 
@@ -620,7 +632,7 @@ avant ou après M4, aucune des deux ne dépend de l'autre.
   |---|---|---|
   | Super-héros | mots-clés `superhero` (9715) + `based on comic` (9717) | mêmes mots-clés |
   | Braquage | mot-clé `heist` (10051) | mot-clé `heist` (10051) |
-  | Halloween | genre Horreur (27) | genre Horreur (27) |
+  | Halloween | genre Horreur (27) | mot-clé `horror` (315058) — TMDB n'a pas de genre Horreur côté séries |
   | Romance | genre Romance (10749) | *(pas de mood série — voir D3)* |
 
   Testés et écartés du lancement, tous les deux pour la même raison : le nettoyage qu'ils
@@ -644,10 +656,9 @@ avant ou après M4, aucune des deux ne dépend de l'autre.
 - **Recoupe l'onglet « Découvrir »** noté dans « Ce qui reste ouvert » de `PROJET_CONTEXTE.md` —
   M5 en couvre une partie (rayons par thème) ; le reste (compléter une saga, angles morts,
   disponible sur mes plateformes) reste noté là, non cadré.
-- **Présentation proposée** : un onglet ou un bloc « Moods » dans l'accueil de la recherche
-  (à côté de Tendances / Nouveautés / À venir), un bouton par mood, réutilisant `discoverByGenre`
-  avec des mots-clés/genres fixes au lieu du genre choisi par Kinder — même mécanique que
-  « Histoire & Époques », pas un nouveau moteur.
+- **Présentation, revue le 2026-09-23** : d'abord posés à côté de Tendances / Nouveautés / À venir
+  dans l'accueil de la recherche (voir plus bas) — **retiré de là à la demande de Kinder**, qui
+  préfère un onglet séparé. Voir « Onglet Découvrir » ci-dessous.
 - **Hors M5** : pas de mood personnalisé (créer son propre pack), pas de mémoire de mood
   préféré, pas de mélange de plusieurs moods à la fois.
 - **Critère de validation (à essayer par Kinder)** : « Dans l'accueil de la recherche, je touche
@@ -676,6 +687,28 @@ avant ou après M4, aucune des deux ne dépend de l'autre.
     votes — propre (Supernatural, Stranger Things).
 - **Reste à confirmer sur l'appareil** : rien de spécifique aux moods — mêmes gestes que le
   reste de l'accueil, déjà couverts par l'essai téléphone en attente.
+
+#### Onglet Découvrir — demande de Kinder (2026-09-23), faite
+Après l'essai sur téléphone, Kinder demande de sortir les moods de l'accueil de la recherche et
+d'en faire un onglet à part : « les paramètres en haut avec le profil, dans les onglets en bas on
+va remplacer l'onglet Réglages par Découvrir et mettre notamment le mood dedans ».
+- **Réglages** : déjà accessible depuis l'avatar en haut à droite (`goTo('settings')` sur
+  l'en-tête) — rien à changer côté accès ; c'est la ligne « Réglages » du bas qui disparaît,
+  devenue redondante.
+- **Nouvel onglet Découvrir**, en bas à la place de Réglages (icône boussole) : les 4 moods,
+  « Choisis un rayon ci-dessus » tant qu'aucun n'est choisi, puis le filtre Tout/Films/Séries et
+  la grille, avec « Voir plus » — même mécanique de pagination que l'accueil de la recherche, mais
+  un état et une fonction de chargement séparés (`chargerDecouvrir`, indépendante de
+  `chargerAccueil`) : changer de mood dans Découvrir ne touche pas à Tendances/Nouveautés/À venir,
+  et inversement.
+- **Accueil de la recherche** : revenu à Tendances / Nouveautés / À venir seulement.
+- **Vérifié dans un navigateur en largeur téléphone** : accueil de la recherche sans les moods ;
+  onglet Découvrir accessible en bas (icône boussole), 4 moods proposés ; Halloween → Supernatural,
+  American Horror Story, The Walking Dead, Stranger Things ; filtre Films → 0 série parmi les
+  résultats ; Réglages toujours joignable depuis l'avatar.
+- **Cadrage technique** : `Icon.jsx` (icônes `compass`, `trash`) ; `App.jsx` (état et fonction
+  `chargerDecouvrir` séparés, bloc `view === 'discover'`, tabbar) ; 211 tests toujours verts
+  (aucun test dédié à la navigation par onglets, déjà hors du périmètre testé automatiquement).
 
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.

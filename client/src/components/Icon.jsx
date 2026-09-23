@@ -10,6 +10,13 @@ const PATHS = {
     </>
   ),
   lists: <path d="M2 5h10M2 12h10M2 19h10M16 4v9l3-2 3 2V4" />,
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.5 8.5-2 5-5 2 2-5z" />
+    </>
+  ),
+  trash: <path d="M5 6h14M9 6V4h6v2M6 6l1 14h10l1-14M10 11v5M14 11v5" />,
   gear: (
     <>
       <circle cx="12" cy="12" r="3" />

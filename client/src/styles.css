@@ -874,6 +874,7 @@ button { font-family: inherit; }
   font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* Journal de visionnages (M4) : ne revoir qu'un épisode déjà coché. */
+.episode__journal { display: flex; align-items: center; gap: .25rem; flex-shrink: 0; }
 .episode__revoir {
   display: flex; align-items: center; gap: .2rem; flex-shrink: 0;
   padding: .4rem .5rem; margin-left: .3rem; border-radius: 8px;
@@ -881,9 +882,23 @@ button { font-family: inherit; }
   cursor: pointer; font-size: .78rem;
 }
 .episode__revoir:hover { border-color: var(--vu); color: var(--vu); }
+.episode__revoir--retirer { margin-left: 0; }
+.episode__revoir--retirer:hover { border-color: var(--abandon); color: var(--abandon); }
 
 .revisionnage { margin-top: .6rem; }
-.revisionnage .hint--small { text-align: center; margin-top: .4rem; }
+.revisionnage .hint--small { text-align: center; margin-top: .4rem; margin-bottom: 0; }
+/* Historique des visionnages d'un film : une ligne par date, retirable. */
+.visionnage-liste { list-style: none; margin: .4rem 0 0; padding: 0; }
+.visionnage-liste li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .35rem .2rem; font-size: .85rem; color: var(--faint);
+  border-top: 1px solid var(--border);
+}
+.visionnage-liste button {
+  display: flex; align-items: center; padding: .3rem; border-radius: 6px;
+  border: none; background: transparent; color: var(--faint); cursor: pointer;
+}
+.visionnage-liste button:hover { color: var(--abandon); }
 
 /* ---------- Réactif ---------- */
 @media (prefers-reduced-motion: reduce) {

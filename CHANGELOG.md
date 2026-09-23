@@ -31,10 +31,12 @@
 Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
 
 **M5 — Packs de mood, codée et vérifiée le 2026-09-23** (194 tests verts) :
-- Accueil de la recherche : 4 boutons de plus, à côté de Tendances / Nouveautés / À venir —
-  Super-héros, Braquage, Halloween, Romance (films). Chacun vérifié sur le vrai catalogue.
+- Super-héros, Braquage, Halloween, Romance (films). Chacun vérifié sur le vrai catalogue.
 - Noël et Love-séries reportés (nettoyage supplémentaire nécessaire, comme pour le genre
   Histoire & Époques). Saga retirée du périmètre : déjà couverte par la fiche d'un film.
+- **Retour de Kinder après essai sur téléphone : les moods déménagent de l'accueil de la
+  recherche vers un nouvel onglet « Découvrir »**, en bas à la place de « Réglages » — Réglages
+  reste joignable depuis l'avatar en haut, comme avant.
 
 **M4 — Journal de visionnages, codée et vérifiée le 2026-09-23** (211 tests verts) :
 - Fiche d'un film suivi : bouton « J'ai revu ce film », avec le nombre de fois et la date du
@@ -48,6 +50,10 @@ Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
   quand il y en a un.
 - `Stats.jsx` inchangé par choix assumé : le temps passé compte les titres vus, pas le nombre
   de fois où ils ont été revus.
+- **Retour de Kinder après essai sur téléphone : le compte n'était pas assez visible et rien ne
+  permettait de corriger un clic de trop.** Le texte est remplacé par un **historique** (une
+  ligne par visionnage, une corbeille pour la retirer) sur la fiche d'un film, et une corbeille
+  ajoutée à côté de la pastille ↻ d'un épisode.
 
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à

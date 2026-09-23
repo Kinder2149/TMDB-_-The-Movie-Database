@@ -233,21 +233,12 @@ export default function App() {
     setAccueilCharge(true);
     const depuis = ajouter ? tendancesPage + 1 : 1;
     const pages = [depuis, depuis + 1, depuis + 2];
-    // Un mood (Super-héros, Braquage…) se charge comme une rubrique, mais par
-    // une porte différente : ce sont des rayons fixes (genre/mots-clés), pas
-    // les tendances/nouveautés/à venir de TMDB.
-    const estMood = moods.some((m) => m.key === quelleRubrique);
-    const charge = (page) =>
-      estMood
-        ? discoverMood({
-            mood: quelleRubrique,
-            movie: filtre !== 'tv',
-            tv: filtre !== 'movie',
-            page,
-          })
-        : getRubrique({ rubrique: quelleRubrique, mediaType: filtre, page });
     try {
-      const lots = await Promise.all(pages.map((page) => charge(page).catch(() => [])));
+      const lots = await Promise.all(
+        pages.map((page) =>
+          getRubrique({ rubrique: quelleRubrique, mediaType: filtre, page }).catch(() => [])
+        )
+      );
       if (seq !== tendancesSeq.current) return; // rubrique/filtre changé entre-temps
       const nouveaux = lots.flat();
       setTendancesPage(depuis + 2);
@@ -258,11 +249,65 @@ export default function App() {
         return [...base, ...nouveaux.filter((r) => !vus.has(keyOf(r)) && vus.add(keyOf(r)))];
       });
     } catch {
-      /* réseau indisponible : l'écran reste sans rien */
+      /* réseau indisponible : l'écran reste sans Tendances */
     } finally {
       if (seq === tendancesSeq.current) setAccueilCharge(false);
     }
   }
+
+  // --- Onglet Découvrir (M5) : les moods, indépendants de l'accueil de la
+  // recherche. Même mécanique de pagination (3 pages, « Voir plus »), une
+  // porte différente (`discoverMood`, genre/mots-clés fixes plutôt que
+  // tendances TMDB) et son propre état — rien ne se mélange avec Tendances /
+  // Nouveautés / À venir.
+  const [mood, setMood] = useState(null); // aucun choisi au départ
+  const [decouvrir, setDecouvrir] = useState([]);
+  const [decouvrirPage, setDecouvrirPage] = useState(0);
+  const [decouvrirPlus, setDecouvrirPlus] = useState(true);
+  const [decouvrirCharge, setDecouvrirCharge] = useState(false);
+  const decouvrirSeq = useRef(0);
+
+  async function chargerDecouvrir(quelMood, filtre, ajouter = false) {
+    if (!quelMood) return;
+    const seq = ++decouvrirSeq.current;
+    setDecouvrirCharge(true);
+    const depuis = ajouter ? decouvrirPage + 1 : 1;
+    const pages = [depuis, depuis + 1, depuis + 2];
+    try {
+      const lots = await Promise.all(
+        pages.map((page) =>
+          discoverMood({
+            mood: quelMood,
+            movie: filtre !== 'tv',
+            tv: filtre !== 'movie',
+            page,
+          }).catch(() => [])
+        )
+      );
+      if (seq !== decouvrirSeq.current) return;
+      const nouveaux = lots.flat();
+      setDecouvrirPage(depuis + 2);
+      setDecouvrirPlus(lots[2].length > 0);
+      setDecouvrir((prev) => {
+        const base = ajouter ? prev : [];
+        const vus = new Set(base.map(keyOf));
+        return [...base, ...nouveaux.filter((r) => !vus.has(keyOf(r)) && vus.add(keyOf(r)))];
+      });
+    } catch {
+      /* réseau indisponible : l'écran reste sans rien */
+    } finally {
+      if (seq === decouvrirSeq.current) setDecouvrirCharge(false);
+    }
+  }
+
+  // Relance à chaque changement de mood, ou de filtre Films/Séries tant qu'un
+  // mood est choisi.
+  useEffect(() => {
+    if (!mood) return;
+    setDecouvrir([]);
+    chargerDecouvrir(mood, mediaFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mood, mediaFilter]);
 
   // Genres et moods chargés une fois (indépendants du profil).
   useEffect(() => {
@@ -791,6 +836,8 @@ export default function App() {
       : trending.filter((r) => r.mediaType === mediaFilter)
   ).filter((r) => !dejaChezMoi(r));
 
+  const decouvrirFiltered = decouvrir.filter((r) => !dejaChezMoi(r));
+
   // Passage d'un onglet à l'autre : on rafraîchit les données dont il a besoin.
   // `push` alimente l'historique de navigation ; on le laisse à false quand
   // c'est justement le retour qui nous amène là (sinon on tournerait en rond).
@@ -1011,7 +1058,6 @@ export default function App() {
                   ['tendances', '✨ Tendances'],
                   ['nouveautes', 'Nouveautés'],
                   ['avenir', 'À venir'],
-                  ...moods.map((m) => [m.key, m.name]),
                 ].map(([v, label]) => (
                   <button
                     key={v}
@@ -1125,6 +1171,75 @@ export default function App() {
           suiviCount={suivi.size}
         />
       )}
+
+      {view === 'discover' && (
+        <>
+          <h2 className="tonight__title">Découvrir</h2>
+          <p className="hint">Des rayons prêts à l'emploi, par thème.</p>
+
+          <div className="rubriques" role="group" aria-label="Mood">
+            {moods.map((m) => (
+              <button
+                key={m.key}
+                className={`chip ${mood === m.key ? 'on' : ''}`}
+                aria-pressed={mood === m.key}
+                onClick={() => setMood(m.key)}
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+
+          {!mood && <p className="hint">Choisis un rayon ci-dessus.</p>}
+
+          {mood && (
+            <>
+              <div className="seg">
+                {[
+                  ['all', 'Tout'],
+                  ['movie', 'Films'],
+                  ['tv', 'Séries'],
+                ].map(([v, label]) => (
+                  <button
+                    key={v}
+                    className={mediaFilter === v ? 'on' : ''}
+                    onClick={() => setMediaFilter(v)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {decouvrirFiltered.length === 0 && (
+                <p className="hint">
+                  {decouvrirCharge ? 'Chargement…' : 'Rien à afficher pour le moment.'}
+                </p>
+              )}
+              <section className="grid">
+                {decouvrirFiltered.map((item) => (
+                  <MovieCard
+                    key={keyOf(item)}
+                    item={item}
+                    isFollowed={suivi.has(keyOf(item))}
+                    status={suivi.get(keyOf(item))?.status}
+                    {...cardProps}
+                  />
+                ))}
+              </section>
+              {decouvrirPlus && decouvrirFiltered.length > 0 && (
+                <div className="voirplus">
+                  <button
+                    className="btn btn--ghost"
+                    onClick={() => chargerDecouvrir(mood, mediaFilter, true)}
+                  >
+                    Voir plus
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
       </main>
 
       <nav className="tabbar">
@@ -1132,7 +1247,7 @@ export default function App() {
           ['search', 'Recherche', 'search'],
           ['tonight', 'Ce soir', 'film'],
           ['lists', 'Mes listes', 'lists'],
-          ['settings', 'Réglages', 'gear'],
+          ['discover', 'Découvrir', 'compass'],
         ].map(([v, label, icon]) => (
           <button
             key={v}

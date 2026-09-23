@@ -16,6 +16,7 @@ import {
   setNote,
   getVisionnages,
   addVisionnage,
+  removeVisionnage,
   getCollection,
   getRecommendations,
 } from '../api.js';
@@ -169,15 +170,25 @@ export default function Detail({
     }
   }
 
-  // Séries : nombre de visionnages par épisode, pour la pastille sous la case.
+  // Séries : visionnages par épisode (du plus récent au plus ancien), pour la
+  // pastille sous la case et pour savoir quelle ligne retirer en premier.
   const visionnagesParEpisode = new Map();
   for (const v of visionnages) {
     if (v.season == null) continue;
     const cle = `${v.season}-${v.episode}`;
-    visionnagesParEpisode.set(cle, (visionnagesParEpisode.get(cle) || 0) + 1);
+    if (!visionnagesParEpisode.has(cle)) visionnagesParEpisode.set(cle, []);
+    visionnagesParEpisode.get(cle).push(v);
   }
   async function revoirEpisode(season, episode) {
     await addVisionnage(item.mediaType, item.id, { season, episode });
+    setVisionnages(await getVisionnages(item.mediaType, item.id));
+  }
+
+  // Retirer une ligne du journal (correction d'un clic de trop). `listVisionnages`
+  // rend le plus récent en premier : sans préciser d'id, on retire toujours le
+  // dernier — c'est le seul qu'on vient de poser par erreur.
+  async function retirerVisionnage(id) {
+    await removeVisionnage(id);
     setVisionnages(await getVisionnages(item.mediaType, item.id));
   }
 
@@ -461,11 +472,28 @@ export default function Detail({
                 J'ai revu ce film
               </button>
               {visionnagesFilm.length > 0 && (
-                <p className="hint hint--small">
-                  {visionnagesFilm.length === 1
-                    ? `Vu le ${visionnagesFilm[0].date}.`
-                    : `Vu ${visionnagesFilm.length} fois, la dernière le ${visionnagesFilm[0].date}.`}
-                </p>
+                <>
+                  <p className="hint hint--small">
+                    {visionnagesFilm.length === 1
+                      ? 'Vu 1 fois.'
+                      : `Vu ${visionnagesFilm.length} fois.`}
+                  </p>
+                  <ul className="visionnage-liste">
+                    {visionnagesFilm.map((v) => (
+                      <li key={v.id}>
+                        <span>{v.date}</span>
+                        <button
+                          type="button"
+                          aria-label="Retirer ce visionnage"
+                          title="Retirer ce visionnage"
+                          onClick={() => retirerVisionnage(v.id)}
+                        >
+                          <Icon name="trash" size={14} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
           )}
@@ -574,8 +602,8 @@ export default function Detail({
                           </button>
                           <ul className="episode-list">
                             {episodes.map((ep) => {
-                              const fois =
-                                visionnagesParEpisode.get(`${expanded}-${ep.episodeNumber}`) || 0;
+                              const vus =
+                                visionnagesParEpisode.get(`${expanded}-${ep.episodeNumber}`) || [];
                               return (
                                 <li key={ep.episodeNumber}>
                                   <label className="episode">
@@ -590,18 +618,32 @@ export default function Detail({
                                     <span className="episode__name">{ep.name}</span>
                                   </label>
                                   {/* Journal (M4) : ne revoir qu'un épisode déjà vu, sans
-                                      toucher à la case ni tout redéplier. */}
+                                      toucher à la case ni tout redéplier. Au-delà d'un
+                                      visionnage, un bouton retire le dernier posé. */}
                                   {ep.watched && (
-                                    <button
-                                      type="button"
-                                      className="episode__revoir"
-                                      title="J'ai revu cet épisode"
-                                      aria-label="J'ai revu cet épisode"
-                                      onClick={() => revoirEpisode(expanded, ep.episodeNumber)}
-                                    >
-                                      <Icon name="refresh" size={13} />
-                                      {fois > 1 && <span>×{fois}</span>}
-                                    </button>
+                                    <span className="episode__journal">
+                                      <button
+                                        type="button"
+                                        className="episode__revoir"
+                                        title="J'ai revu cet épisode"
+                                        aria-label="J'ai revu cet épisode"
+                                        onClick={() => revoirEpisode(expanded, ep.episodeNumber)}
+                                      >
+                                        <Icon name="refresh" size={13} />
+                                        {vus.length > 1 && <span>×{vus.length}</span>}
+                                      </button>
+                                      {vus.length > 0 && (
+                                        <button
+                                          type="button"
+                                          className="episode__revoir episode__revoir--retirer"
+                                          title="Retirer le dernier visionnage"
+                                          aria-label="Retirer le dernier visionnage"
+                                          onClick={() => retirerVisionnage(vus[0].id)}
+                                        >
+                                          <Icon name="trash" size={13} />
+                                        </button>
+                                      )}
+                                    </span>
                                   )}
                                 </li>
                               );
