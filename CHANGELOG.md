@@ -36,8 +36,18 @@ Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
 - Noël et Love-séries reportés (nettoyage supplémentaire nécessaire, comme pour le genre
   Histoire & Époques). Saga retirée du périmètre : déjà couverte par la fiche d'un film.
 
-**M4 : décision figée le 2026-09-23, rien codé** — voir `PLAN_V2.md`.
-- Revoir un titre plusieurs fois se pose par épisode, pas par titre — décision de Kinder.
+**M4 — Journal de visionnages, codée et vérifiée le 2026-09-23** (211 tests verts) :
+- Fiche d'un film suivi : bouton « J'ai revu ce film », avec le nombre de fois et la date du
+  dernier visionnage. Se pose automatiquement à la date du jour la première fois qu'un film
+  passe à « Vu ».
+- Fiche d'une série : pastille ↻ sur un épisode déjà coché pour le revoir, sans décocher ni
+  rouvrir la saison ; affiche « ×N » au-delà d'une fois.
+- Sauvegarde (Drive et fichier) : le journal est emporté et restauré (`BACKUP_VERSION` 3) ;
+  une sauvegarde plus ancienne se restaure sans erreur, simplement sans journal.
+- Export CSV Letterboxd : la date de visionnage vient désormais du dernier visionnage réel
+  quand il y en a un.
+- `Stats.jsx` inchangé par choix assumé : le temps passé compte les titres vus, pas le nombre
+  de fois où ils ont été revus.
 
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à

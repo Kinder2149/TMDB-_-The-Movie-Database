@@ -55,7 +55,7 @@ describe('export', () => {
     const fichier = await backup.exportProfile(profil.id);
 
     expect(fichier.format).toBe('suivi-films-series');
-    expect(fichier.version).toBe(2);
+    expect(fichier.version).toBe(3);
     expect(fichier.profile).toEqual({
       id: profil.id,
       name: 'Mon profil',
@@ -203,6 +203,7 @@ describe('vérification du fichier ouvert', () => {
       profil: 'Mon profil',
       titres: 2,
       episodes: 3,
+      visionnages: 4, // 1 film marqué « vu » + 3 épisodes cochés (M4)
       listes: 1,
       date: fichier.exportedAt.slice(0, 10),
     });

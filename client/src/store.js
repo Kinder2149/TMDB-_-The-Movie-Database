@@ -163,11 +163,55 @@ export async function removeFromSuivi(profileId, mediaType, id) {
 
 export async function setStatus(profileId, mediaType, id, status) {
   if (!STATUSES.includes(status)) throw new Error('Statut invalide.');
+  // Pour un film, passer à « Vu » pour la première fois pose un premier
+  // visionnage à la date du jour (M4, D2) — sans dupliquer si on repasse par
+  // « Vu » après un aller-retour vers un autre statut.
+  const [avant] = await query(
+    'SELECT status FROM suivi WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?',
+    [profileId, id, mediaType]
+  );
   const { changes } = await run(
     'UPDATE suivi SET status = ? WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?',
     [status, profileId, id, mediaType]
   );
   if (changes === 0) throw new Error('Titre absent du suivi.');
+  if (mediaType === 'movie' && status === 'vu' && avant?.status !== 'vu') {
+    await addVisionnage(profileId, mediaType, id, {});
+  }
+}
+
+// --- Journal de visionnages (M4) ---
+//
+// Une ligne par visionnage — pas un compteur — pour pouvoir répondre à « la
+// dernière fois, c'était quand ? » et pas seulement « combien de fois ».
+// Séparé du suivi et des épisodes cochés : cocher un épisode dit « je l'ai vu
+// (au moins une fois) », le journal dit « et voici quand, à chaque fois ».
+// `season`/`episode` restent vides pour un film.
+export async function addVisionnage(profileId, mediaType, tmdbId, { season, episode, date } = {}) {
+  await run(
+    `INSERT INTO visionnages (profile_id, tmdb_id, media_type, season_number, episode_number, date)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [profileId, tmdbId, mediaType, season ?? null, episode ?? null, date || today()]
+  );
+}
+
+// Tous les visionnages d'un titre, du plus récent au plus ancien.
+export function listVisionnages(profileId, mediaType, tmdbId) {
+  return query(
+    `SELECT id, season_number AS season, episode_number AS episode, date
+     FROM visionnages
+     WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?
+     ORDER BY date DESC, id DESC`,
+    [profileId, tmdbId, mediaType]
+  );
+}
+
+export async function deleteVisionnage(profileId, id) {
+  await run('DELETE FROM visionnages WHERE id = ? AND profile_id = ?', [id, profileId]);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 // --- Épisodes vus (présence d'une ligne = épisode vu) ---
@@ -181,12 +225,17 @@ function listWatchedEpisodes(profileId, seriesId) {
 }
 
 export async function markEpisode(profileId, seriesId, season, episode) {
-  await run(
+  const { changes } = await run(
     `INSERT OR IGNORE INTO episodes_vus
        (profile_id, series_id, season_number, episode_number)
      VALUES (?, ?, ?, ?)`,
     [profileId, seriesId, season, episode]
   );
+  // `changes === 0` : l'épisode était déjà coché, on ne repose pas un
+  // visionnage à chaque clic — « J'ai revu cet épisode » sert à ça.
+  if (changes > 0) {
+    await addVisionnage(profileId, 'tv', seriesId, { season, episode });
+  }
 }
 
 export async function unmarkEpisode(profileId, seriesId, season, episode) {
@@ -197,16 +246,32 @@ export async function unmarkEpisode(profileId, seriesId, season, episode) {
   );
 }
 
-// Coche toute une saison d'un coup (un seul bloc d'écriture).
+// Coche toute une saison d'un coup (un seul bloc d'écriture). Ne pose un
+// visionnage que pour les épisodes qui n'étaient pas déjà cochés : sinon,
+// recocher une saison déjà vue en repasserait tous les épisodes pour vus « à
+// l'instant », faussant le journal.
 export async function markWholeSeason(profileId, seriesId, season, episodeNumbers) {
-  await runMany(
-    episodeNumbers.map((e) => ({
+  const deja = new Set(
+    (await listWatchedEpisodes(profileId, seriesId))
+      .filter((e) => e.season === season)
+      .map((e) => e.episode)
+  );
+  const nouveaux = episodeNumbers.filter((e) => !deja.has(e));
+  const date = today();
+  await runMany([
+    ...episodeNumbers.map((e) => ({
       sql: `INSERT OR IGNORE INTO episodes_vus
               (profile_id, series_id, season_number, episode_number)
             VALUES (?, ?, ?, ?)`,
       params: [profileId, seriesId, season, e],
-    }))
-  );
+    })),
+    ...nouveaux.map((e) => ({
+      sql: `INSERT INTO visionnages
+              (profile_id, tmdb_id, media_type, season_number, episode_number, date)
+            VALUES (?, ?, 'tv', ?, ?, ?)`,
+      params: [profileId, seriesId, season, e, date],
+    })),
+  ]);
 }
 
 export async function unmarkWholeSeason(profileId, seriesId, season) {
@@ -230,19 +295,33 @@ export async function markSeasonWatched(profileId, seriesId, season) {
 // la série serait déclarée finie avant de l'être.
 export async function markSeriesWatched(profileId, seriesId) {
   const { seasons } = await getSeriesStructure(seriesId);
+  const deja = new Set(
+    (await listWatchedEpisodes(profileId, seriesId)).map((e) => `${e.season}-${e.episode}`)
+  );
+  const date = today();
   const ecritures = [];
+  let coches = 0;
   for (const s of seasons) {
     for (const numero of airedOnly(await getEpisodes(seriesId, s.seasonNumber))) {
+      coches += 1;
       ecritures.push({
         sql: `INSERT OR IGNORE INTO episodes_vus
                 (profile_id, series_id, season_number, episode_number)
               VALUES (?, ?, ?, ?)`,
         params: [profileId, seriesId, s.seasonNumber, numero],
       });
+      if (!deja.has(`${s.seasonNumber}-${numero}`)) {
+        ecritures.push({
+          sql: `INSERT INTO visionnages
+                  (profile_id, tmdb_id, media_type, season_number, episode_number, date)
+                VALUES (?, ?, 'tv', ?, ?, ?)`,
+          params: [profileId, seriesId, s.seasonNumber, numero, date],
+        });
+      }
     }
   }
   await runMany(ecritures);
-  return ecritures.length;
+  return coches;
 }
 
 export async function unmarkSeriesWatched(profileId, seriesId) {

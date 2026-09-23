@@ -204,6 +204,23 @@ export async function setStatus(mediaType, id, status) {
   return ecriture(store.setStatus(requireProfile(), mediaType, id, status));
 }
 
+// --- Journal de visionnages (M4) ---
+
+// Ajoute un visionnage à la date du jour (ou `date` si fournie) : le bouton
+// « Je l'ai revu » de la fiche. `{ season, episode }` pour un épisode, vide
+// pour un film.
+export async function addVisionnage(mediaType, id, options) {
+  return ecriture(store.addVisionnage(requireProfile(), mediaType, id, options));
+}
+
+export async function getVisionnages(mediaType, id) {
+  return store.listVisionnages(requireProfile(), mediaType, id);
+}
+
+export async function removeVisionnage(id) {
+  return ecriture(store.deleteVisionnage(requireProfile(), id));
+}
+
 // Met les dates de sortie à jour : celles qui manquent (fiches d'avant que
 // l'application ne les retienne) et celles qui viennent d'un autre pays que
 // celui de la langue choisie. Renvoie le nombre de fiches complétées.

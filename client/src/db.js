@@ -57,6 +57,18 @@ const SCHEMA = `
     FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS visionnages (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id     TEXT    NOT NULL,
+    tmdb_id        INTEGER NOT NULL,
+    media_type     TEXT    NOT NULL,
+    season_number  INTEGER,
+    episode_number INTEGER,
+    date           TEXT    NOT NULL,
+    created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS listes (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL,

@@ -858,8 +858,9 @@ button { font-family: inherit; }
 .season__all:hover { background: color-mix(in srgb, var(--encours) 14%, transparent); }
 
 .episode-list { list-style: none; margin: 0; padding: 0; }
+.episode-list li { display: flex; align-items: center; }
 .episode {
-  display: flex; align-items: center; gap: .7rem;
+  display: flex; align-items: center; gap: .7rem; flex: 1; min-width: 0;
   padding: .5rem .2rem; min-height: 46px; cursor: pointer;
 }
 .episode input {
@@ -869,7 +870,20 @@ button { font-family: inherit; }
   color: var(--faint); font-size: .85rem; flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
-.episode__name { font-size: .9rem; }
+.episode__name {
+  font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Journal de visionnages (M4) : ne revoir qu'un épisode déjà coché. */
+.episode__revoir {
+  display: flex; align-items: center; gap: .2rem; flex-shrink: 0;
+  padding: .4rem .5rem; margin-left: .3rem; border-radius: 8px;
+  border: 1px solid var(--border); background: transparent; color: var(--faint);
+  cursor: pointer; font-size: .78rem;
+}
+.episode__revoir:hover { border-color: var(--vu); color: var(--vu); }
+
+.revisionnage { margin-top: .6rem; }
+.revisionnage .hint--small { text-align: center; margin-top: .4rem; }
 
 /* ---------- Réactif ---------- */
 @media (prefers-reduced-motion: reduce) {

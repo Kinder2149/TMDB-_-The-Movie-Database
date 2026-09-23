@@ -14,6 +14,8 @@ import {
   getItemListes,
   getNote,
   setNote,
+  getVisionnages,
+  addVisionnage,
   getCollection,
   getRecommendations,
 } from '../api.js';
@@ -137,6 +139,48 @@ export default function Detail({
   // Filet de sécurité : ce qui reste en attente part à la fermeture de la fiche.
   useEffect(() => () => sauveRef.current(), []);
 
+  // --- Journal de visionnages (M4) ---
+  // Une ligne par visionnage, par film ou par épisode. Chargé une fois le
+  // titre suivi ; rechargé après chaque « J'ai revu ».
+  const [visionnages, setVisionnages] = useState([]);
+  const [revoirEnCours, setRevoirEnCours] = useState(false);
+
+  useEffect(() => {
+    if (!isFollowed) return;
+    getVisionnages(item.mediaType, item.id).then(setVisionnages).catch(() => {});
+    // `status` : marquer « Vu » pose un visionnage automatique (M4, D2) —
+    // sans cette dépendance, le compteur ne le voyait qu'au prochain « J'ai
+    // revu » ou à la réouverture de la fiche.
+  }, [item.id, item.mediaType, isFollowed, status]);
+
+  // Films : compte et date du dernier visionnage. Un film qu'on vient de
+  // marquer « vu » a déjà une ligne (posée automatiquement) — ce bouton sert
+  // aux fois suivantes.
+  const visionnagesFilm = !isSeries ? visionnages : [];
+  async function revoirLeFilm() {
+    setRevoirEnCours(true);
+    try {
+      await addVisionnage(item.mediaType, item.id, {});
+      setVisionnages(await getVisionnages(item.mediaType, item.id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setRevoirEnCours(false);
+    }
+  }
+
+  // Séries : nombre de visionnages par épisode, pour la pastille sous la case.
+  const visionnagesParEpisode = new Map();
+  for (const v of visionnages) {
+    if (v.season == null) continue;
+    const cle = `${v.season}-${v.episode}`;
+    visionnagesParEpisode.set(cle, (visionnagesParEpisode.get(cle) || 0) + 1);
+  }
+  async function revoirEpisode(season, episode) {
+    await addVisionnage(item.mediaType, item.id, { season, episode });
+    setVisionnages(await getVisionnages(item.mediaType, item.id));
+  }
+
   // --- Épisodes (séries suivies uniquement) ---
   const [seasons, setSeasons] = useState([]);
   const [progress, setProgress] = useState(null);
@@ -193,6 +237,10 @@ export default function Detail({
       const p = await getProgress(item.id);
       setProgress(p);
       getSeasonsProgress(item.id).then(setSeasons).catch(() => {});
+      // Cocher un épisode pose un visionnage (M4) sans forcément changer le
+      // statut de la série — la dépendance sur `status` de l'effet plus haut
+      // ne suffirait donc pas à rafraîchir le journal.
+      getVisionnages(item.mediaType, item.id).then(setVisionnages).catch(() => {});
       const cur = status || 'a_voir';
       if (cur !== 'abandonne') {
         const derived = deriveSeriesStatus(p);
@@ -400,6 +448,28 @@ export default function Detail({
             </div>
           )}
 
+          {/* Journal de visionnages (M4) : un film seulement, une série se
+              revoit épisode par épisode, plus bas. */}
+          {!isSeries && isFollowed && (
+            <div className="revisionnage">
+              <button
+                className="btn btn--ghost btn--wide"
+                onClick={revoirLeFilm}
+                disabled={revoirEnCours}
+              >
+                <Icon name="check" size={15} />
+                J'ai revu ce film
+              </button>
+              {visionnagesFilm.length > 0 && (
+                <p className="hint hint--small">
+                  {visionnagesFilm.length === 1
+                    ? `Vu le ${visionnagesFilm[0].date}.`
+                    : `Vu ${visionnagesFilm.length} fois, la dernière le ${visionnagesFilm[0].date}.`}
+                </p>
+              )}
+            </div>
+          )}
+
           {info?.trailer && (
             <a
               className="btn btn--primary btn--wide"
@@ -503,21 +573,39 @@ export default function Detail({
                               : 'Cocher toute la saison'}
                           </button>
                           <ul className="episode-list">
-                            {episodes.map((ep) => (
-                              <li key={ep.episodeNumber}>
-                                <label className="episode">
-                                  <input
-                                    type="checkbox"
-                                    checked={ep.watched}
-                                    onChange={() => toggleEpisode(ep)}
-                                  />
-                                  <span className="episode__num">
-                                    E{String(ep.episodeNumber).padStart(2, '0')}
-                                  </span>
-                                  <span className="episode__name">{ep.name}</span>
-                                </label>
-                              </li>
-                            ))}
+                            {episodes.map((ep) => {
+                              const fois =
+                                visionnagesParEpisode.get(`${expanded}-${ep.episodeNumber}`) || 0;
+                              return (
+                                <li key={ep.episodeNumber}>
+                                  <label className="episode">
+                                    <input
+                                      type="checkbox"
+                                      checked={ep.watched}
+                                      onChange={() => toggleEpisode(ep)}
+                                    />
+                                    <span className="episode__num">
+                                      E{String(ep.episodeNumber).padStart(2, '0')}
+                                    </span>
+                                    <span className="episode__name">{ep.name}</span>
+                                  </label>
+                                  {/* Journal (M4) : ne revoir qu'un épisode déjà vu, sans
+                                      toucher à la case ni tout redéplier. */}
+                                  {ep.watched && (
+                                    <button
+                                      type="button"
+                                      className="episode__revoir"
+                                      title="J'ai revu cet épisode"
+                                      aria-label="J'ai revu cet épisode"
+                                      onClick={() => revoirEpisode(expanded, ep.episodeNumber)}
+                                    >
+                                      <Icon name="refresh" size={13} />
+                                      {fois > 1 && <span>×{fois}</span>}
+                                    </button>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </>
                       )}

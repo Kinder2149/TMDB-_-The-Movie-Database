@@ -544,11 +544,11 @@ M2 validée par Kinder le 2026-09-21.
   résultat pour ce filtre » s'affiche).
 - **Reporté** : genre et plateforme dans « Mes listes » (D3).
 
-### M4 — Journal de visionnages : cadrage proposé (2026-09-23) — À VALIDER, rien codé
+### M4 — Journal de visionnages : codée et vérifiée (2026-09-23)
 M3 validée par Kinder. **Tranche sensible** (comme la tranche 2 de `PLAN_ANDROID.md`) : c'est la
 première mission de cette série qui touche la base, la sauvegarde et l'export — une erreur ici
-abîmerait des données réelles, pas seulement un affichage. Cadrage écrit avant tout code, à
-valider avant de commencer.
+abîmerait des données réelles, pas seulement un affichage. Cadrage écrit avant tout code, décisions
+validées par Kinder, code fait ensuite.
 - **Ce que ça couvre** : points 1 et 2 de la liste d'origine — revoir un titre plusieurs fois, et
   la date de visionnage.
 - **D1 — Un journal, pas un compteur.** Aujourd'hui `suivi.status = 'vu'` ne dit qu'un booléen.
@@ -565,21 +565,45 @@ valider avant de commencer.
   l'épisode (série) ou du film, pas seulement du titre : revoir S2E01 précisément, pas juste
   « revu la série ». C'est l'option la plus fidèle à la demande, et la plus lourde à construire
   (table, écran, sauvegarde, CSV, statistiques en quadruple) — assumé.
-- **Ce que ça oblige à toucher** :
-  - `db.js` : nouvelle table, migration (`addColumnIfMissing`/nouvelle table selon le motif déjà
-    utilisé dans `initDb`) — jamais de perte des bases déjà installées.
-  - `store.js` : lecture/écriture des visionnages, agrégation pour la fiche et les statistiques.
-  - `backup.js` : la sauvegarde et la restauration doivent emporter ce journal — **format de
-    sauvegarde à monter** (comme `BACKUP_VERSION` l'a déjà fait pour les notes) ; sinon,
-    restaurer une sauvegarde plus ancienne redonnerait un historique tronqué sans le dire.
-  - Export CSV (Letterboxd/Trakt) : ces outils attendent en général une ligne par visionnage —
-    `csvExport` devra en tenir compte plutôt que la seule date d'ajout au suivi.
-  - `Stats.jsx` : « temps passé » compterait alors les revisionnages, pas seulement les titres
-    distincts — à décider si c'est voulu (regarder deux fois un film double bien le temps passé).
-- **Hors M4, sauf décision contraire** : pas de rappel ni de suggestion basée sur « ça fait
-  longtemps » — cadré au point 9 (packs), pas ici.
-- **Prochaine étape** : réponse de Kinder à la question ci-dessus, puis rédaction des décisions
-  figées (comme M1 à M3), puis — seulement ensuite — le cadrage technique et le code.
+- **Ce qui a été fait** :
+  - `db.js` : table `visionnages` (`profile_id, tmdb_id, media_type, season_number, episode_number,
+    date`) — vide pour un film, remplis pour une série. `CREATE TABLE IF NOT EXISTS` dans le
+    schéma existant : pas de migration spéciale, les bases déjà installées la reçoivent au
+    prochain lancement, sans toucher à leurs données.
+  - `store.js` : `addVisionnage`, `listVisionnages`, `deleteVisionnage`. Posé automatiquement à la
+    date du jour par `markEpisode` (un épisode réellement nouveau, pas un double clic) et par
+    `setStatus` (un film qui **devient** « Vu », pas qui y reste) ; les raccourcis en bloc
+    (`markWholeSeason`, `markSeriesWatched`) ne posent un visionnage que pour les épisodes
+    qui n'étaient pas déjà cochés — recocher une saison déjà vue n'en rajoute aucun.
+  - `backup.js` : `BACKUP_VERSION` passe à 3, le journal est exporté et restauré comme le reste
+    (remplacé, pas fusionné) ; une sauvegarde d'avant M4 (sans journal) se restaure sans erreur.
+    Export CSV Letterboxd : la date de visionnage vient désormais du **dernier** visionnage réel
+    quand il y en a un, sinon retombe sur la date d'ajout comme avant.
+  - `Detail.jsx` : bouton « J'ai revu ce film » (compte + date du dernier) ; par épisode déjà
+    coché, une pastille ↻ discrète (avec « ×N » au-delà d'une fois) qui ajoute un visionnage sans
+    toucher à la case ni tout redéplier.
+  - **`Stats.jsx` non touché, décision assumée** : « temps passé » continue de compter les titres
+    et épisodes distincts, pas les revisionnages — un film revu deux fois ne double pas le total.
+    C'est le choix le plus prudent (celui qui ne change pas un chiffre déjà affiché) ; à revoir si
+    Kinder préfère l'inverse.
+- **Hors M4** : pas de rappel ni de suggestion basée sur « ça fait longtemps » — cadré au point 9
+  (packs), pas ici.
+- **Critère de validation (à essayer par Kinder)** : « Je marque un film « Vu », la fiche affiche
+  la date. Je touche « J'ai revu ce film » : le compte passe à 2. Sur une série, je coche un
+  épisode : une pastille ↻ apparaît dessus ; je la touche, elle affiche « ×2 », la case reste
+  cochée. »
+- **Fait le 2026-09-23** ✅ codée et vérifiée, en attente de l'essai de Kinder : 16 tests
+  (`tests/visionnages.test.js`), 211 tests verts au total. Parcours vérifié dans un navigateur en
+  largeur téléphone avec le vrai catalogue : Matrix Reloaded marqué « Vu » → « Vu le [date] »
+  affiché tout de suite ; Resident Evil (série), E01 coché → pastille ↻ sans compteur ; touchée
+  une fois → « ↻ ×2 », case toujours cochée, autres épisodes intacts.
+- **Défaut trouvé et corrigé en route** : le compte affiché sur la fiche ne se mettait pas à jour
+  tout de suite après avoir marqué « Vu » (visible seulement après avoir touché « J'ai revu » une
+  fois, ou rouvert la fiche) — l'effet qui charge le journal ne dépendait pas du statut. Corrigé
+  (`status` ajouté aux dépendances côté film ; le rechargement du journal déplacé dans
+  `refreshProgress` côté épisode, déjà appelée par les quatre actions de cochage).
+- **Reste à confirmer sur l'appareil** : rien de spécifique à M4 au-delà des gestes déjà en
+  attente (appui long, photo d'avatar, bouton retour, restauration Drive).
 
 ### M5 — Packs de mood : décisions figées (2026-09-23)
 Couvre le point 9. Dépend de M2 (réutilise les filtres et `GENRES` de `tmdb.js`) ; peut se faire

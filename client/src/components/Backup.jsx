@@ -212,7 +212,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
     setBusy('csv');
     try {
       const data = await exportProfile(profileId);
-      const { csv, films, series } = toLetterboxdCsv(data.suivi);
+      const { csv, films, series } = toLetterboxdCsv(data.suivi, data.visionnages);
       if (films === 0) {
         setError("Aucun film à exporter (ce format n'accepte pas les séries).");
         return;

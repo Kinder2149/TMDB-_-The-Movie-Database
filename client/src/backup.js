@@ -13,10 +13,11 @@ import { query, run, runMany } from './db.js';
 
 export const BACKUP_FORMAT = 'suivi-films-series';
 // Version 2 : les sauvegardes emportent la note personnelle (avis + étoiles).
+// Version 3 : le journal de visionnages (M4, une ligne par visionnage).
 // Le numéro monte parce qu'une version plus ancienne de l'application, qui ne
 // connaît pas ces champs, les perdrait en silence en restaurant puis en
 // ré-exportant. Elle refuse donc le fichier plutôt que d'effacer des avis.
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 
 // --- Sauvegarde complète ---
 
@@ -45,6 +46,14 @@ export async function exportProfile(profileId) {
     [profileId]
   );
 
+  const visionnages = await query(
+    `SELECT tmdb_id AS tmdbId, media_type AS mediaType, season_number AS season,
+            episode_number AS episode, date
+     FROM visionnages WHERE profile_id = ?
+     ORDER BY tmdb_id, season_number, episode_number, date`,
+    [profileId]
+  );
+
   const listesRows = await query(
     'SELECT id, name, created_at AS createdAt FROM listes WHERE profile_id = ? ORDER BY created_at',
     [profileId]
@@ -68,6 +77,7 @@ export async function exportProfile(profileId) {
     profile: { id: profil.id, name: profil.name, avatar: profil.avatar ?? null },
     suivi,
     episodesVus,
+    visionnages,
     listes,
   };
 }
@@ -95,6 +105,7 @@ export function describeBackup(data) {
     profil: data.profile.name,
     titres: data.suivi.length,
     episodes: (data.episodesVus || []).length,
+    visionnages: (data.visionnages || []).length,
     listes: (data.listes || []).length,
     date: data.exportedAt ? data.exportedAt.slice(0, 10) : null,
   };
@@ -119,6 +130,7 @@ export async function importProfile(data) {
     // Les suppressions en cascade emportent listes, éléments et épisodes.
     await run('DELETE FROM suivi WHERE profile_id = ?', [id]);
     await run('DELETE FROM episodes_vus WHERE profile_id = ?', [id]);
+    await run('DELETE FROM visionnages WHERE profile_id = ?', [id]);
     await run('DELETE FROM listes WHERE profile_id = ?', [id]);
   } else {
     await run('INSERT INTO profiles (id, name, avatar) VALUES (?, ?, ?)', [
@@ -168,6 +180,20 @@ export async function importProfile(data) {
     );
   }
 
+  // Sauvegarde d'avant M4 (version < 3) : pas de journal, rien à restaurer —
+  // pas une perte, cette version n'en produisait aucun.
+  const visionnages = data.visionnages || [];
+  if (visionnages.length > 0) {
+    await runMany(
+      visionnages.map((v) => ({
+        sql: `INSERT INTO visionnages
+                (profile_id, tmdb_id, media_type, season_number, episode_number, date)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        params: [id, v.tmdbId, v.mediaType, v.season ?? null, v.episode ?? null, v.date],
+      }))
+    );
+  }
+
   for (const l of data.listes || []) {
     const { lastId } = await run(
       `INSERT INTO listes (profile_id, name, created_at)
@@ -205,20 +231,34 @@ function csvCell(value) {
 // Export au format CSV que Letterboxd et Trakt savent importer.
 // Letterboxd n'accepte que des **films** : les séries sont écartées, et on
 // l'annonce à l'utilisateur plutôt que de les perdre en silence.
-export function toLetterboxdCsv(suivi) {
+//
+// `visionnages` (facultatif, M4) : le journal complet du profil. Quand un film
+// y a au moins une ligne, on exporte la date du **dernier** visionnage plutôt
+// que la date d'ajout au suivi — c'est ce que « WatchedDate » veut dire pour
+// Letterboxd. Sans journal (sauvegarde d'avant M4, ou export appelé sans ce
+// paramètre), on retombe sur l'ancien comportement, inchangé.
+export function toLetterboxdCsv(suivi, visionnages = []) {
   const films = suivi.filter((s) => s.mediaType === 'movie');
+  const dernierVisionnage = new Map();
+  for (const v of visionnages) {
+    if (v.mediaType !== 'movie') continue;
+    const precedent = dernierVisionnage.get(v.tmdbId);
+    if (!precedent || v.date > precedent) dernierVisionnage.set(v.tmdbId, v.date);
+  }
   const lignes = [
     ['Title', 'Year', 'tmdbID', 'WatchedDate', 'Rating', 'Review'].join(','),
   ];
   for (const f of films) {
+    const vu = dernierVisionnage.get(f.tmdbId);
     lignes.push(
       [
         csvCell(f.title),
         csvCell(f.year),
         csvCell(f.tmdbId),
-        // Letterboxd attend une date de visionnage : on ne la connaît pas,
-        // on ne fournit donc que celle des titres marqués « vu ».
-        csvCell(CSV_STATUS_VU.has(f.status) ? (f.addedAt || '').slice(0, 10) : ''),
+        // Letterboxd attend une date de visionnage : celle du journal si on
+        // l'a, sinon celle d'ajout au suivi pour ce qui est marqué « vu »,
+        // sinon rien.
+        csvCell(vu || (CSV_STATUS_VU.has(f.status) ? (f.addedAt || '').slice(0, 10) : '')),
         // Letterboxd lit la note sur 5 et l'avis : nos deux champs y trouvent
         // leur place telle quelle.
         csvCell(f.rating ?? ''),
