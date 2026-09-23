@@ -561,12 +561,11 @@ valider avant de commencer.
   la date du jour (point 2) ; un bouton sur la fiche (« Je l'ai revu ») ajoute un visionnage à la
   date du jour, modifiable ensuite. Aucune saisie obligatoire : la fonction reste facultative,
   comme demandé.
-- **Question pour Kinder, avant tout code** : un « revisionnage » se pose-t-il **par titre**
-  (un film revu = une ligne, sans détail des épisodes) ou **par épisode** (revoir S2E01
-  spécifiquement) ? La deuxième option est plus proche de « revoir une série », mais nettement
-  plus de travail — table, écran, sauvegarde, CSV, statistiques en quadruple. À trancher avant
-  la phase 5 (cadrage technique).
-- **Ce que ça oblige à toucher, une fois la question tranchée** :
+- **D3 — Décision de Kinder (2026-09-23) : par épisode.** Un revisionnage se pose au niveau de
+  l'épisode (série) ou du film, pas seulement du titre : revoir S2E01 précisément, pas juste
+  « revu la série ». C'est l'option la plus fidèle à la demande, et la plus lourde à construire
+  (table, écran, sauvegarde, CSV, statistiques en quadruple) — assumé.
+- **Ce que ça oblige à toucher** :
   - `db.js` : nouvelle table, migration (`addColumnIfMissing`/nouvelle table selon le motif déjà
     utilisé dans `initDb`) — jamais de perte des bases déjà installées.
   - `store.js` : lecture/écriture des visionnages, agrégation pour la fiche et les statistiques.
@@ -582,33 +581,61 @@ valider avant de commencer.
 - **Prochaine étape** : réponse de Kinder à la question ci-dessus, puis rédaction des décisions
   figées (comme M1 à M3), puis — seulement ensuite — le cadrage technique et le code.
 
-### M5 — Packs de mood : cadrage proposé (2026-09-23) — À VALIDER, rien codé
-Couvre le point 9. Dépend de M2 (réutilise les filtres) ; peut attendre après M4 sans perdre de
-valeur — aucune des deux ne dépend de l'autre.
-- **Ce que la liste d'origine demande** : des rayons prêts à l'emploi (Noël, saga, love,
-  super-héros…), remplis automatiquement.
-- **Le vrai sujet à trancher, avant tout code : comment un titre entre dans un pack.** Trois
-  pistes, aucune choisie :
-  1. **Par genre TMDB**, réutilisant directement `GENRES` de `tmdb.js` — marche tout de suite
-     pour « super-héros » (déjà proche d'Action & Aventure) mais pas pour « Noël » (aucun genre
-     TMDB ne l'identifie) ni pour « love » (Romance a été volontairement retiré des genres, cf.
-     `PLAN_V2.md` point 13).
-  2. **Par mots-clés TMDB**, comme « Histoire & Époques » l'a fait pour les genres — capable de
-     couvrir « Noël » (mot-clé `christmas` existe chez TMDB) mais demande de vérifier chaque
-     mood un par un, comme cela a été fait pour l'Histoire.
-  3. **Un pack = une recherche Explorer sauvegardée** (genre + période + mots-clés), que Kinder
-     compose lui-même depuis l'écran existant plutôt qu'une liste de moods décidée à l'avance —
-     ne demande aucune nouvelle donnée TMDB, réutilise tout M2, mais change la nature de la
-     fonction (« mes recherches favorites » plutôt que « des rayons éditorialisés »).
-  La voie 3 est la moins risquée techniquement (aucun mood mal couvert par TMDB) mais ne répond
-  pas exactement à la demande d'origine (« Noël, saga, love, super-héros » sonne comme des
-  rayons tout faits, pas des recherches personnelles).
+### M5 — Packs de mood : décisions figées (2026-09-23)
+Couvre le point 9. Dépend de M2 (réutilise les filtres et `GENRES` de `tmdb.js`) ; peut se faire
+avant ou après M4, aucune des deux ne dépend de l'autre.
+
+- **D1 — Voie retenue : mots-clés TMDB (voie 2), comme « Histoire & Époques ».** Écartées : la
+  voie « genre seul » (ne couvre pas Noël ni le braquage) et la voie « recherche Explorer
+  sauvegardée » (répond à un autre besoin — mes recherches à moi — pas à des rayons éditorialisés
+  prêts à l'emploi, qui est la demande d'origine).
+- **D2 — 4 moods retenus pour le lancement, chacun vérifié sur le vrai catalogue TMDB avant
+  d'être choisi** (2026-09-23) :
+
+  | Mood | Films | Séries |
+  |---|---|---|
+  | Super-héros | mots-clés `superhero` (9715) + `based on comic` (9717) | mêmes mots-clés |
+  | Braquage | mot-clé `heist` (10051) | mot-clé `heist` (10051) |
+  | Halloween | genre Horreur (27) | genre Horreur (27) |
+  | Romance | genre Romance (10749) | *(pas de mood série — voir D3)* |
+
+  Testés et écartés du lancement, tous les deux pour la même raison : le nettoyage qu'ils
+  demanderaient dépasse celui d'un mood ordinaire (comme « Histoire & Époques » en son temps) —
+  reportés, pas abandonnés :
+  - **Noël** : le mot-clé `christmas` seul est pollué (toute scène de Noël dans n'importe quel
+    film le déclenche — Harry Potter, Iron Man 3 remontaient). **Genre Famille (10751) + mot-clé
+    `christmas` (207317)** donne une liste propre côté films (Le Grinch, Maman j'ai raté l'avion,
+    La vie est belle). Côté séries, même filtre : 19 résultats, presque tous des séries
+    scandinaves obscures — pas assez pour un rayon présentable.
+  - **Love pour les séries** : TMDB n'a pas de genre Romance côté séries. Le mot-clé `romance`
+    seul mélange animes et séries dramatiques sans rapport (Better Call Saul, This is Us) —
+    demanderait le même travail d'exclusions que « Histoire & Époques » (écarter l'Animation,
+    poser un seuil de votes), non fait à ce stade.
+- **D3 — Romance et Halloween en « Tout » seulement** (pas de filtre Films/Séries séparé pour
+  Romance, faute d'équivalent série ; Halloween marche pour les deux, il garde le filtre normal).
+- **Saga : PAS un mood, décision assumée.** Ce n'est pas un classement TMDB (genre ou mot-clé) :
+  c'est déjà couvert par la fiche d'un film (rayon « Saga », fait en M1-avant). En faire un pack
+  de découverte demanderait de choisir *quelles* sagas mettre en avant, ce qui est un autre
+  sujet. Retiré du périmètre M5.
 - **Recoupe l'onglet « Découvrir »** noté dans « Ce qui reste ouvert » de `PROJET_CONTEXTE.md` —
-  les deux mélangent « proposer ce qu'on n'a pas encore vu, groupé par thème ». À cadrer
-  ensemble plutôt que deux fois le même travail.
-- **Question pour Kinder, avant tout code** : quelle voie (1, 2 ou 3), et si 1 ou 2, la première
-  liste de moods à couvrir — 4 ou 5, pas plus, pour rester testable un par un comme le reste.
-- **Prochaine étape** : réponse de Kinder, puis décisions figées et cadrage technique.
+  M5 en couvre une partie (rayons par thème) ; le reste (compléter une saga, angles morts,
+  disponible sur mes plateformes) reste noté là, non cadré.
+- **Présentation proposée** : un onglet ou un bloc « Moods » dans l'accueil de la recherche
+  (à côté de Tendances / Nouveautés / À venir), un bouton par mood, réutilisant `discoverByGenre`
+  avec des mots-clés/genres fixes au lieu du genre choisi par Kinder — même mécanique que
+  « Histoire & Époques », pas un nouveau moteur.
+- **Hors M5** : pas de mood personnalisé (créer son propre pack), pas de mémoire de mood
+  préféré, pas de mélange de plusieurs moods à la fois.
+- **Critère de validation (à confirmer par Kinder une fois codé)** : « Dans l'accueil de la
+  recherche, je touche Super-héros et je vois des films et séries de super-héros reconnus.
+  Je touche Braquage, Halloween, Romance : chacun donne une liste cohérente avec son thème,
+  sans titre qui n'a rien à voir. »
+- **Cadrage technique (phase 5)** — fichiers touchés : `tmdb.js` (table `MOODS`, sur le modèle de
+  `GENRES`, et une fonction `discoverByMood`) ; `api.js` (une porte `getMood` ou réutilisation de
+  `discoverGenre`) ; `App.jsx` (bloc Moods dans l'accueil, un nouvel état `mood` proche de
+  `rubrique`) ; `styles.css` ; un fichier de tests dédié, sur le modèle de `genres.test.js`.
+- **Prochaine étape** : ce cadrage peut passer en code dès que Kinder le confirme — rien
+  d'autre à trancher avant la phase technique.
 
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.

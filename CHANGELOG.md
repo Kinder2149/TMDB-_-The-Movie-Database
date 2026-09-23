@@ -28,10 +28,13 @@
   sont gardés tant que l'application tourne. Pas de genre ni de plateforme : reporté.
 
 **M1 à M3 validées à l'écran le 2026-09-23** (fiche → acteur → filmographie → retour ; accueil ;
-Explorer avec filtres ; Mes listes filtrées), 188 tests verts. **M4 (revoir un titre, date de
-visionnage) et M5 (packs de mood) : cadrage proposé, rien codé** — voir `PLAN_V2.md`, en attente
-de réponse de Kinder sur deux questions de fond avant tout code (M4 : par titre ou par épisode ?
-M5 : quelle voie de classement ?).
+Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
+
+**M4 et M5 : décisions figées le 2026-09-23, rien codé** — voir `PLAN_V2.md`.
+- M4 (revoir un titre) : par épisode, pas par titre — décision de Kinder.
+- M5 (packs de mood) : mots-clés TMDB, 4 moods vérifiés sur le vrai catalogue — Super-héros,
+  Braquage, Halloween, Romance (films). Noël et Love-séries reportés (nettoyage supplémentaire
+  nécessaire). Saga retirée du périmètre (déjà couverte par la fiche d'un film).
 
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à
