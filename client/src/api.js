@@ -124,19 +124,36 @@ export async function searchByActor(query) {
   return tmdb.searchByActor(query);
 }
 
+// Filmographie d'un acteur à partir de son identifiant TMDB : { person, results }.
+export async function getActorFilmography(id) {
+  return tmdb.getActorFilmography(id);
+}
+
+// Titres dans le même esprit (recommandations TMDB), pour le bas de la fiche.
+export async function getRecommendations(mediaType, id) {
+  return tmdb.getRecommendations(mediaType, id);
+}
+
 // Liste des genres : [{ name, movieId, tvId }].
 export async function getGenres() {
   return tmdb.getGenres();
 }
 
 // Titres d'un genre de la liste unique (`key`), côté films et/ou séries.
-export async function discoverGenre({ genre, movie = true, tv = true, page = 1 }) {
-  return tmdb.discoverByGenre({ genre, movie, tv, page });
+// Le genre est facultatif ; `filtres` = { periode, tri, plateformes } (voir filtres.js).
+export async function discoverGenre({ genre, movie = true, tv = true, page = 1, filtres }) {
+  return tmdb.discoverByGenre({ genre, movie, tv, page, filtres });
 }
 
-// Tendances du moment : proposées quand le champ est vide. { mediaType, page }.
-export async function getTrending(options) {
-  return tmdb.getTrending(options);
+// Plateformes de streaming proposées dans les filtres d'« Explorer ».
+export async function getPlateformes() {
+  return tmdb.getPlateformes();
+}
+
+// Rubrique de l'accueil de la recherche : 'tendances', 'nouveautes' ou 'avenir'.
+// { rubrique, mediaType, page }.
+export async function getRubrique(options) {
+  return tmdb.getRubrique(options);
 }
 
 export async function searchTitles(query) {

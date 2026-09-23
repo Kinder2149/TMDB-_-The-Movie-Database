@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import MovieCard from './MovieCard.jsx';
 import Icon from './Icon.jsx';
 import AddToListe from './AddToListe.jsx';
+import Filtres from './Filtres.jsx';
 import { STATUSES, isUpcoming, titreCorrespond } from '../status.js';
 import { getListeItems } from '../api.js';
+import {
+  TRIS_BIBLIO,
+  FILTRES_BIBLIO_VIDES,
+  filtresBiblioActifs,
+  appliquerFiltresBiblio,
+} from '../filtres.js';
 
 // Mes listes. Les 4 statuts en grille, les listes créées à la main en dessous :
 // avant, tout était mélangé dans une barre latérale pensée pour un écran de PC.
@@ -14,6 +21,8 @@ export default function Lists({
   onDeleteListe,
   onAddManyToListe,
   onSurcouche,
+  filtres, // tri et filtres, gardés par l'application le temps de la séance
+  onFiltres,
   onToggleFollow,
   onSetStatus,
   onOpenDetail,
@@ -24,6 +33,7 @@ export default function Lists({
   const [loadingItems, setLoadingItems] = useState(false);
   const [mediaFilter, setMediaFilter] = useState('all');
   const [ajoutOuvert, setAjoutOuvert] = useState(false); // ajout en masse
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
   // Recherche dans toute la bibliothèque, quels que soient le statut ou la
   // liste sélectionnés : on cherche un titre qu'on a, pas un rayon.
   const [recherche, setRecherche] = useState('');
@@ -85,8 +95,11 @@ export default function Lists({
       ? STATUSES.find((s) => s.value === selected.value).label
       : selectedListe?.name || '';
 
-  const filteredItems =
+  const duType =
     mediaFilter === 'all' ? mainItems : mainItems.filter((i) => i.mediaType === mediaFilter);
+  // Pendant une recherche on retrouve un titre précis : le tri reste A → Z et les
+  // filtres se mettent de côté. Ils reprennent, intacts, quand on efface le champ.
+  const filteredItems = cherche ? duType : appliquerFiltresBiblio(duType, filtres);
 
   const films = filteredItems.filter((i) => i.mediaType === 'movie');
   const series = filteredItems.filter((i) => i.mediaType === 'tv');
@@ -199,6 +212,33 @@ export default function Lists({
           </button>
         ))}
       </div>
+
+      {!cherche && (
+        <>
+          <div className="filtres-bar">
+            <button
+              className={`chip ${filtresOuverts || filtresBiblioActifs(filtres) ? 'on' : ''}`}
+              aria-expanded={filtresOuverts}
+              onClick={() => setFiltresOuverts((o) => !o)}
+            >
+              Filtres
+              {filtresBiblioActifs(filtres) && (
+                <span className="filtres-bar__dot" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+          {filtresOuverts && (
+            <Filtres
+              filtres={filtres}
+              onChange={onFiltres}
+              tris={TRIS_BIBLIO}
+              avecNote
+              vides={FILTRES_BIBLIO_VIDES}
+              actifs={filtresBiblioActifs}
+            />
+          )}
+        </>
+      )}
 
       <div className="sechead">
         <h3>{title}</h3>

@@ -8,6 +8,7 @@ import Tonight from './components/Tonight.jsx';
 import Settings from './components/Settings.jsx';
 import StatusMenu from './components/StatusMenu.jsx';
 import CatalogLanguage from './components/CatalogLanguage.jsx';
+import Filtres from './components/Filtres.jsx';
 import Icon from './components/Icon.jsx';
 import About from './components/About.jsx';
 import Backup from './components/Backup.jsx';
@@ -17,9 +18,12 @@ import Avatar from './components/Avatar.jsx';
 import {
   searchTitles,
   searchByActor,
+  getActorFilmography,
+  getRecommendations,
   getGenres,
   discoverGenre,
-  getTrending,
+  getPlateformes,
+  getRubrique,
   getSuggestions,
   getSuivi,
   addToSuivi,
@@ -53,6 +57,13 @@ import {
   surChangementDeSauvegarde,
 } from './backup.js';
 
+import {
+  FILTRES_VIDES,
+  FILTRES_BIBLIO_VIDES,
+  filtresActifs,
+  appliquerFiltres,
+} from './filtres.js';
+
 const keyOf = (item) => `${item.mediaType}-${item.id}`;
 
 export default function App() {
@@ -70,11 +81,28 @@ export default function App() {
   const [searchMode, setSearchMode] = useState('title'); // title | actor | genre
   const [person, setPerson] = useState(null); // acteur résolu (mode acteur)
   const [genres, setGenres] = useState([]); // [{ key, name }] — liste unique films + séries
-  const [trending, setTrending] = useState([]); // tendances (champ vide)
+  const [trending, setTrending] = useState([]); // accueil de la recherche (champ vide)
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [genrePage, setGenrePage] = useState(1);
   const [genreMore, setGenreMore] = useState(true);
   const searchSeq = useRef(0);
+  // Fiche d'où l'on est parti en touchant un acteur, et l'onglet où elle était
+  // ouverte : le retour (bouton ou geste Android) la rouvre. Effacée dès qu'on
+  // fait autre chose (nouvel onglet, nouvelle recherche).
+  const [ficheOrigine, setFicheOrigine] = useState(null); // { item, view }
+  // La barre de recherche lance une recherche *vide* dès qu'elle change de mode
+  // ou se recrée, ce qui viderait la filmographie qu'on vient d'afficher. Tant
+  // que cette filmographie est à l'écran, on ignore cette recherche vide ; la
+  // barre est recréée (`barreCle`) pour ne pas rejouer un ancien texte tapé.
+  const acteurParFiche = useRef(false);
+  const [barreCle, setBarreCle] = useState(0);
+  // Filtres de la recherche (Titre, Acteur, Explorer) : période, tri et,
+  // dans Explorer seulement, plateformes. Remis à zéro à chaque changement de mode.
+  const [filtres, setFiltres] = useState(FILTRES_VIDES);
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
+  const [plateformes, setPlateformes] = useState([]);
+  // Rubrique de l'accueil de la recherche (champ vide, Titre/Acteur).
+  const [rubrique, setRubrique] = useState('tendances');
   // Suivi complet : clé -> item (avec status et listStatus).
   const [suivi, setSuivi] = useState(() => new Map());
   const [openDetail, setOpenDetail] = useState(null);
@@ -119,6 +147,10 @@ export default function App() {
   }
 
   const [listes, setListes] = useState([]);
+  // Tri et filtres de « Mes listes » : gardés par l'application le temps de la
+  // séance (on les retrouve en changeant de statut, de liste ou d'onglet),
+  // jamais enregistrés d'une session à l'autre.
+  const [filtresListes, setFiltresListes] = useState(FILTRES_BIBLIO_VIDES);
   // Sous-onglet actif de « Ce soir ». Mémorisé tant que l'application tourne
   // (on retrouve son sous-onglet en revenant depuis un autre onglet), mais
   // jamais enregistré : à la réouverture on repart toujours d'« En attente ».
@@ -185,24 +217,26 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
 
-  // Tendances du moment. Une page TMDB (20 titres), une fois masqué ce qu'on a
-  // déjà, n'en laissait parfois qu'une poignée : on en charge 3 d'un coup, et
-  // « Voir plus » en ajoute 3 autres.
+  // Accueil de la recherche : Tendances, Nouveautés, À venir. Une page TMDB
+  // (20 titres), une fois masqué ce qu'on a déjà, n'en laissait parfois qu'une
+  // poignée : on en charge 3 d'un coup, et « Voir plus » en ajoute 3 autres.
   const [tendancesPage, setTendancesPage] = useState(0); // dernière page chargée
   const [tendancesPlus, setTendancesPlus] = useState(true);
+  const [accueilCharge, setAccueilCharge] = useState(false);
   const tendancesSeq = useRef(0);
 
-  async function chargerTendances(filtre, ajouter = false) {
+  async function chargerAccueil(quelleRubrique, filtre, ajouter = false) {
     const seq = ++tendancesSeq.current;
+    setAccueilCharge(true);
     const depuis = ajouter ? tendancesPage + 1 : 1;
     const pages = [depuis, depuis + 1, depuis + 2];
     try {
       const lots = await Promise.all(
         pages.map((page) =>
-          getTrending({ mediaType: filtre, page }).catch(() => [])
+          getRubrique({ rubrique: quelleRubrique, mediaType: filtre, page }).catch(() => [])
         )
       );
-      if (seq !== tendancesSeq.current) return; // filtre changé entre-temps
+      if (seq !== tendancesSeq.current) return; // rubrique/filtre changé entre-temps
       const nouveaux = lots.flat();
       setTendancesPage(depuis + 2);
       setTendancesPlus(lots[2].length > 0);
@@ -212,7 +246,9 @@ export default function App() {
         return [...base, ...nouveaux.filter((r) => !vus.has(keyOf(r)) && vus.add(keyOf(r)))];
       });
     } catch {
-      /* réseau indisponible : l'écran reste sans tendances */
+      /* réseau indisponible : l'écran reste sans rien */
+    } finally {
+      if (seq === tendancesSeq.current) setAccueilCharge(false);
     }
   }
 
@@ -221,19 +257,29 @@ export default function App() {
     getGenres().then(setGenres).catch(() => {});
   }, []);
 
-  // Tendances : rechargées quand on passe de Tout à Films ou Séries.
+  // Accueil : rechargé quand on change de rubrique ou qu'on passe de Tout à
+  // Films ou Séries. Vidé d'abord : on ne montre pas les Tendances sous le titre
+  // « Nouveautés » le temps que la réponse arrive.
   useEffect(() => {
-    chargerTendances(mediaFilter);
+    setTrending([]);
+    chargerAccueil(rubrique, mediaFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaFilter]);
+  }, [mediaFilter, rubrique]);
 
-  // En mode genre, changer le filtre Films/Séries relance la découverte. Chaque
-  // genre de la liste vaut pour les deux : il n'y a jamais de liste vide à éviter.
+  // Explorer : la découverte se relance à l'entrée dans le mode, et quand le
+  // filtre Films/Séries ou l'un des filtres change. Le genre est facultatif.
   useEffect(() => {
-    if (searchMode !== 'genre' || !selectedGenre) return;
+    if (searchMode !== 'genre') return;
     runDiscover(selectedGenre, mediaFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaFilter]);
+  }, [mediaFilter, searchMode, filtres]);
+
+  // Liste des plateformes : chargée en entrant dans Explorer (et rechargée si la
+  // langue, donc la région, change).
+  useEffect(() => {
+    if (searchMode !== 'genre') return;
+    getPlateformes().then(setPlateformes).catch(() => {});
+  }, [searchMode, catalogLang]);
 
   function handleSelectProfile(id) {
     setActiveProfileId(id);
@@ -293,7 +339,10 @@ export default function App() {
   }
 
   async function handleSearch(query) {
+    if (!query && acteurParFiche.current) return;
+    acteurParFiche.current = false;
     const seq = ++searchSeq.current;
+    setFicheOrigine(null);
     if (!query) {
       setResults([]);
       setPerson(null);
@@ -329,8 +378,59 @@ export default function App() {
     }
   }
 
+  // Touche un acteur dans une fiche : on ferme la fiche et on affiche sa
+  // filmographie dans l'onglet Recherche, en mode acteur.
+  async function handleOpenActor(actor) {
+    const seq = ++searchSeq.current;
+    acteurParFiche.current = true;
+    setBarreCle((n) => n + 1);
+    setFicheOrigine({ item: openDetail, view });
+    setOpenDetail(null);
+    showTab('search');
+    setFiltres(FILTRES_VIDES);
+    setFiltresOuverts(false);
+    setSearchMode('actor');
+    setSelectedGenre(null);
+    setMediaFilter('all');
+    setResults([]);
+    setPerson(null);
+    setError('');
+    setHasSearched(true);
+    setStatus('loading');
+    try {
+      const { person: found, results: credits } = await getActorFilmography(actor.id);
+      if (seq === searchSeq.current) {
+        setPerson(found);
+        setResults(credits);
+        setStatus('done');
+      }
+    } catch (err) {
+      if (seq === searchSeq.current) {
+        setError(err.message);
+        setStatus('error');
+      }
+    }
+  }
+
+  // Rouvre la fiche d'où l'on venait, dans l'onglet où elle était.
+  function retourFiche() {
+    const origine = ficheOrigine;
+    acteurParFiche.current = false;
+    setFicheOrigine(null);
+    if (!origine) return;
+    showTab(origine.view);
+    setOpenDetail(origine.item);
+  }
+
   // Change de mode de recherche en repartant d'un état propre.
   function changeMode(mode) {
+    // Retoucher Explorer ne doit pas vider la découverte affichée.
+    if (mode === 'genre' && searchMode === 'genre') return;
+    acteurParFiche.current = false;
+    setFicheOrigine(null);
+    // Les filtres d'un mode ne suivent pas dans l'autre : leur effet n'est pas le même.
+    setFiltres(FILTRES_VIDES);
+    setFiltresOuverts(false);
     setSearchMode(mode);
     setSelectedGenre(null);
     setPerson(null);
@@ -344,7 +444,13 @@ export default function App() {
     setError('');
     setHasSearched(true);
     setPerson(null);
-    const params = { genre: genre.key, movie: filter !== 'tv', tv: filter !== 'movie', page };
+    const params = {
+      genre: genre?.key, // facultatif : sans genre, tout le catalogue
+      movie: filter !== 'tv',
+      tv: filter !== 'movie',
+      page,
+      filtres,
+    };
     if (!append) setStatus('loading');
     try {
       // Les titres déjà suivis sont masqués à l'affichage : une page TMDB de
@@ -381,11 +487,13 @@ export default function App() {
     }
   }
 
+  // Retoucher le genre déjà choisi le retire (retour à tout le catalogue).
   function selectGenre(genre) {
-    setSelectedGenre(genre);
+    const suivant = selectedGenre?.key === genre.key ? null : genre;
+    setSelectedGenre(suivant);
     setGenrePage(1);
     setGenreMore(true);
-    runDiscover(genre, mediaFilter, 1, false);
+    runDiscover(suivant, mediaFilter, 1, false);
   }
 
   // Titres ajoutés pendant cette séance. La découverte (genre, acteur,
@@ -465,7 +573,7 @@ export default function App() {
     setSuggestions([]); // recalculées dans la nouvelle langue au prochain passage
     setResults([]);
     setTrending([]);
-    chargerTendances(mediaFilter);
+    chargerAccueil(rubrique, mediaFilter);
     getGenres().then(setGenres).catch(() => {});
     return res;
   }
@@ -543,6 +651,7 @@ export default function App() {
     else if (showBackup) setShowBackup(false);
     else if (showAbout) setShowAbout(false);
     else if (openDetail) closeDetail();
+    else if (ficheOrigine) retourFiche();
     else if (tabStack.length > 0) goBackTab();
     else if (view !== 'search') goTo('search', { push: false });
     else {
@@ -638,17 +747,30 @@ export default function App() {
       ? results
       : results.filter((r) => r.mediaType === mediaFilter);
 
+  // Titre et Acteur : les filtres (année, tri) jouent sur ce qui est déjà
+  // affiché — TMDB ne filtre pas ces listes. Explorer, lui, les envoie
+  // directement à TMDB (voir tmdb.js) : `results` en tient déjà compte.
+  const resultsAffiches =
+    searchMode !== 'genre' ? appliquerFiltres(resultsDuType, filtres) : resultsDuType;
+
   // Par genre et par acteur, on cherche à découvrir : ce qu'on a déjà est
   // masqué. Par titre, on le garde — on y cherche souvent un titre précis
   // pour l'ouvrir.
   const decouverte = searchMode === 'genre' || searchMode === 'actor';
   const filteredResults = decouverte
-    ? resultsDuType.filter((r) => !dejaChezMoi(r))
-    : resultsDuType;
-  const masques = resultsDuType.length - filteredResults.length;
+    ? resultsAffiches.filter((r) => !dejaChezMoi(r))
+    : resultsAffiches;
+  const masques = resultsAffiches.length - filteredResults.length;
+  // Un filtre (Titre / Acteur) qui vide une liste pourtant non vide : message
+  // différent de « Aucun résultat » (qui, lui, dit que la recherche n'a rien donné).
+  const filtresToutEcarte =
+    searchMode !== 'genre' &&
+    filtresActifs(filtres) &&
+    resultsDuType.length > 0 &&
+    resultsAffiches.length === 0;
 
   // Écran de recherche à vide (titre / acteur, avant toute frappe) : on propose
-  // les tendances plutôt qu'un écran vide.
+  // l'accueil (Tendances / Nouveautés / À venir) plutôt qu'un écran vide.
   const isDefault = searchMode !== 'genre' && !hasSearched;
   const trendingFiltered = (
     mediaFilter === 'all'
@@ -735,6 +857,7 @@ export default function App() {
               Les modes et les filtres viennent ensuite, pas l'inverse. */}
           {searchMode !== 'genre' && (
             <SearchBar
+              key={barreCle}
               onSearch={handleSearch}
               mode={searchMode}
               placeholder={
@@ -749,7 +872,7 @@ export default function App() {
             {[
               ['title', 'Titre'],
               ['actor', 'Acteur'],
-              ['genre', 'Genre'],
+              ['genre', 'Explorer'],
             ].map(([v, label]) => (
               <button
                 key={v}
@@ -793,12 +916,44 @@ export default function App() {
             </div>
           )}
 
+          {/* Filtres : dans Explorer dès l'entrée ; dans Titre et Acteur, une fois
+              qu'il y a des résultats à filtrer. */}
+          {(searchMode === 'genre' ||
+            (hasSearched && searchMode !== 'genre' && resultsDuType.length > 0)) && (
+            <>
+              <div className="filtres-bar">
+                <button
+                  className={`chip ${filtresOuverts || filtresActifs(filtres) ? 'on' : ''}`}
+                  aria-expanded={filtresOuverts}
+                  onClick={() => setFiltresOuverts((o) => !o)}
+                >
+                  Filtres
+                  {filtresActifs(filtres) && <span className="filtres-bar__dot" aria-hidden="true" />}
+                </button>
+              </div>
+              {filtresOuverts && (
+                <Filtres
+                  filtres={filtres}
+                  onChange={setFiltres}
+                  plateformes={plateformes}
+                  avecPlateformes={searchMode === 'genre'}
+                  indicationPlateforme={searchMode !== 'genre'}
+                />
+              )}
+            </>
+          )}
+
           {searchMode === 'actor' && person && (
             <div className="actor-head">
               {person.photoUrl && <img src={person.photoUrl} alt={person.name} />}
               <span>
                 Films &amp; séries avec <b>{person.name}</b>
               </span>
+              {ficheOrigine && (
+                <button className="btn btn--ghost" onClick={retourFiche}>
+                  Retour à la fiche
+                </button>
+              )}
             </div>
           )}
 
@@ -821,7 +976,11 @@ export default function App() {
             filteredResults.length === 0 &&
             !(searchMode === 'actor' && !person) && (
               <p className="hint">
-                {masques > 0 ? 'Tu as déjà tous ces titres.' : 'Aucun résultat.'}
+                {filtresToutEcarte
+                  ? 'Aucun résultat avec ces filtres.'
+                  : masques > 0
+                    ? 'Tu as déjà tous ces titres.'
+                    : 'Aucun résultat.'}
               </p>
             )}
           {status === 'done' && decouverte && masques > 0 && filteredResults.length > 0 && (
@@ -832,11 +991,29 @@ export default function App() {
             </p>
           )}
 
-          {isDefault && trendingFiltered.length > 0 && (
+          {isDefault && (
             <>
-              <div className="sechead">
-                <h3>✨ Tendances du moment</h3>
+              <div className="rubriques" role="group" aria-label="Rubrique">
+                {[
+                  ['tendances', '✨ Tendances'],
+                  ['nouveautes', 'Nouveautés'],
+                  ['avenir', 'À venir'],
+                ].map(([v, label]) => (
+                  <button
+                    key={v}
+                    className={`chip ${rubrique === v ? 'on' : ''}`}
+                    aria-pressed={rubrique === v}
+                    onClick={() => setRubrique(v)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
+              {trendingFiltered.length === 0 && (
+                <p className="hint">
+                  {accueilCharge ? 'Chargement…' : 'Rien à afficher pour le moment.'}
+                </p>
+              )}
               <section className="grid">
                 {trendingFiltered.map((item) => (
                   <MovieCard
@@ -848,11 +1025,11 @@ export default function App() {
                   />
                 ))}
               </section>
-              {tendancesPlus && (
+              {tendancesPlus && trendingFiltered.length > 0 && (
                 <div className="voirplus">
                   <button
                     className="btn btn--ghost"
-                    onClick={() => chargerTendances(mediaFilter, true)}
+                    onClick={() => chargerAccueil(rubrique, mediaFilter, true)}
                   >
                     Voir plus
                   </button>
@@ -874,7 +1051,6 @@ export default function App() {
           </section>
 
           {searchMode === 'genre' &&
-            selectedGenre &&
             genreMore &&
             status === 'done' &&
             filteredResults.length > 0 && (
@@ -900,6 +1076,8 @@ export default function App() {
           onDeleteListe={handleDeleteListe}
           onAddManyToListe={handleAddManyToListe}
           onSurcouche={setSurcouche}
+          filtres={filtresListes}
+          onFiltres={setFiltresListes}
           {...cardProps}
         />
       )}
@@ -971,6 +1149,7 @@ export default function App() {
           onAddToListe={handleAddToListe}
           onRemoveFromListe={handleRemoveFromListe}
           onClose={closeDetail}
+          onOpenActor={handleOpenActor}
         />
       )}
 

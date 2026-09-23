@@ -15,6 +15,7 @@ import {
   getNote,
   setNote,
   getCollection,
+  getRecommendations,
 } from '../api.js';
 import { STATUSES, deriveSeriesStatus } from '../status.js';
 import Icon from './Icon.jsx';
@@ -33,6 +34,7 @@ export default function Detail({
   onAddToListe,
   onRemoveFromListe,
   onClose,
+  onOpenActor, // touche un acteur : ses films et séries
   suivi, // Map des titres suivis : l'état de chaque film de la saga
   cardProps,
 }) {
@@ -156,6 +158,21 @@ export default function Detail({
     if (!collectionId) return;
     getCollection(collectionId).then(setSaga).catch(() => setSaga(null));
   }, [collectionId]);
+
+  // --- Dans le même esprit ---
+  // Recommandations TMDB, chargées à part : leur absence ne doit rien casser.
+  const [similaires, setSimilaires] = useState([]);
+  useEffect(() => {
+    let annule = false;
+    getRecommendations(item.mediaType, item.id)
+      .then((liste) => {
+        if (!annule) setSimilaires(liste.slice(0, 12));
+      })
+      .catch(() => {});
+    return () => {
+      annule = true;
+    };
+  }, [item.id, item.mediaType]);
 
   // Dans une longue saga, le film ouvert peut être hors de l'écran : on fait
   // défiler la rangée (et elle seule) jusqu'à lui.
@@ -391,7 +408,7 @@ export default function Detail({
               rel="noopener noreferrer"
             >
               <Icon name="play" size={15} />
-              Bande-annonce
+              {info.trailer.recherche ? 'Chercher la bande-annonce' : 'Bande-annonce'}
             </a>
           )}
         </div>
@@ -648,16 +665,45 @@ export default function Detail({
             <h4>Têtes d'affiche</h4>
             <div className="cast">
               {info.cast.map((a) => (
-                <div className="actor" key={a.name + (a.character || '')}>
+                <button
+                  className="actor"
+                  key={a.id}
+                  onClick={() => onOpenActor(a)}
+                  aria-label={`Voir les films et séries avec ${a.name}`}
+                >
                   {a.photoUrl ? (
-                    <img className="actor__ph" src={a.photoUrl} alt={a.name} />
+                    <img className="actor__ph" src={a.photoUrl} alt="" />
                   ) : (
                     <div className="actor__ph actor__ph--empty">{a.name.charAt(0)}</div>
                   )}
                   <span className="actor__n">{a.name}</span>
                   {a.character && <span className="actor__r">{a.character}</span>}
-                </div>
+                </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Dans le même esprit : mêmes cartes que la saga. Les titres déjà suivis
+            restent affichés, avec leur état — on est dans une fiche, pas dans une
+            liste où l'on cherche du neuf. */}
+        {similaires.length > 0 && (
+          <div className="section">
+            <h4>Dans le même esprit</h4>
+            <div className="saga">
+              {similaires.map((s) => {
+                const cle = `${s.mediaType}-${s.id}`;
+                return (
+                  <div key={cle} className="saga__item">
+                    <MovieCard
+                      item={s}
+                      isFollowed={suivi.has(cle)}
+                      status={suivi.get(cle)?.status}
+                      {...cardProps}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

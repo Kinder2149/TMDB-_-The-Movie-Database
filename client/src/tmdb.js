@@ -7,7 +7,8 @@
 // La clé est embarquée dans l'application (décision figée, PLAN_ANDROID) : elle
 // n'ouvre que le catalogue public TMDB, aucune donnée personnelle ni budget.
 
-import { getCatalogLanguage, TMDB_LANG } from './lang.js';
+import { getCatalogLanguage, getCatalogRegion, TMDB_LANG } from './lang.js';
+import { bornesDePeriode, dateRelative, VOTES_MIN } from './filtres.js';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 
@@ -80,6 +81,10 @@ function toCardItem(item, mediaType) {
     posterUrl: item.poster_path
       ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
       : null,
+    // Note et nombre de votes : pour trier « Mieux notés » sur une liste déjà
+    // affichée (filtres.js). Ne sont pas enregistrés dans le suivi.
+    note: typeof item.vote_average === 'number' ? item.vote_average : null,
+    votes: item.vote_count ?? 0,
   };
 }
 
@@ -118,7 +123,18 @@ export async function searchByActor(query) {
   const data = await tmdbGet('/search/person', { query, include_adult: 'false' });
   const person = (data.results || [])[0];
   if (!person) return { person: null, results: [] };
+  return filmographie(person);
+}
 
+// Même filmographie, mais depuis l'identifiant de la personne : c'est ce que
+// donne un clic sur un acteur de la fiche. Passer par son nom pourrait tomber
+// sur un homonyme plus connu.
+export async function getActorFilmography(id) {
+  const person = await tmdbGet(`/person/${id}`);
+  return filmographie(person);
+}
+
+async function filmographie(person) {
   const credits = await tmdbGet(`/person/${person.id}/combined_credits`);
   const seen = new Set();
   const results = topByPopularity(
@@ -221,12 +237,78 @@ export function parametresDeGenre(key, mediaType) {
   return params;
 }
 
-// Découverte par genre : films et/ou séries, triés par popularité. Paginé.
-export async function discoverByGenre({ genre, movie = true, tv = true, page = 1 }) {
+// Ce que les filtres de « Explorer » demandent à TMDB, pour un film ou une série.
+//  - Tri : popularité (défaut), date, ou note. « Plus récent » ne remonte que ce
+//    qui est déjà sorti ; « Plus ancien » et « Mieux notés » exigent un minimum de
+//    votes, sinon ils ne montrent que des titres inconnus.
+//  - Période : bornes de date de sortie (première diffusion pour une série).
+//  - Plateforme : titres disponibles chez elle (abonnement, location ou achat, selon
+//    ce qu'elle propose) dans la région du catalogue ; plusieurs = « au choix ».
+export function parametresDeFiltres(mediaType, filtres, aujourdhui = new Date()) {
+  const champ = mediaType === 'movie' ? 'primary_release_date' : 'first_air_date';
+  const { periode, tri = 'popularite', plateformes = [] } = filtres || {};
+  const params = {};
+
+  const SORT = {
+    popularite: 'popularity.desc',
+    recent: `${champ}.desc`,
+    ancien: `${champ}.asc`,
+    notes: 'vote_average.desc',
+  };
+  params.sort_by = SORT[tri] || SORT.popularite;
+  if (VOTES_MIN[tri]) params['vote_count.gte'] = VOTES_MIN[tri];
+
+  let { from, to } = bornesDePeriode(periode, aujourdhui);
+  if (tri === 'recent') {
+    const auj = dateRelative(0, aujourdhui);
+    if (!to || to > auj) to = auj;
+  }
+  if (from) params[`${champ}.gte`] = from;
+  if (to) params[`${champ}.lte`] = to;
+
+  if (plateformes.length > 0) {
+    params.with_watch_providers = ou(plateformes);
+    params.watch_region = getCatalogRegion();
+  }
+  return params;
+}
+
+// Réunit films et séries dans l'ordre demandé (ce que TMDB ne fait pas entre
+// deux appels séparés). Une date absente passe à la fin.
+function fusionner(entries, tri = 'popularite', limite = 50) {
+  const cle = {
+    popularite: (e) => e.popularity,
+    recent: (e) => e.item.releaseDate || '',
+    ancien: (e) => e.item.releaseDate || '9999',
+    notes: (e) => e.item.note ?? 0,
+  }[tri] || ((e) => e.popularity);
+  const sens = tri === 'ancien' ? 1 : -1;
+  return entries
+    .sort((a, b) => {
+      const x = cle(a);
+      const y = cle(b);
+      return x < y ? -sens : x > y ? sens : 0;
+    })
+    .slice(0, limite)
+    .map((e) => e.item);
+}
+
+// Découverte : films et/ou séries, avec un genre facultatif et des filtres
+// (période, plateformes, tri). Paginé. Sans genre ni filtre : tout le catalogue
+// par popularité.
+export async function discoverByGenre({ genre, movie = true, tv = true, page = 1, filtres }) {
   const calls = [];
   for (const [mediaType, voulu] of [['movie', movie], ['tv', tv]]) {
-    const params = voulu && parametresDeGenre(genre, mediaType);
-    if (!params) continue;
+    if (!voulu) continue;
+    const base = genre ? parametresDeGenre(genre, mediaType) : {};
+    if (!base) continue;
+    const params = { ...base, ...parametresDeFiltres(mediaType, filtres) };
+    // Sans genre, la découverte porte sur tout le catalogue : on écarte les
+    // talk-shows, journaux et télé-réalité, comme pour les nouveautés.
+    if (!genre && mediaType === 'tv') params.without_genres = '10767,10763,10764';
+    // Le seuil de votes du genre et celui du tri : on garde le plus exigeant.
+    const votes = Math.max(base['vote_count.gte'] || 0, params['vote_count.gte'] || 0);
+    if (votes) params['vote_count.gte'] = votes;
     calls.push(
       tmdbGet(`/discover/${mediaType}`, {
         ...params,
@@ -242,7 +324,74 @@ export async function discoverByGenre({ genre, movie = true, tv = true, page = 1
       entries.push({ item: toCardItem(c, mediaType), popularity: c.popularity || 0 });
     }
   }
-  return topByPopularity(entries);
+  return fusionner(entries, filtres?.tri);
+}
+
+// Plateformes de streaming proposées dans les filtres : les plus courantes de la
+// région du catalogue (Netflix, Prime Video, Disney+…), films et séries réunis.
+const cachePlateformes = new Map();
+
+export async function getPlateformes() {
+  const region = getCatalogRegion();
+  return memo(cachePlateformes, `${getCatalogLanguage()}:${region}`, async () => {
+    const [films, series] = await Promise.all(
+      ['movie', 'tv'].map((t) => tmdbGet(`/watch/providers/${t}`, { watch_region: region }))
+    );
+    const parId = new Map();
+    for (const p of [...(films.results || []), ...(series.results || [])]) {
+      if (!parId.has(p.provider_id)) parId.set(p.provider_id, p);
+    }
+    const priorite = (p) => p.display_priorities?.[region] ?? p.display_priority ?? 999;
+    return [...parId.values()]
+      .sort((a, b) => priorite(a) - priorite(b))
+      .slice(0, 12)
+      .map((p) => ({
+        id: p.provider_id,
+        name: p.provider_name,
+        logoUrl: p.logo_path ? `https://image.tmdb.org/t/p/w45${p.logo_path}` : null,
+      }));
+  });
+}
+
+// Fenêtres de l'accueil : « Nouveautés » = sorties des 60 derniers jours,
+// « À venir » = sorties des 90 jours qui viennent.
+export function fenetreDeRubrique(rubrique, aujourdhui = new Date()) {
+  if (rubrique === 'nouveautes') {
+    return { from: dateRelative(-60, aujourdhui), to: dateRelative(0, aujourdhui) };
+  }
+  if (rubrique === 'avenir') {
+    return { from: dateRelative(1, aujourdhui), to: dateRelative(90, aujourdhui) };
+  }
+  return null;
+}
+
+// Rubriques de l'accueil de la recherche : Tendances, Nouveautés, À venir.
+// `mediaType` : 'all', 'movie' ou 'tv'. Paginé (20 titres par appel et par type).
+export async function getRubrique({ rubrique = 'tendances', mediaType = 'all', page = 1 } = {}) {
+  const fenetre = fenetreDeRubrique(rubrique);
+  if (!fenetre) return getTrending({ mediaType, page });
+
+  const types = mediaType === 'all' ? ['movie', 'tv'] : [mediaType];
+  const parts = await Promise.all(
+    types.map((t) => {
+      const champ = t === 'movie' ? 'primary_release_date' : 'first_air_date';
+      return tmdbGet(`/discover/${t}`, {
+        sort_by: 'popularity.desc',
+        [`${champ}.gte`]: fenetre.from,
+        [`${champ}.lte`]: fenetre.to,
+        // Talk-shows, journaux et télé-réalité inondent les nouveautés télé.
+        ...(t === 'tv' ? { without_genres: '10767,10763,10764' } : { include_adult: 'false' }),
+        page,
+      }).then((d) => [t, d]);
+    })
+  );
+  const entries = [];
+  for (const [t, data] of parts) {
+    for (const c of data.results || []) {
+      entries.push({ item: toCardItem(c, t), popularity: c.popularity || 0 });
+    }
+  }
+  return fusionner(entries, 'popularite', 40);
 }
 
 // Recommandations TMDB pour un titre (films OU séries selon le type source).
@@ -302,6 +451,12 @@ export async function getSeasons(seriesId) {
 }
 
 // Fiche détaillée d'un film ou d'une série (infos + acteurs), normalisée pour l'UI.
+// Recherche YouTube « titre année bande-annonce », pour les fiches sans vidéo.
+export function urlRechercheBandeAnnonce(titre, annee) {
+  const q = [titre, annee, 'bande-annonce'].filter(Boolean).join(' ');
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+}
+
 export async function getDetails(mediaType, id) {
   const path = mediaType === 'movie' ? `/movie/${id}` : `/tv/${id}`;
   const data = await tmdbGet(path, {
@@ -325,7 +480,8 @@ export async function getDetails(mediaType, id) {
 
   const isMovie = mediaType === 'movie';
   const date = isMovie ? data.release_date : data.first_air_date;
-  const cast = (data.credits?.cast || []).slice(0, 8).map((c) => ({
+  const cast = (data.credits?.cast || []).slice(0, 12).map((c) => ({
+    id: c.id,
     name: c.name,
     character: c.character || null,
     photoUrl: c.profile_path
@@ -340,9 +496,16 @@ export async function getDetails(mediaType, id) {
     vids.find((v) => v.site === 'YouTube' && v.type === 'Trailer') ||
     vids.find((v) => v.site === 'YouTube' && v.type === 'Teaser') ||
     null;
+  // Sans vidéo chez TMDB, on renvoie vers la recherche YouTube : le bouton est
+  // toujours là, `recherche` dit juste qu'il ne mène pas à une vidéo précise.
+  const titre = isMovie ? data.title : data.name;
   const trailer = pick
-    ? { name: pick.name, url: `https://www.youtube.com/watch?v=${pick.key}` }
-    : null;
+    ? { name: pick.name, url: `https://www.youtube.com/watch?v=${pick.key}`, recherche: false }
+    : {
+        name: titre,
+        url: urlRechercheBandeAnnonce(titre, date ? date.slice(0, 4) : null),
+        recherche: true,
+      };
 
   // Disponibilité streaming en France (données JustWatch via TMDB).
   const fr = data['watch/providers']?.results?.FR;

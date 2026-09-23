@@ -391,6 +391,159 @@ anglais ; les noms suivent la langue du catalogue.
 - **Tests** : `tests/genres.test.js` (8 tests) — chaque genre vaut pour les deux types, aucune
   des entrées retirées ne revient, l'animation est exclue des séries d'époque seulement.
 
+## Retours utilisateur du 2026-09-21 — plan en 5 missions (FIGÉ le 2026-09-21)
+
+**Liste d'origine, telle que reçue** (rien ne doit se perdre) :
+1. Pouvoir voir une série ou un film plusieurs fois (×2, ×3, ×4…).
+2. En optionnel, sur la fiche d'un film ou d'un épisode : la date de visionnage. Quand on coche
+   un épisode dans « en cours », la date du jour se met automatiquement.
+3. Dans la fiche d'un film ou d'une série : afficher en bas les titres similaires, en plus des
+   éléments de la même saga.
+4. Dans la fiche : le bandeau d'acteurs n'est pas cliquable ; le lier à la recherche des films
+   de l'acteur.
+5. Recherche : ajouter des filtres d'affichage (plateforme, année, autre) et des tris
+   (popularité, récent, pas récent, autre).
+6. Accueil de la recherche : l'affichage « Tendance du moment » devient un bouton, avec aussi
+   « Nouveautés » et « À venir ».
+7. Listes : ajouter aussi le tri et le filtre.
+8. Fiche : liens vers les bandes-annonces et vers les plateformes (« je trouve un film, il est
+   sur Netflix, je clique et je tombe dessus »).
+9. « Packs de mood » (Noël, saga, love, super-héros…) remplis de films et séries ; réfléchir aux
+   moods et à la façon de décider ce qu'on met dedans.
+
+**Découpage validé** (une mission à la fois, testée avant la suivante) :
+| Mission | Points | Contenu |
+|---|---|---|
+| **M1 — Fiche enrichie** | 3, 4, 8 (partiel) | acteurs cliquables, titres similaires, bande-annonce toujours présente |
+| **M2 — Recherche et accueil** | 5, 6 | filtres et tri, Tendances / Nouveautés / À venir |
+| **M3 — Listes** | 7 | tri et filtre (limité par ce qu'on stocke) |
+| **M4 — Journal de visionnages** | 1, 2 | revoir ×N + date ; touche base, sauvegarde Drive, CSV, statistiques |
+| **M5 — Packs mood** | 9 | règles d'entrée dans un pack à cadrer ; réutilise les filtres de M2 |
+
+Points d'attention notés : M4 est un journal (un visionnage = une date), pas un compteur ; M3 :
+genre et plateforme ne sont pas stockés dans le suivi ; M5 recoupe l'onglet « Découvrir » (§3).
+
+### M1 — Fiche enrichie : décisions figées (2026-09-21) — ✅ codée et vérifiée, en attente de la capture de Kinder
+**Fait le 2026-09-21** : 5 tests (`tests/fiche.test.js`), 154 tests verts au total ; parcours
+vérifié dans un navigateur en largeur téléphone avec le vrai catalogue (Resident Evil → acteur
+Austin Abrams → sa filmographie → « Retour à la fiche » ; 12 titres « Dans le même esprit »
+ouvrables). Un défaut trouvé et corrigé en route : la barre de recherche relançait une
+recherche vide au changement de mode et effaçait la filmographie (`acteurParFiche` dans
+`App.jsx`). Reste à confirmer sur l'appareil : le retour Android depuis la filmographie.
+- **D1 — Acteur cliquable.** Le clic ouvre Recherche en mode acteur, sur la filmographie
+  (films + séries) de cet acteur, **par identifiant TMDB** (pas par nom : homonymes). Casting
+  de 8 à 12 noms. Le retour ramène à la fiche d'origine.
+- **D2 — « Dans le même esprit ».** Recommandations TMDB (source déjà utilisée par les
+  suggestions), en bas de la fiche après le casting ; cartes identiques à la saga (liseré
+  d'état, pastille d'ajout, appui long) ; les titres déjà suivis **restent affichés**. La
+  saga reste à sa place. Ajuste la décision du 2026-08-10 sans créer de seconde source.
+- **D3 — Liens plateformes / JustWatch : ABANDONNÉ (Kinder, 2026-09-21).** Aucun bouton ni
+  logo cliquable vers les plateformes. « Où le voir en France » reste informatif, mention
+  JustWatch / TMDB conservée. Ne pas rouvrir sans demande de Kinder.
+- **D4 — Bande-annonce.** Le bouton actuel reste ; sans vidéo TMDB, il devient « Chercher la
+  bande-annonce » (recherche YouTube « titre + année + bande-annonce »).
+- **Hors M1** : aucun changement de base ni de sauvegarde, pas de lecteur vidéo intégré.
+- **Critère de validation (Kinder, 2026-09-21)** : « Sur la fiche d'un film ou d'une série, je
+  touche un acteur et je vois ses films et séries. En bas de la fiche, je vois « Dans le même
+  esprit » avec des titres que je peux ouvrir ou ajouter. Un titre sans bande-annonce a quand
+  même un bouton qui me mène à sa recherche YouTube. »
+- **Cadrage technique (phase 5)** — fichiers touchés :
+  - `tmdb.js` : casting à 12 avec l'identifiant TMDB de chaque acteur ; `getActorFilmography(id)`
+    (même filmographie que la recherche par nom, factorisée) ; `urlRechercheBandeAnnonce()` +
+    repli quand TMDB n'a pas de vidéo.
+  - `api.js` : deux portes (`getActorFilmography`, `getRecommendations`).
+  - `Detail.jsx` : acteurs cliquables, bloc « Dans le même esprit », libellé du bouton.
+  - `App.jsx` : ouvrir un acteur = onglet Recherche en mode acteur ; mémoire de la fiche
+    d'origine, retour Android et bouton « Retour à la fiche ».
+  - `styles.css` : acteur = bouton, rangée de similaires.
+  - `tests/fiche.test.js` : lien de recherche de bande-annonce, casting avec identifiants.
+
+### M2 — Recherche et accueil : décisions figées (2026-09-21)
+M1 validée par Kinder le 2026-09-21.
+- **D1 — Le mode « Genre » devient « Explorer ».** Le genre y devient facultatif : sans genre,
+  la découverte porte sur tout le catalogue, par popularité, avec les filtres seuls.
+- **D2 — Filtres dans « Explorer »** (bouton « Filtres », panneau, point quand un filtre est
+  actif, bouton « Réinitialiser ») : **Plateforme** (principales de la région du catalogue,
+  plusieurs au choix), **Année** (Cette année, 2020s, 2010s, 2000s, 90s, Avant 1990),
+  **Tri** (Popularité par défaut, Plus récent = déjà sorti seulement, Plus ancien, Mieux notés
+  = avec un minimum de votes).
+- **D3 — Titre et Acteur : Année et Tri seulement**, appliqués aux résultats déjà affichés
+  (TMDB ne filtre pas la recherche par titre). Pas de plateforme dans ces deux modes ; le
+  panneau le dit.
+- **D4 — Accueil : boutons Tendances / Nouveautés / À venir** (Tendances par défaut), avec le
+  filtre Tout / Films / Séries, sans filtres plateforme ni année. Nouveautés = sorties des
+  60 derniers jours ; À venir = sorties dans les 90 jours ; les deux par popularité. Les titres
+  déjà suivis restent masqués, comme pour les tendances.
+- **Hors M2** : pas de mémorisation des filtres d'une fois sur l'autre, pas d'onglet
+  « Découvrir » distinct, aucun changement de base ni de sauvegarde.
+- **Critère de validation (Kinder, 2026-09-21)** : « Sur l'accueil de la recherche, je touche
+  Nouveautés puis À venir et la liste change à chaque fois. Dans Explorer, sans choisir de
+  genre, je choisis une plateforme et une période (2010s), et je vois des titres de cette
+  plateforme sortis à cette période. Je change le tri en Plus récent, puis en Mieux notés, et
+  l'ordre change. Dans Acteur, je filtre par année et je trie sans relancer la recherche. »
+- **Cadrage technique (phase 5)** — fichiers touchés : `filtres.js` (nouveau, logique pure :
+  périodes, tris, filtre/tri d'une liste affichée) ; `tmdb.js` (filtres envoyés à `discover`,
+  fusion films + séries selon le tri, `getPlateformes`, `getRubrique`) ; `api.js` (3 portes) ;
+  `components/Filtres.jsx` (nouveau, panneau) ; `App.jsx` (mode Explorer, rubriques de
+  l'accueil, filtres) ; `styles.css` ; `tests/recherche.test.js`.
+- **Fait le 2026-09-21** ✅ codée et vérifiée, en attente de la capture de Kinder : 21 tests
+  (`tests/recherche.test.js`), 175 tests verts au total ; parcours vérifié dans un navigateur
+  en largeur téléphone avec le vrai catalogue (3 rubriques → 3 listes différentes ; Explorer
+  sans genre + Netflix + 2010s → séries de 2011 à 2018 ; Plus récent → 2019 en tête ; Plus
+  ancien → 2010 ; Mieux notés → autre ordre ; Réinitialiser ; Acteur « Tom Hanks » + 90s + tris
+  sans aucun nouvel appel TMDB).
+- **Écarts avec le cadrage, décidés en route** : (1) « Plateforme » ne se limite pas à
+  l'abonnement : la liste de TMDB contient des boutiques (Apple TV Store, Google Play…) qui
+  n'auraient jamais rien donné en abonnement seul ; on filtre donc sur « disponible chez elle ».
+  (2) Sans genre, les talk-shows, journaux et télé-réalité sont écartés côté séries (un talk-show
+  de 1962 remontait en tête). (3) Retoucher le genre déjà choisi le retire ; retoucher
+  « Explorer » ne vide plus l'écran. (4) Les filtres sont remis à zéro quand on change de mode.
+- **Limites connues** : la liste des plateformes est celle de TMDB (« JustWatch TV », « INA
+  madelen » y figurent) ; dans Titre, le filtre d'année ne porte que sur les ~20 résultats de
+  TMDB. Reste à confirmer sur l'appareil : le geste au doigt sur les chips de filtres.
+
+### M3 — Listes : tri et filtre — décisions figées (2026-09-21)
+M2 validée par Kinder le 2026-09-21.
+- **D1 — Tri** : Ajouté récemment (défaut, ordre actuel ; dans une liste perso = ajouté à cette
+  liste), Titre A → Z, Sortie la plus récente, Sortie la plus ancienne, Ma note (non-notés à la
+  fin). Films toujours groupés au-dessus des Séries ; le tri joue dans chaque groupe.
+- **D2 — Filtres** : **Année** (mêmes périodes que la recherche, sur la date de sortie) et
+  **Ma note** (Toutes / 4 étoiles et plus / Pas encore noté). Tout / Films / Séries inchangé.
+  Les compteurs des statuts restent les totaux réels, indifférents aux filtres.
+- **D3 — Genre et plateforme : PAS dans M3, reportés (noté pour plus tard).** Le genre demande
+  une colonne en base (migration, sauvegarde, rattrapage réseau de tous les titres déjà suivis)
+  sur une base que M4 va modifier ; la plateforme change avec le temps, la stocker serait faux.
+  Si le besoin revient : genre en colonne remplie à l'ajout + rattrapage au lancement, comme
+  `backfillReleaseDates`.
+- **D4 — Présentation** : bouton « Filtres » (point quand actif) et panneau identiques à la
+  recherche, avec « Réinitialiser ». Pendant une recherche dans la bibliothèque, le panneau
+  disparaît et le tri reste A → Z. Tri et filtres gardés **pour la séance** (on les retrouve en
+  changeant de statut, de liste ou d'onglet), jamais enregistrés d'une session à l'autre.
+- **Hors M3** : aucun changement de base ni de sauvegarde, pas de genre ni de plateforme, pas de
+  tri par durée.
+- **Critère de validation (Kinder, 2026-09-21)** : « Dans Mes listes, en Vu, je trie par Titre
+  A → Z puis par Ma note et l'ordre change. Je filtre 2010s et il ne reste que des titres de
+  cette période. Je filtre 4 étoiles et plus et il ne reste que mes titres bien notés. Je change
+  de statut : le tri reste. Je touche Réinitialiser : tout revient comme avant. »
+- **Cadrage technique (phase 5)** — fichiers touchés : `filtres.js` (tris et filtres de la
+  bibliothèque, logique pure) ; `components/Filtres.jsx` (rendu réutilisable : tris, filtre de
+  note, indication plateforme facultatifs) ; `components/Lists.jsx` ; `App.jsx` (état gardé
+  pour la séance) ; `styles.css` ; `tests/listes.test.js`. Pas de changement dans `store.js` :
+  « Ajouté récemment » est l'ordre déjà reçu de la base (le tri le conserve tel quel).
+
+- **Fait le 2026-09-21** ✅ codée et vérifiée, en attente de la capture de Kinder : 13 tests
+  (`tests/listes.test.js`), 188 tests verts au total ; parcours vérifié dans un navigateur en
+  largeur téléphone sur une bibliothèque de 16 titres réels (7 « Vu » notés) : Titre A → Z, Ma
+  note (égalités dans l'ordre reçu, non-notés à la fin), 2010s → Toy Story 3, Toy Story 4,
+  Sully ; « 4 étoiles et plus » → 5 titres ; changement de statut → tri et filtres conservés
+  (compteurs des statuts inchangés : 9 / 0 / 7 / 0) ; retour d'onglet → état conservé ;
+  recherche dans la bibliothèque → panneau caché, ordre A → Z, filtres intacts après effacement ;
+  Réinitialiser → ordre d'origine, point éteint.
+- **Comportement à connaître** : un filtre de note dans « À voir » ne montre rien tant qu'on n'a
+  rien noté — c'est voulu, un titre pas vu n'a en général pas de note (le message « Aucun
+  résultat pour ce filtre » s'affiche).
+- **Reporté** : genre et plateforme dans « Mes listes » (D3).
+
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.
   *(Le bloc « Pas encore sorti » de « Ce soir » — `Upcoming.jsx` — existe : il liste les

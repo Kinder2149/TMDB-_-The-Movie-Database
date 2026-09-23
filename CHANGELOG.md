@@ -4,6 +4,29 @@
 > `PLAN_ANDROID.md` et `PROJET_CONTEXTE.md`. Écrit le 2026-09-19 à partir de ces fichiers et de
 > l'historique de versions.
 
+## 2.3 — en préparation (retours d'usage du 2026-09-21, missions M1 à M5 dans `PLAN_V2.md`)
+**M1 — Fiche enrichie** (2026-09-21) :
+- Fiche d'un film ou d'une série : toucher un acteur ouvre la liste de ses films et séries
+  (par son identifiant, pas par son nom), avec « Retour à la fiche ». Casting de 8 à 12 noms.
+- Fiche : bloc « Dans le même esprit » en bas, avec les mêmes cartes que la saga.
+- Fiche : sans bande-annonce chez TMDB, le bouton devient « Chercher la bande-annonce » et
+  ouvre la recherche YouTube. Liens vers les plateformes : abandonnés (décision de Kinder).
+
+**M2 — Recherche et accueil** (2026-09-21) :
+- Accueil de la recherche : trois boutons « Tendances / Nouveautés / À venir » à la place du
+  titre fixe. Nouveautés = sorties des 60 derniers jours, À venir = celles des 90 jours qui viennent.
+- Le mode « Genre » devient « Explorer » : le genre est facultatif, et un bouton « Filtres »
+  ouvre plateforme (celles de ta région), année (par période) et tri (Popularité, Plus récent,
+  Plus ancien, Mieux notés).
+- Recherche par Titre et par Acteur : filtre d'année et tri sur les résultats affichés, sans
+  relancer la recherche.
+
+**M3 — Mes listes** (2026-09-21) :
+- « Mes listes » : un bouton « Filtres » (même panneau que la recherche) pour trier — Ajouté
+  récemment, Titre A → Z, Sortie récente, Sortie ancienne, Ma note — et filtrer par année et
+  par note (4 étoiles et plus / pas encore noté). Films et séries restent groupés. Tri et filtres
+  sont gardés tant que l'application tourne. Pas de genre ni de plateforme : reporté.
+
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à
 l'écran dans un navigateur en largeur téléphone le 2026-09-19 (`PLAN_V2.md`, point 13).
