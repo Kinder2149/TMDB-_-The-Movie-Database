@@ -156,6 +156,15 @@ export async function getRubrique(options) {
   return tmdb.getRubrique(options);
 }
 
+// Rayons « moods » de l'accueil (Super-héros, Braquage, Halloween, Romance).
+export async function getMoods() {
+  return tmdb.getMoods();
+}
+
+export async function discoverMood({ mood, movie = true, tv = true, page = 1 }) {
+  return tmdb.discoverByMood({ mood, movie, tv, page });
+}
+
 export async function searchTitles(query) {
   return tmdb.searchMulti(query);
 }

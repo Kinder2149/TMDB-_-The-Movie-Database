@@ -30,11 +30,14 @@
 **M1 à M3 validées à l'écran le 2026-09-23** (fiche → acteur → filmographie → retour ; accueil ;
 Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
 
-**M4 et M5 : décisions figées le 2026-09-23, rien codé** — voir `PLAN_V2.md`.
-- M4 (revoir un titre) : par épisode, pas par titre — décision de Kinder.
-- M5 (packs de mood) : mots-clés TMDB, 4 moods vérifiés sur le vrai catalogue — Super-héros,
-  Braquage, Halloween, Romance (films). Noël et Love-séries reportés (nettoyage supplémentaire
-  nécessaire). Saga retirée du périmètre (déjà couverte par la fiche d'un film).
+**M5 — Packs de mood, codée et vérifiée le 2026-09-23** (194 tests verts) :
+- Accueil de la recherche : 4 boutons de plus, à côté de Tendances / Nouveautés / À venir —
+  Super-héros, Braquage, Halloween, Romance (films). Chacun vérifié sur le vrai catalogue.
+- Noël et Love-séries reportés (nettoyage supplémentaire nécessaire, comme pour le genre
+  Histoire & Époques). Saga retirée du périmètre : déjà couverte par la fiche d'un film.
+
+**M4 : décision figée le 2026-09-23, rien codé** — voir `PLAN_V2.md`.
+- Revoir un titre plusieurs fois se pose par épisode, pas par titre — décision de Kinder.
 
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à

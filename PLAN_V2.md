@@ -626,16 +626,32 @@ avant ou après M4, aucune des deux ne dépend de l'autre.
   « Histoire & Époques », pas un nouveau moteur.
 - **Hors M5** : pas de mood personnalisé (créer son propre pack), pas de mémoire de mood
   préféré, pas de mélange de plusieurs moods à la fois.
-- **Critère de validation (à confirmer par Kinder une fois codé)** : « Dans l'accueil de la
-  recherche, je touche Super-héros et je vois des films et séries de super-héros reconnus.
-  Je touche Braquage, Halloween, Romance : chacun donne une liste cohérente avec son thème,
-  sans titre qui n'a rien à voir. »
+- **Critère de validation (à essayer par Kinder)** : « Dans l'accueil de la recherche, je touche
+  Super-héros et je vois des films et séries de super-héros reconnus. Je touche Braquage,
+  Halloween, Romance : chacun donne une liste cohérente avec son thème, sans titre qui n'a rien
+  à voir. »
 - **Cadrage technique (phase 5)** — fichiers touchés : `tmdb.js` (table `MOODS`, sur le modèle de
-  `GENRES`, et une fonction `discoverByMood`) ; `api.js` (une porte `getMood` ou réutilisation de
-  `discoverGenre`) ; `App.jsx` (bloc Moods dans l'accueil, un nouvel état `mood` proche de
-  `rubrique`) ; `styles.css` ; un fichier de tests dédié, sur le modèle de `genres.test.js`.
-- **Prochaine étape** : ce cadrage peut passer en code dès que Kinder le confirme — rien
-  d'autre à trancher avant la phase technique.
+  `GENRES` ; fonction `discoverByMood`) ; `api.js` (`getMoods`, `discoverMood`) ; `App.jsx`
+  (moods ajoutés à la rangée de rubriques de l'accueil, chargés par la même fonction
+  `chargerAccueil` que Tendances/Nouveautés/À venir) ; `tests/moods.test.js`.
+
+- **Fait le 2026-09-23** ✅ codée et vérifiée, en attente de l'essai de Kinder : 6 tests
+  (`tests/moods.test.js`), 194 tests verts au total. Parcours vérifié dans un navigateur en
+  largeur téléphone avec le vrai catalogue : les 4 boutons apparaissent à côté de Tendances /
+  Nouveautés / À venir ; Super-héros donne Avengers, The Boys, Arrow, Flash ; Romance (Tout)
+  donne Titanic, Forrest Gump, aucune série (comme prévu) ; Halloween en Séries donne
+  Supernatural, American Horror Story, Stranger Things.
+- **Écart avec le cadrage, corrigé en route** : deux des quatre moods, vérifiés à l'origine sans
+  aller au-delà de la première page TMDB, se sont révélés moins propres une fois les 3 pages
+  chargées d'un coup (comme le reste de l'accueil) :
+  - **Romance** n'avait pas de seuil de votes : sur 60 titres, les films confidentiels
+    noyaient Titanic et Forrest Gump. Seuil ajouté (`vote_count.gte=200`, comme le tri « Mieux
+    notés » d'Explorer).
+  - **Halloween côté séries** ne renvoyait **rien du tout** : TMDB n'a pas de genre Horreur pour
+    les séries (seulement pour les films). Remplacé par le mot-clé `horror`, avec un seuil de
+    votes — propre (Supernatural, Stranger Things).
+- **Reste à confirmer sur l'appareil** : rien de spécifique aux moods — mêmes gestes que le
+  reste de l'accueil, déjà couverts par l'essai téléphone en attente.
 
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.

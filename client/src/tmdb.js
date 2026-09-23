@@ -237,6 +237,100 @@ export function parametresDeGenre(key, mediaType) {
   return params;
 }
 
+// --- Moods : rayons éditorialisés (M5) ---
+//
+// Même mécanique que les genres (mots-clés ou genre TMDB, films et séries
+// séparément), mais une liste fixe et courte plutôt qu'un choix ouvert : ce
+// sont des rayons proposés à l'accueil, pas une recherche.
+//
+// Chaque mood a été vérifié sur le vrai catalogue avant d'être retenu
+// (cadrage PLAN_V2.md, 2026-09-23). Deux idées écartées pour l'instant faute
+// du même nettoyage : Noël (mot-clé seul pollué par toute scène de Noël dans
+// n'importe quel film ; propre en ajoutant le genre Familial, mais séries trop
+// pauvres) et Love pour les séries (pas de genre Romance côté séries chez
+// TMDB, le mot-clé seul mélange animes et séries sans rapport).
+export const MOODS = [
+  {
+    key: 'superheros',
+    fr: 'Super-héros',
+    en: 'Superheroes',
+    movie: { keywords: [9715, 9717], votesMin: 100 }, // superhero, based on comic
+    tv: { keywords: [9715, 9717], votesMin: 50 },
+  },
+  {
+    key: 'braquage',
+    fr: 'Braquage',
+    en: 'Heist',
+    movie: { keywords: [10051], votesMin: 20 }, // heist
+    tv: { keywords: [10051], votesMin: 10 },
+  },
+  {
+    key: 'halloween',
+    fr: 'Halloween',
+    en: 'Halloween',
+    movie: { genres: [27] }, // Horreur — genre TMDB, films seulement.
+    // TMDB n'a pas de genre Horreur côté séries : mot-clé à la place.
+    tv: { keywords: [315058], votesMin: 20 }, // horror
+  },
+  {
+    key: 'romance',
+    fr: 'Romance',
+    en: 'Romance',
+    // Pas d'entrée `tv` : TMDB n'a pas de genre Romance côté séries. Un mood
+    // sans entrée pour un type ne renvoie rien pour ce type (voir
+    // `parametresDeMood`), plutôt qu'une liste hors sujet.
+    // Seuil de votes : sans lui, « Voir plus » (3 pages d'un coup) noie vite
+    // les titres connus sous des films confidentiels à quelques votes.
+    movie: { genres: [10749], votesMin: 200 },
+  },
+];
+
+// Liste affichée à l'accueil, dans la langue du catalogue.
+export async function getMoods() {
+  const langue = getCatalogLanguage() === 'en' ? 'en' : 'fr';
+  return MOODS.map((m) => ({ key: m.key, name: m[langue] }));
+}
+
+// Paramètres TMDB pour un mood, côté films ou côté séries. `null` = ce mood
+// n'a rien à proposer pour ce type (Romance côté séries).
+function parametresDeMood(key, mediaType) {
+  const mood = MOODS.find((m) => m.key === key);
+  const regle = mood?.[mediaType];
+  if (!regle) return null;
+  const params = { sort_by: 'popularity.desc' };
+  if (regle.genres) params.with_genres = ou(regle.genres);
+  if (regle.keywords) params.with_keywords = ou(regle.keywords);
+  if (regle.votesMin) params['vote_count.gte'] = regle.votesMin;
+  return params;
+}
+
+// Titres d'un mood : films et/ou séries, triés par popularité. Pas de filtres
+// ni de tri — ce sont des rayons tout faits, pas une recherche (`Explorer` le
+// fait déjà).
+export async function discoverByMood({ mood, movie = true, tv = true, page = 1 }) {
+  const calls = [];
+  for (const [mediaType, voulu] of [['movie', movie], ['tv', tv]]) {
+    if (!voulu) continue;
+    const params = parametresDeMood(mood, mediaType);
+    if (!params) continue;
+    calls.push(
+      tmdbGet(`/discover/${mediaType}`, {
+        ...params,
+        ...(mediaType === 'movie' ? { include_adult: 'false' } : {}),
+        page,
+      }).then((d) => [mediaType, d])
+    );
+  }
+  const parts = await Promise.all(calls);
+  const entries = [];
+  for (const [mediaType, data] of parts) {
+    for (const c of data.results || []) {
+      entries.push({ item: toCardItem(c, mediaType), popularity: c.popularity || 0 });
+    }
+  }
+  return topByPopularity(entries);
+}
+
 // Ce que les filtres de « Explorer » demandent à TMDB, pour un film ou une série.
 //  - Tri : popularité (défaut), date, ou note. « Plus récent » ne remonte que ce
 //    qui est déjà sorti ; « Plus ancien » et « Mieux notés » exigent un minimum de

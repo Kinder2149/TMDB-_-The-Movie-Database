@@ -24,6 +24,8 @@ import {
   discoverGenre,
   getPlateformes,
   getRubrique,
+  getMoods,
+  discoverMood,
   getSuggestions,
   getSuivi,
   addToSuivi,
@@ -81,6 +83,7 @@ export default function App() {
   const [searchMode, setSearchMode] = useState('title'); // title | actor | genre
   const [person, setPerson] = useState(null); // acteur résolu (mode acteur)
   const [genres, setGenres] = useState([]); // [{ key, name }] — liste unique films + séries
+  const [moods, setMoods] = useState([]); // [{ key, name }] — rayons de l'accueil (M5)
   const [trending, setTrending] = useState([]); // accueil de la recherche (champ vide)
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [genrePage, setGenrePage] = useState(1);
@@ -230,12 +233,21 @@ export default function App() {
     setAccueilCharge(true);
     const depuis = ajouter ? tendancesPage + 1 : 1;
     const pages = [depuis, depuis + 1, depuis + 2];
+    // Un mood (Super-héros, Braquage…) se charge comme une rubrique, mais par
+    // une porte différente : ce sont des rayons fixes (genre/mots-clés), pas
+    // les tendances/nouveautés/à venir de TMDB.
+    const estMood = moods.some((m) => m.key === quelleRubrique);
+    const charge = (page) =>
+      estMood
+        ? discoverMood({
+            mood: quelleRubrique,
+            movie: filtre !== 'tv',
+            tv: filtre !== 'movie',
+            page,
+          })
+        : getRubrique({ rubrique: quelleRubrique, mediaType: filtre, page });
     try {
-      const lots = await Promise.all(
-        pages.map((page) =>
-          getRubrique({ rubrique: quelleRubrique, mediaType: filtre, page }).catch(() => [])
-        )
-      );
+      const lots = await Promise.all(pages.map((page) => charge(page).catch(() => [])));
       if (seq !== tendancesSeq.current) return; // rubrique/filtre changé entre-temps
       const nouveaux = lots.flat();
       setTendancesPage(depuis + 2);
@@ -252,9 +264,10 @@ export default function App() {
     }
   }
 
-  // Genres chargés une fois (indépendants du profil).
+  // Genres et moods chargés une fois (indépendants du profil).
   useEffect(() => {
     getGenres().then(setGenres).catch(() => {});
+    getMoods().then(setMoods).catch(() => {});
   }, []);
 
   // Accueil : rechargé quand on change de rubrique ou qu'on passe de Tout à
@@ -998,6 +1011,7 @@ export default function App() {
                   ['tendances', '✨ Tendances'],
                   ['nouveautes', 'Nouveautés'],
                   ['avenir', 'À venir'],
+                  ...moods.map((m) => [m.key, m.name]),
                 ].map(([v, label]) => (
                   <button
                     key={v}
