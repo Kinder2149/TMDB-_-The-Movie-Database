@@ -710,6 +710,42 @@ va remplacer l'onglet Réglages par Découvrir et mettre notamment le mood dedan
   `chargerDecouvrir` séparés, bloc `view === 'discover'`, tabbar) ; 211 tests toujours verts
   (aucun test dédié à la navigation par onglets, déjà hors du périmètre testé automatiquement).
 
+### M6 — Sauvegarde Drive : deux appareils (cadrage proposé le 2026-09-24, à valider)
+
+**Phase de cadrage : proposition, aucun code écrit.**
+
+**Le risque.** Aujourd'hui la sauvegarde écrase le fichier Drive sans regarder s'il a changé. Un
+vieux téléphone rouvert après un mois, ou une réinstallation où l'on a refusé la restauration,
+peut donc remplacer un suivi récent par un suivi ancien. C'est la seule perte de données encore
+possible dans le circuit de sauvegarde (audit du 2026-09-24).
+
+**Option retenue : détecter, ne jamais fusionner, ne jamais écraser sans demander.**
+- À chaque envoi, l'appli retient la « version » que Drive a donnée à chaque fichier (sa date de
+  modification, fournie par Drive lui-même, donc sans dépendre de l'heure du téléphone).
+- Avant d'envoyer, elle compare avec la version qu'elle connaît. Identique : envoi normal.
+  Différente : quelqu'un d'autre a écrit depuis — **c'est un conflit**, et rien n'est écrasé.
+- **Sauvegarde automatique** : renonce en silence, garde le rappel levé, note « conflit » dans le
+  dernier essai. Jamais d'écran surprise.
+- **Bouton manuel** : un écran clair avec deux choix — « Garder ce que j'ai sur ce téléphone »
+  (écrase le Drive) ou « Reprendre la version du Drive » (remplace le téléphone, avec le résumé
+  habituel : titres, épisodes, date). Pas de fusion : la décision « restaurer remplace, ne mélange
+  pas » reste vraie.
+- Fichier présent sur le Drive mais jamais vu par cet appareil : traité comme un conflit, sauf si
+  l'appareil a déjà sauvegardé avant cette mise à jour (sinon tous les utilisateurs actuels
+  verraient un faux conflit) : dans ce cas la version du Drive est adoptée en silence, une fois.
+
+**Pourquoi pas une fusion.** Fusionner deux suivis suppose de trancher les suppressions (un titre
+retiré ici mais présent là-bas est-il à garder ?). Sans horodatage par ligne, on ferait des
+erreurs silencieuses — pire que de demander. Deux appareils qui modifient le même profil en même
+temps restent un cas rare pour une appli à usage personnel.
+
+**Fichiers touchés** : `backup.js` (comparaison, versions rangées sur l'appareil), `google.js`
+(l'envoi rend déjà la date de modification), `Backup.jsx` (écran de conflit), `App.jsx` (bandeau si
+conflit). Tests : conflit détecté, envoi normal, adoption silencieuse des utilisateurs existants,
+automatique qui ne demande rien, chacun des deux choix.
+
+**Ce qui reste non vérifiable ici** : le comportement réel de Drive avec deux vrais appareils.
+
 ## Hors périmètre V2 (noté, pas construit)
 - Calendrier des prochaines sorties (vue par date) / notifications de nouvel épisode.
   *(Le bloc « Pas encore sorti » de « Ce soir » — `Upcoming.jsx` — existe : il liste les
