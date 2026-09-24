@@ -9,6 +9,8 @@ import {
   backupToDrive,
   listCloudBackups,
   restoreFromDrive,
+  ConflitSauvegarde,
+  resumerSauvegardeDrive,
   lastCloudBackup,
   dernierEssaiAutomatique,
   sauvegardeAutoActive,
@@ -50,6 +52,8 @@ function texteEssaiAuto(essai) {
     desactivee: 'sauvegarde automatique désactivée',
     'autorisation-indisponible':
       'Google n’a pas renouvelé l’autorisation sans écran — à refaire à la main',
+    conflit:
+      'un autre appareil a modifié la sauvegarde Drive — rien n’a été écrasé, à trancher à la main',
     'deja-en-cours': 'un envoi était déjà en cours',
     echec: `échec${essai.message ? ` : ${essai.message}` : ''}`,
   };
@@ -71,6 +75,8 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
   const [pendingChanges, setPendingChanges] = useState(hasPendingChanges);
   // Contenu du Drive lu, en attente de confirmation avant d'écraser le local.
   const [cloudPending, setCloudPending] = useState(null);
+  // Un autre appareil a écrit dans le Drive : rien n'est parti, on demande.
+  const [conflit, setConflit] = useState(null);
   // Ce qu'a donné la dernière tentative automatique. Sans cette ligne, une
   // sauvegarde qui échoue en silence reste indiagnosticable : le téléphone
   // n'est pas sous nos yeux.
@@ -134,6 +140,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
       const jeton = await getGoogleAccessToken();
       if (!jeton) return; // autorisation refusée ou annulée
       const { profils } = await backupToDrive(jeton);
+      setConflit(null);
       setLastBackup(lastCloudBackup());
       setPendingChanges(false);
       const mode = {
@@ -146,6 +153,58 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
           profils > 1 ? 's' : ''
         })${mode ? ` — ${mode}.` : '.'}`
       );
+    } catch (e) {
+      if (e instanceof ConflitSauvegarde) await presenterConflit(e.conflits);
+      else setError(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  // Montre ce que contient le Drive avant de demander de choisir.
+  async function presenterConflit(conflits) {
+    const jeton = await getGoogleAccessToken();
+    const detail = await Promise.all(
+      conflits.map(async (c) => {
+        try {
+          return { ...c, resume: await resumerSauvegardeDrive(jeton, c.fileId) };
+        } catch {
+          return c;
+        }
+      })
+    );
+    setConflit({ jeton, conflits: detail });
+  }
+
+  // « Garder ce téléphone » : choix explicite d'écraser le Drive.
+  async function garderCeTelephone() {
+    setBusy('cloud');
+    setError('');
+    try {
+      await backupToDrive(conflit.jeton, { ecraser: true });
+      setConflit(null);
+      setLastBackup(lastCloudBackup());
+      setPendingChanges(false);
+      setNote('Le Drive a été remplacé par le contenu de ce téléphone.');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  // « Reprendre le Drive » : ce téléphone est remplacé, puis le reste part normalement.
+  async function reprendreLeDrive() {
+    setBusy('cloud');
+    setError('');
+    try {
+      const id = await restoreFromDrive(conflit.jeton, conflit.conflits);
+      await backupToDrive(conflit.jeton);
+      setConflit(null);
+      setLastBackup(lastCloudBackup());
+      setPendingChanges(false);
+      setNote('Ce téléphone a repris la version du Drive.');
+      if (id) onRestored(id);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -337,6 +396,36 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
                   Restaurer depuis Drive…
                 </button>
               </div>
+
+              {conflit && (
+                <div className="backup__confirm">
+                  <p>
+                    <strong>Un autre appareil a modifié votre sauvegarde Drive</strong> depuis la
+                    dernière fois. Rien n'a été écrasé. Que voulez-vous garder ?
+                  </p>
+                  <ul>
+                    {conflit.conflits.map((c) => (
+                      <li key={c.fileId}>
+                        « {c.profileName} » — sur le Drive :{' '}
+                        {c.modifiedAt ? dateLisible(c.modifiedAt) : 'date inconnue'}
+                        {c.resume &&
+                          `, ${c.resume.titres} titre(s), ${c.resume.episodes} épisode(s) vu(s)`}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="backup__actions">
+                    <button className="btn" onClick={reprendreLeDrive} disabled={!!busy}>
+                      Reprendre la version du Drive
+                    </button>
+                    <button className="btn btn--danger" onClick={garderCeTelephone} disabled={!!busy}>
+                      Garder ce téléphone
+                    </button>
+                    <button className="btn" onClick={() => setConflit(null)} disabled={!!busy}>
+                      Décider plus tard
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {cloudPending && (
                 <div className="backup__confirm">

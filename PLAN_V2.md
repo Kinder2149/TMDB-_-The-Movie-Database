@@ -710,9 +710,9 @@ va remplacer l'onglet Réglages par Découvrir et mettre notamment le mood dedan
   `chargerDecouvrir` séparés, bloc `view === 'discover'`, tabbar) ; 211 tests toujours verts
   (aucun test dédié à la navigation par onglets, déjà hors du périmètre testé automatiquement).
 
-### M6 — Sauvegarde Drive : deux appareils (cadrage proposé le 2026-09-24, à valider)
+### M6 — Sauvegarde Drive : deux appareils (cadrage validé et codé le 2026-09-24)
 
-**Phase de cadrage : proposition, aucun code écrit.**
+**Validé par Kinder, codé le 2026-09-24** : `backup.js` (versions, `ConflitSauvegarde`), `Backup.jsx` (encadré de conflit), `tests/cloud.conflit.test.js` (8 tests, faux Drive). Non vérifié : Drive réel avec deux appareils.
 
 **Le risque.** Aujourd'hui la sauvegarde écrase le fichier Drive sans regarder s'il a changé. Un
 vieux téléphone rouvert après un mois, ou une réinstallation où l'on a refusé la restauration,

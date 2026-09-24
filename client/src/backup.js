@@ -285,6 +285,11 @@ import {
 
 const PENDING_KEY = 'cloud-pending';
 const LAST_BACKUP_KEY = 'cloud-last-backup';
+// « Version » que Drive a donnée à chaque fichier de profil la dernière fois que
+// cet appareil l'a écrit ou lu (sa date de modification, fournie par Drive : elle
+// ne dépend pas de l'heure du téléphone). Sert à voir si un autre appareil a
+// écrit entre-temps.
+const VERSIONS_KEY = 'cloud-versions';
 
 // --- Profils supprimés ---
 //
@@ -313,6 +318,30 @@ export function oublierProfil(profileId) {
   ids.add(profileId);
   writeLocal(SUPPRIMES_KEY, JSON.stringify([...ids]));
   markChanged(); // la sauvegarde suivante retire son fichier du Drive
+}
+
+function lireVersions() {
+  try {
+    return JSON.parse(readLocal(VERSIONS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function noterVersions(modifs) {
+  const versions = { ...lireVersions(), ...modifs };
+  for (const k of Object.keys(versions)) if (!versions[k]) delete versions[k];
+  writeLocal(VERSIONS_KEY, JSON.stringify(versions));
+}
+
+// Un autre appareil a écrit dans le Drive depuis la dernière fois que celui-ci
+// l'a vu : envoyer écraserait son travail. On s'arrête et on demande.
+export class ConflitSauvegarde extends Error {
+  constructor(conflits) {
+    super('Un autre appareil a modifié la sauvegarde Drive depuis la dernière fois.');
+    this.name = 'ConflitSauvegarde';
+    this.conflits = conflits;
+  }
 }
 
 const cloudFileName = (profileId) => `profil-${profileId}.json`;
@@ -438,6 +467,7 @@ export async function sauvegardeAutomatique() {
     const { profils } = await backupToDrive(jeton);
     return noterEssai({ fait: true, profils });
   } catch (error) {
+    if (error instanceof ConflitSauvegarde) return noterEssai({ fait: false, raison: 'conflit' });
     return noterEssai({ fait: false, raison: 'echec', message: error.message });
   } finally {
     autoEnCours = false;
@@ -455,13 +485,18 @@ export function forgetCloudState() {
   writeLocal(PENDING_KEY, null);
   writeLocal(LAST_BACKUP_KEY, null);
   writeLocal(LAST_AUTO_KEY, null);
+  writeLocal(VERSIONS_KEY, null);
   writeLocal(AUTO_OFF_KEY, null);
   prevenir();
 }
 
 // Envoie **tous** les profils de l'appareil dans le Drive. Sauvegarder à
 // moitié n'aurait pas de sens : on change d'appareil avec tout son suivi.
-export async function backupToDrive(token) {
+//
+// Avant d'envoyer quoi que ce soit, on vérifie que **aucun** fichier n'a été
+// modifié par un autre appareil (`ConflitSauvegarde`, rien n'est écrit). Seul
+// `ecraser: true` — choix explicite de l'utilisateur — passe outre.
+export async function backupToDrive(token, { ecraser = false } = {}) {
   // Photographie du marqueur **avant** de lire les données : ce qui est envoyé
   // correspond à cet état-là, pas à ce qui se passera pendant l'envoi.
   const marqueurAvant = readLocal(PENDING_KEY);
@@ -469,11 +504,39 @@ export async function backupToDrive(token) {
   const existants = await listDriveFiles(token);
   let envoyes = 0;
 
+  if (!ecraser) {
+    const connues = lireVersions();
+    // Cet appareil a déjà sauvegardé avant que les versions existent : on adopte
+    // celle du Drive une fois, sinon chaque utilisateur actuel verrait un faux conflit.
+    const adopter = !!readLocal(LAST_BACKUP_KEY);
+    const conflits = [];
+    const adoptees = {};
+    for (const profil of profils) {
+      const existant = existants.find((f) => f.name === cloudFileName(profil.id));
+      if (!existant) continue;
+      const connue = connues[profil.id];
+      if (connue === existant.modifiedTime) continue;
+      if (!connue && adopter) {
+        adoptees[profil.id] = existant.modifiedTime;
+        continue;
+      }
+      conflits.push({
+        fileId: existant.id,
+        profileId: profil.id,
+        profileName: profil.name,
+        modifiedAt: existant.modifiedTime ? new Date(existant.modifiedTime) : null,
+        version: existant.modifiedTime,
+      });
+    }
+    if (conflits.length > 0) throw new ConflitSauvegarde(conflits);
+    noterVersions(adoptees);
+  }
+
   for (const profil of profils) {
     const data = await exportProfile(profil.id);
     const nom = cloudFileName(profil.id);
     const existant = existants.find((f) => f.name === nom);
-    await uploadDriveFile(token, {
+    const resultat = await uploadDriveFile(token, {
       fileId: existant?.id,
       name: nom,
       contents: JSON.stringify(data),
@@ -481,6 +544,7 @@ export async function backupToDrive(token) {
       // « profil Marie » avant de télécharger quoi que ce soit.
       appProperties: { profileId: profil.id, profileName: profil.name },
     });
+    noterVersions({ [profil.id]: resultat?.modifiedTime });
     envoyes += 1;
   }
 
@@ -518,6 +582,7 @@ export async function listCloudBackups(token) {
       profileId: f.appProperties?.profileId || f.name.slice(7, -5),
       profileName: f.appProperties?.profileName || 'Profil',
       modifiedAt: f.modifiedTime ? new Date(f.modifiedTime) : null,
+      version: f.modifiedTime,
     }))
     .filter((s) => !supprimes.has(s.profileId));
 }
@@ -530,6 +595,8 @@ export async function restoreFromDrive(token, sauvegardes) {
   for (const s of sauvegardes) {
     const data = validateBackup(await downloadDriveFile(token, s.fileId));
     const id = await importProfile(data);
+    // Ce qu'on vient de lire est ce que Drive contient : pas un conflit ensuite.
+    noterVersions({ [s.profileId || id]: s.version });
     if (!premier) premier = id;
   }
   writeLocal(PENDING_KEY, null);
@@ -564,4 +631,9 @@ export async function cloudRestoreSuggestions(token) {
     if (n === 0) proposables.push(s);
   }
   return proposables;
+}
+
+// Ce que contient un fichier du Drive, pour le montrer avant de choisir.
+export async function resumerSauvegardeDrive(token, fileId) {
+  return describeBackup(validateBackup(await downloadDriveFile(token, fileId)));
 }

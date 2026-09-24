@@ -60,8 +60,14 @@ Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
   levé et la sauvegarde suivante l'emporte.
 - La restauration d'un profil est « tout ou rien » : si l'appli est coupée en route, le profil
   reste exactement comme avant au lieu de rester vide.
-- Reste à traiter (mission séparée) : deux appareils qui sauvegardent l'un après l'autre
-  (le dernier écrase l'autre sans comparer les dates).
+
+**M6 — Deux appareils sur le même Drive, codée le 2026-09-24** (221 tests verts) :
+- La sauvegarde ne remplace plus un fichier Drive qu'un autre appareil a modifié depuis la
+  dernière fois : elle s'arrête avant d'écrire quoi que ce soit (aucun profil n'est envoyé).
+- Sauvegarde automatique : renonce en silence, garde le rappel, note « conflit » dans le dernier essai.
+- Bouton manuel : un encadré montre ce que contient le Drive et propose « Reprendre la version du
+  Drive », « Garder ce téléphone » ou « Décider plus tard ». Pas de fusion.
+- Appareil déjà sauvegardé avant cette version : adopte celle du Drive sans fausse alerte.
 
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à
