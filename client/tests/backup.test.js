@@ -232,4 +232,18 @@ describe('export vers Letterboxd', () => {
     ]);
     expect(csv.split('\n')[1]).toBe('"Moi, moche et ""méchant""",2010,1,,,');
   });
+
+  it('une restauration qui échoue en route laisse le profil intact', async () => {
+    await remplirProfil(profil.id);
+    const fichier = await backup.exportProfile(profil.id);
+    const sansDate = async () => ({ ...(await backup.exportProfile(profil.id)), exportedAt: null });
+    const avant = JSON.stringify(await sansDate());
+
+    // Un titre invalide au milieu du fichier : l'insertion échoue après l'effacement.
+    fichier.suivi.push({ tmdbId: 999, mediaType: 'movie', title: null });
+    await expect(backup.importProfile(fichier)).rejects.toThrow();
+
+    const apres = JSON.stringify(await sansDate());
+    expect(apres).toBe(avant);
+  });
 });

@@ -194,4 +194,22 @@ describe('sauvegarde automatique', () => {
     expect(resultat).toEqual({ fait: false, raison: 'rien-a-sauvegarder' });
     expect(autorisation).not.toHaveBeenCalled();
   });
+
+  it('garde le rappel levé si on modifie quelque chose pendant l’envoi', async () => {
+    autorisation.mockResolvedValue('jeton-valide');
+    backup.markChanged();
+    // Un changement survient pendant que l'envoi est en route.
+    globalThis.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/upload/drive/v3/files')) {
+        backup.markChanged();
+        return { ok: true, status: 200, json: async () => ({ id: 'id-1' }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ files: [] }) };
+    });
+
+    const resultat = await backup.sauvegardeAutomatique();
+    expect(resultat).toMatchObject({ fait: true });
+    // Cette modification n'est pas partie : elle ne doit pas être déclarée sauvegardée.
+    expect(backup.hasPendingChanges()).toBe(true);
+  });
 });

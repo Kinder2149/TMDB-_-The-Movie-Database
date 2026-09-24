@@ -121,101 +121,93 @@ export async function importProfile(data) {
   const { id, name } = data.profile;
 
   const existe = (await query('SELECT id FROM profiles WHERE id = ?', [id])).length > 0;
+  const avatar = data.profile.avatar ?? null;
+
+  // Tout part dans **un seul bloc** : ou bien le profil est entièrement
+  // restauré, ou bien il reste exactement comme avant. Autrement, une appli
+  // coupée entre l'effacement et la réécriture laissait un profil vide — que
+  // la sauvegarde suivante aurait envoyé sur le Drive à la place du bon fichier.
+  const blocs = [];
+
   if (existe) {
-    await run('UPDATE profiles SET name = ?, avatar = ? WHERE id = ?', [
-      name,
-      data.profile.avatar ?? null,
-      id,
-    ]);
+    blocs.push({ sql: 'UPDATE profiles SET name = ?, avatar = ? WHERE id = ?', params: [name, avatar, id] });
     // Les suppressions en cascade emportent listes, éléments et épisodes.
-    await run('DELETE FROM suivi WHERE profile_id = ?', [id]);
-    await run('DELETE FROM episodes_vus WHERE profile_id = ?', [id]);
-    await run('DELETE FROM visionnages WHERE profile_id = ?', [id]);
-    await run('DELETE FROM listes WHERE profile_id = ?', [id]);
+    for (const table of ['suivi', 'episodes_vus', 'visionnages', 'listes']) {
+      blocs.push({ sql: `DELETE FROM ${table} WHERE profile_id = ?`, params: [id] });
+    }
   } else {
-    await run('INSERT INTO profiles (id, name, avatar) VALUES (?, ?, ?)', [
-      id,
-      name,
-      data.profile.avatar ?? null,
-    ]);
+    blocs.push({ sql: 'INSERT INTO profiles (id, name, avatar) VALUES (?, ?, ?)', params: [id, name, avatar] });
   }
 
-  if (data.suivi.length > 0) {
-    await runMany(
-      data.suivi.map((s) => ({
-        sql: `INSERT OR REPLACE INTO suivi
-                (profile_id, tmdb_id, media_type, title, year, release_date,
-                 poster_url, status, note, rating, runtime, release_region,
-                 added_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
-        params: [
-          id,
-          s.tmdbId,
-          s.mediaType,
-          s.title,
-          s.year ?? null,
-          s.releaseDate ?? null,
-          s.posterUrl ?? null,
-          s.status || 'a_voir',
-          // Absents d'une sauvegarde d'avant la note : simplement vides.
-          s.note ?? null,
-          s.rating ?? null,
-          s.runtime ?? null,
-          s.releaseRegion ?? null,
-          s.addedAt ?? null,
-        ],
-      }))
-    );
+  for (const s of data.suivi) {
+    blocs.push({
+      sql: `INSERT OR REPLACE INTO suivi
+              (profile_id, tmdb_id, media_type, title, year, release_date,
+               poster_url, status, note, rating, runtime, release_region,
+               added_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+      params: [
+        id,
+        s.tmdbId,
+        s.mediaType,
+        s.title,
+        s.year ?? null,
+        s.releaseDate ?? null,
+        s.posterUrl ?? null,
+        s.status || 'a_voir',
+        // Absents d'une sauvegarde d'avant la note : simplement vides.
+        s.note ?? null,
+        s.rating ?? null,
+        s.runtime ?? null,
+        s.releaseRegion ?? null,
+        s.addedAt ?? null,
+      ],
+    });
   }
 
-  const episodes = data.episodesVus || [];
-  if (episodes.length > 0) {
-    await runMany(
-      episodes.map((e) => ({
-        sql: `INSERT OR REPLACE INTO episodes_vus
-                (profile_id, series_id, season_number, episode_number, marked_at)
-              VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))`,
-        params: [id, e.seriesId, e.season, e.episode, e.markedAt ?? null],
-      }))
-    );
+  for (const e of data.episodesVus || []) {
+    blocs.push({
+      sql: `INSERT OR REPLACE INTO episodes_vus
+              (profile_id, series_id, season_number, episode_number, marked_at)
+            VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+      params: [id, e.seriesId, e.season, e.episode, e.markedAt ?? null],
+    });
   }
 
   // Sauvegarde d'avant M4 (version < 3) : pas de journal, rien à restaurer —
   // pas une perte, cette version n'en produisait aucun.
-  const visionnages = data.visionnages || [];
-  if (visionnages.length > 0) {
-    await runMany(
-      visionnages.map((v) => ({
-        sql: `INSERT INTO visionnages
-                (profile_id, tmdb_id, media_type, season_number, episode_number, date)
-              VALUES (?, ?, ?, ?, ?, ?)`,
-        params: [id, v.tmdbId, v.mediaType, v.season ?? null, v.episode ?? null, v.date],
-      }))
-    );
+  for (const v of data.visionnages || []) {
+    blocs.push({
+      sql: `INSERT INTO visionnages
+              (profile_id, tmdb_id, media_type, season_number, episode_number, date)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      params: [id, v.tmdbId, v.mediaType, v.season ?? null, v.episode ?? null, v.date],
+    });
   }
 
   for (const l of data.listes || []) {
-    const { lastId } = await run(
-      `INSERT INTO listes (profile_id, name, created_at)
-       VALUES (?, ?, COALESCE(?, datetime('now')))`,
-      [id, l.name, l.createdAt ?? null]
-    );
+    blocs.push({
+      sql: `INSERT INTO listes (profile_id, name, created_at)
+            VALUES (?, ?, COALESCE(?, datetime('now')))`,
+      params: [id, l.name, l.createdAt ?? null],
+    });
+    // Un élément de liste doit exister dans le suivi (contrainte de la base).
     const items = (l.items || []).filter((it) =>
-      // Un élément de liste doit exister dans le suivi (contrainte de la base).
       data.suivi.some((s) => s.tmdbId === it.tmdbId && s.mediaType === it.mediaType)
     );
-    if (items.length > 0) {
-      await runMany(
-        items.map((it) => ({
-          sql: `INSERT OR IGNORE INTO liste_items
-                  (liste_id, profile_id, tmdb_id, media_type, added_at)
-                VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))`,
-          params: [lastId, id, it.tmdbId, it.mediaType, it.addedAt ?? null],
-        }))
-      );
+    for (const it of items) {
+      blocs.push({
+        // Les instructions s'exécutent dans l'ordre : la liste qu'on vient de
+        // créer est la plus récente du profil.
+        sql: `INSERT OR IGNORE INTO liste_items
+                (liste_id, profile_id, tmdb_id, media_type, added_at)
+              VALUES ((SELECT MAX(id) FROM listes WHERE profile_id = ?), ?, ?, ?, COALESCE(?, datetime('now')))`,
+        params: [id, id, it.tmdbId, it.mediaType, it.addedAt ?? null],
+      });
     }
   }
 
+  await runMany(blocs);
   return id;
 }
 
@@ -360,9 +352,15 @@ function prevenir() {
 // `api.js` à chaque modification (titre ajouté, épisode coché, statut changé).
 // Volontairement sans effet si aucun compte n'est relié : on ne réclame rien
 // à qui n'a pas demandé de sauvegarde cloud.
+let sequence = 0;
+
 export function markChanged() {
   if (!getAccount()) return;
-  writeLocal(PENDING_KEY, new Date().toISOString());
+  // Le compteur rend chaque marque unique, même deux changements dans la même
+  // milliseconde : `backupToDrive` s'en sert pour savoir si quelque chose a
+  // bougé pendant qu'il envoyait.
+  sequence += 1;
+  writeLocal(PENDING_KEY, `${new Date().toISOString()}#${sequence}`);
   prevenir();
 }
 
@@ -464,6 +462,9 @@ export function forgetCloudState() {
 // Envoie **tous** les profils de l'appareil dans le Drive. Sauvegarder à
 // moitié n'aurait pas de sens : on change d'appareil avec tout son suivi.
 export async function backupToDrive(token) {
+  // Photographie du marqueur **avant** de lire les données : ce qui est envoyé
+  // correspond à cet état-là, pas à ce qui se passera pendant l'envoi.
+  const marqueurAvant = readLocal(PENDING_KEY);
   const profils = await query('SELECT id, name FROM profiles ORDER BY created_at');
   const existants = await listDriveFiles(token);
   let envoyes = 0;
@@ -496,7 +497,9 @@ export async function backupToDrive(token) {
   writeLocal(SUPPRIMES_KEY, null);
 
   writeLocal(LAST_BACKUP_KEY, new Date().toISOString());
-  writeLocal(PENDING_KEY, null);
+  // Modifié pendant l'envoi ? Alors cette modification n'est pas partie : le
+  // marqueur reste, et la prochaine sauvegarde la rattrapera.
+  if (readLocal(PENDING_KEY) === marqueurAvant) writeLocal(PENDING_KEY, null);
   prevenir();
   return { profils: envoyes };
 }

@@ -55,6 +55,14 @@ Explorer avec filtres ; Mes listes filtrées), 188 tests verts.
   ligne par visionnage, une corbeille pour la retirer) sur la fiche d'un film, et une corbeille
   ajoutée à côté de la pastille ↻ d'un épisode.
 
+**Audit de la sauvegarde Drive, correctifs du 2026-09-24** (213 tests verts) :
+- Une modification faite pendant un envoi n'est plus déclarée « sauvegardée » : le rappel reste
+  levé et la sauvegarde suivante l'emporte.
+- La restauration d'un profil est « tout ou rien » : si l'appli est coupée en route, le profil
+  reste exactement comme avant au lieu de rester vide.
+- Reste à traiter (mission séparée) : deux appareils qui sauvegardent l'un après l'autre
+  (le dernier écrase l'autre sans comparer les dates).
+
 ## 2.2 — en préparation (pas encore publiée)
 Passe de corrections issue des retours d'usage du 2026-09-10, faite le 2026-09-11 et validée à
 l'écran dans un navigateur en largeur téléphone le 2026-09-19 (`PLAN_V2.md`, point 13).
