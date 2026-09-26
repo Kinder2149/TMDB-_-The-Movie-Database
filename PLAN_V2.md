@@ -327,3 +327,27 @@ comme base d'une mise en ligne éventuelle, non planifiée à ce jour.
 2. Créer `CHANGELOG.md` — absent malgré un historique de sessions déjà riche (V1 bouclée + début V2).
 3. Vérifier que `server/src/db/listes.repo.js` et `browse.js` correspondent bien au chantier 3/4 prévu, et mettre à jour la section « Chantiers V2 » avec leur statut réel (aucun n'est encore marqué ✅).
 4. Rafraîchir `graphify-out/` après le prochain commit — le graphe actuel ne reflète pas ces fichiers non commités.
+
+## Clé TMDB : retrait du dur, relais Cloudflare + clé personnelle (cadrage du 2026-09-26)
+
+**Point de départ** : la clé TMDB de Kinder est embarquée dans l'application (`VITE_TMDB_API_KEY`,
+`client/src/tmdb.js`), partagée par tous les utilisateurs. Risque identifié : une clé embarquée
+dans un APK ne peut pas être réellement cachée (obfuscation = retarder une extraction, pas
+l'empêcher) ; si elle est extraite et détournée, TMDB peut la bloquer et couper l'application pour
+**tout le monde** d'un coup. Une clé propre à chaque utilisateur (impossible à provisionner
+automatiquement — TMDB n'a pas d'API pour créer une clé, la connexion Google de l'app n'a aucun
+lien avec un compte TMDB) élimine ce risque pour qui la configure.
+
+**Décision (voir aussi `PROJET_CONTEXTE.md` section 6)** : deux mécanismes complémentaires.
+1. **Relais Cloudflare Workers**, gratuit et sans période de veille (contrairement à Render :
+   pas de délai de réveil après inactivité ; contrairement à Supabase : pas de projet complet à
+   maintenir pour un simple relais). Garde la clé de Kinder côté serveur ; l'application l'appelle
+   à la place de TMDB.
+2. **Clé TMDB personnelle**, en option, réglable dans les paramètres via un écran qui explique pas
+   à pas comment la créer (liens, informations à saisir). Une fois renseignée, elle remplace
+   définitivement le relais pour cet utilisateur. Stockée comme un champ du **profil** : elle est
+   donc emportée automatiquement par l'export/import déjà existant (`backup.js`), et voyage avec la
+   sauvegarde Drive (dossier caché `drive.appdata`, déjà en place) sans mécanisme nouveau.
+
+**Statut** : décisions tranchées, doc mise à jour. Le découpage en étapes (cadrage d'étape par
+étape, tranche testée avant la suivante) reste à faire.

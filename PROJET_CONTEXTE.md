@@ -60,8 +60,25 @@ Une seule pièce écrite spécialement pour Android : `DriveAuthPlugin.java`, qu
 l'autorisation Drive sans réafficher l'écran de compte Google.
 
 ## Décisions figées
-- **Aucun serveur, aucun hébergement.** La clé TMDB est embarquée dans l'application, risque
-  accepté et documenté.
+- **Relais Cloudflare Workers pour la clé TMDB (2026-09-26, remplace la décision « aucun
+  serveur » ci-dessous pour ce seul usage).** La clé TMDB de Kinder n'est plus embarquée dans
+  l'application : un relais gratuit, hébergé sur Cloudflare Workers, la garde secrète et
+  transmet les appels à TMDB à sa place. Ce relais ne s'endort jamais (pas de délai de
+  réveil), contrairement aux formules gratuites de type Render. L'utilisateur peut aussi
+  renseigner sa propre clé TMDB depuis un écran des réglages qui explique pas à pas comment
+  la créer (liens, informations à saisir, où cliquer) ; une fois renseignée, elle remplace
+  **définitivement** le relais pour cet utilisateur — la clé de Kinder n'est alors plus jamais
+  utilisée. La clé personnelle est un champ du **profil** : elle voyage donc automatiquement
+  avec la sauvegarde Drive déjà existante (dossier caché de l'application, invisible et
+  inaccessible aux autres applications), sans nouveau mécanisme de synchronisation.
+  Justification : une clé unique partagée par tous les utilisateurs peut être bloquée par
+  TMDB si quelqu'un en abuse, coupant l'application pour tout le monde d'un coup ; le relais
+  isole ce risque, et une clé personnelle en met l'utilisateur définitivement à l'abri.
+- **Aucun serveur applicatif, aucun hébergement de données.** Ancienne formulation, conservée
+  pour ce qu'elle continue de couvrir : pas de back-end métier, pas de base de données en
+  ligne, pas de compte hébergé par l'éditeur. Le relais Cloudflare ci-dessus est une exception
+  strictement limitée à cacher la clé TMDB — il ne stocke aucune donnée personnelle et ne voit
+  jamais le suivi d'un utilisateur.
 - **Aucune monétisation** : ni application payante, ni abonnement, ni publicité. Franchir
   cette ligne imposerait la licence commerciale TMDB.
 - **Mention TMDB obligatoire** dans l'application, et ne jamais masquer son identité auprès
