@@ -67,6 +67,18 @@ function memo(cache, key, charge) {
 // Normalise une entrée de catalogue TMDB (film ou série) au format de l'UI.
 // Les listes (recherche, tendances, genre, acteur, recommandations) partagent
 // toutes cette forme : un seul endroit à corriger si TMDB change.
+// Clés de la liste unique de genres (GENRES) d'un titre TMDB : les listes
+// donnent `genre_ids`, une fiche détaillée donne `genres: [{ id }]`. Un genre
+// de l'application peut en regrouper plusieurs côté TMDB (« Action &
+// Aventure »). `null` quand TMDB ne dit rien : le titre sera redemandé.
+function genreKeysOf(item, mediaType) {
+  const ids = item.genre_ids || (item.genres || []).map((g) => g.id);
+  if (!item.genre_ids && !item.genres) return null;
+  return GENRES.filter((g) => g[mediaType]?.genres?.some((id) => ids.includes(id))).map(
+    (g) => g.key
+  );
+}
+
 function toCardItem(item, mediaType) {
   const mt = mediaType || item.media_type;
   const isMovie = mt === 'movie';
@@ -78,6 +90,7 @@ function toCardItem(item, mediaType) {
     title: isMovie ? item.title : item.name,
     year: date ? date.slice(0, 4) : null,
     releaseDate: date || null,
+    genreKeys: genreKeysOf(item, mt),
     posterUrl: item.poster_path
       ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
       : null,
@@ -283,21 +296,104 @@ export const MOODS = [
     // les titres connus sous des films confidentiels à quelques votes.
     movie: { genres: [10749], votesMin: 200 },
   },
+
+  // --- Sélections : des rayons définis par la note, la durée ou l'époque
+  // plutôt que par un thème. Aucun mot-clé TMDB : seulement des critères de
+  // `discover`, donc rien à nettoyer. ---
+  {
+    key: 'pepites',
+    groupe: 'selection',
+    fr: 'Pépites cachées',
+    en: 'Hidden gems',
+    tri: 'notes',
+    // Très bien notés mais peu vus : le plafond de votes écarte les succès que
+    // tout le monde connaît. Rien de moins d'un an : les nouveautés
+    // reçoivent des notes gonflées par les fans (9/10 sur quelques centaines de
+    // votes) qui noieraient le rayon — elles ont déjà « Le meilleur de l'année ».
+    movie: {
+      params: (auj) => ({
+        'primary_release_date.lte': dateRelative(-365, auj),
+        'vote_average.gte': 7.6,
+        'vote_count.gte': 500,
+        'vote_count.lte': 5000,
+      }),
+    },
+    tv: {
+      params: (auj) => ({
+        'first_air_date.lte': dateRelative(-365, auj),
+        'vote_average.gte': 7.8,
+        'vote_count.gte': 200,
+        'vote_count.lte': 2000,
+        without_genres: '10767,10763,10764',
+      }),
+    },
+  },
+  {
+    key: 'courts',
+    groupe: 'selection',
+    fr: 'Soirée courte',
+    en: 'Short night',
+    // Films de 1h à 1h30, séries aux épisodes de 30 minutes ou moins.
+    movie: { params: { 'with_runtime.gte': 60, 'with_runtime.lte': 90, 'vote_count.gte': 500 } },
+    tv: {
+      params: { 'with_runtime.lte': 30, 'vote_count.gte': 200, without_genres: '10767,10763,10764' },
+    },
+  },
+  {
+    key: 'classiques',
+    groupe: 'selection',
+    fr: 'Grands classiques',
+    en: 'All-time classics',
+    tri: 'notes',
+    movie: {
+      params: { 'primary_release_date.lte': '1995-12-31', 'vote_count.gte': 2000, 'vote_average.gte': 7.5 },
+    },
+    tv: {
+      params: { 'first_air_date.lte': '1999-12-31', 'vote_count.gte': 300, 'vote_average.gte': 7.5 },
+    },
+  },
+  {
+    key: 'annee',
+    groupe: 'selection',
+    fr: "Le meilleur de l'année",
+    en: 'Best of the year',
+    tri: 'notes',
+    movie: {
+      params: (auj) => ({
+        'primary_release_date.gte': `${auj.getUTCFullYear()}-01-01`,
+        'primary_release_date.lte': dateRelative(0, auj),
+        'vote_average.gte': 7,
+        'vote_count.gte': 500,
+      }),
+    },
+    tv: {
+      params: (auj) => ({
+        'first_air_date.gte': `${auj.getUTCFullYear()}-01-01`,
+        'first_air_date.lte': dateRelative(0, auj),
+        'vote_average.gte': 7,
+        'vote_count.gte': 300,
+        without_genres: '10767,10763,10764',
+      }),
+    },
+  },
 ];
 
 // Liste affichée à l'accueil, dans la langue du catalogue.
 export async function getMoods() {
   const langue = getCatalogLanguage() === 'en' ? 'en' : 'fr';
-  return MOODS.map((m) => ({ key: m.key, name: m[langue] }));
+  return MOODS.map((m) => ({ key: m.key, name: m[langue], groupe: m.groupe || 'theme' }));
 }
 
 // Paramètres TMDB pour un mood, côté films ou côté séries. `null` = ce mood
 // n'a rien à proposer pour ce type (Romance côté séries).
-function parametresDeMood(key, mediaType) {
+function parametresDeMood(key, mediaType, aujourdhui = new Date()) {
   const mood = MOODS.find((m) => m.key === key);
   const regle = mood?.[mediaType];
   if (!regle) return null;
-  const params = { sort_by: 'popularity.desc' };
+  const params = { sort_by: mood.tri === 'notes' ? 'vote_average.desc' : 'popularity.desc' };
+  if (regle.params) {
+    Object.assign(params, typeof regle.params === 'function' ? regle.params(aujourdhui) : regle.params);
+  }
   if (regle.genres) params.with_genres = ou(regle.genres);
   if (regle.keywords) params.with_keywords = ou(regle.keywords);
   if (regle.votesMin) params['vote_count.gte'] = regle.votesMin;
@@ -307,12 +403,17 @@ function parametresDeMood(key, mediaType) {
 // Titres d'un mood : films et/ou séries, triés par popularité. Pas de filtres
 // ni de tri — ce sont des rayons tout faits, pas une recherche (`Explorer` le
 // fait déjà).
-export async function discoverByMood({ mood, movie = true, tv = true, page = 1 }) {
+export async function discoverByMood({ mood, movie = true, tv = true, page = 1, plateformes = [] }) {
   const calls = [];
   for (const [mediaType, voulu] of [['movie', movie], ['tv', tv]]) {
     if (!voulu) continue;
     const params = parametresDeMood(mood, mediaType);
     if (!params) continue;
+    // « Sur mes plateformes » : même mécanique que les filtres d'Explorer.
+    if (plateformes.length > 0) {
+      params.with_watch_providers = ou(plateformes);
+      params.watch_region = getCatalogRegion();
+    }
     calls.push(
       tmdbGet(`/discover/${mediaType}`, {
         ...params,
@@ -328,7 +429,9 @@ export async function discoverByMood({ mood, movie = true, tv = true, page = 1 }
       entries.push({ item: toCardItem(c, mediaType), popularity: c.popularity || 0 });
     }
   }
-  return topByPopularity(entries);
+  // Films et séries viennent de deux appels : on les réunit dans l'ordre du
+  // rayon (note pour les « pépites », popularité sinon).
+  return fusionner(entries, MOODS.find((m) => m.key === mood)?.tri);
 }
 
 // Ce que les filtres de « Explorer » demandent à TMDB, pour un film ou une série.
@@ -630,10 +733,20 @@ export async function getDetails(mediaType, id) {
     cast,
     trailer,
     providers,
+    // Pour les pastilles de l'en-tête de la fiche.
+    runtime: isMovie ? data.runtime || null : null,
+    seasonCount: isMovie ? null : data.number_of_seasons || null,
     // Saga à laquelle appartient un film (TMDB n'en connaît pas pour les séries).
     collection: data.belongs_to_collection
       ? { id: data.belongs_to_collection.id, name: data.belongs_to_collection.name }
       : null,
+    // Pour le badge « pas encore sorti » de la fiche : statut TMDB du film
+    // (Released, Planned, In Production…), et pour une série, son prochain
+    // épisode daté (s'il existe) et si elle est terminée (Ended / Canceled —
+    // rien à attendre, même si l'utilisateur n'a pas fini de la regarder).
+    status: isMovie ? data.status || null : null,
+    nextEpisodeDate: isMovie ? null : data.next_episode_to_air?.air_date || null,
+    seriesEnded: isMovie ? null : data.status === 'Ended' || data.status === 'Canceled',
   };
 }
 
@@ -743,6 +856,30 @@ export async function getCardInfo(mediaType, id, language, region) {
     if (locale) carte.releaseDate = locale;
   }
   return carte;
+}
+
+// Ce qu'il faut à un titre suivi « en attente » pour savoir s'il a désormais
+// une date, ou si plus rien n'est à attendre — appelé par le cycle de
+// vérification (store.checkNotifications), jamais par une fiche déjà ouverte
+// (qui a cette information via getDetails). Volontairement plus léger que
+// getDetails : ni distribution, ni casting, ni bande-annonce.
+export async function getNotifInfo(mediaType, id, language, region) {
+  if (mediaType === 'movie') {
+    const data = await tmdbGet(`/movie/${id}`, { append_to_response: 'release_dates' }, language);
+    let releaseDate = data.release_date || null;
+    if (region) {
+      const locale = dateDeSortieRegionale(data.release_dates, region);
+      if (locale) releaseDate = locale;
+    }
+    return { releaseDate, status: data.status || null, nextEpisodeDate: null, seriesEnded: null };
+  }
+  const data = await tmdbGet(`/tv/${id}`, {}, language);
+  return {
+    releaseDate: data.first_air_date || null,
+    status: null,
+    nextEpisodeDate: data.next_episode_to_air?.air_date || null,
+    seriesEnded: data.status === 'Ended' || data.status === 'Canceled',
+  };
 }
 
 // Épisodes d'une saison donnée.

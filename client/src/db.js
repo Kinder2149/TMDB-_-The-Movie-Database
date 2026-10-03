@@ -26,6 +26,17 @@ const isWeb = Capacitor.getPlatform() === 'web';
 let engine = null;
 let ready = null; // promesse d'initialisation, partagée par tous les appelants
 
+// ⚠️ Pas un seul commentaire SQL (« -- ») dans le schéma ci-dessous : le moteur du téléphone
+// découpe le texte à chaque point-virgule et s'étrangle sur les apostrophes, avec l'erreur
+// « execute: not an error (code 0) » — et l'application ne démarre plus. Le navigateur, lui,
+// les accepte : seul un essai sur téléphone ou le test `db.test.js` le voit.
+// Notes sur les tables ajoutées :
+//  - partage : une ligne par profil qui a activé le partage (amis par code). `cle` est la clé
+//    secrète qui prouve qu'on est propriétaire de la fiche en ligne ; elle ne quitte
+//    l'appareil que dans la sauvegarde Drive du profil.
+//  - amis : les amis suivis par code (suivi à sens unique, stocké sur le téléphone). `fiche`
+//    est une copie de la dernière fiche lue (JSON), `lu` l'instant de cette lecture (en
+//    secondes) : on ne relit pas le serveur plus d'une fois par heure.
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS profiles (
     id         TEXT PRIMARY KEY,
@@ -74,6 +85,31 @@ const SCHEMA = `
     profile_id TEXT NOT NULL,
     name       TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS partage (
+    profile_id     TEXT PRIMARY KEY,
+    code           TEXT NOT NULL,
+    cle            TEXT NOT NULL,
+    pseudo         TEXT NOT NULL,
+    actif          INTEGER NOT NULL DEFAULT 0,
+    statuts_prives TEXT NOT NULL DEFAULT '',
+    empreinte      TEXT,
+    maj            TEXT,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS amis (
+    profile_id TEXT    NOT NULL,
+    code       TEXT    NOT NULL,
+    pseudo     TEXT    NOT NULL,
+    avatar     TEXT,
+    ajoute     TEXT    NOT NULL DEFAULT (datetime('now')),
+    fiche      TEXT,
+    lu         INTEGER,
+    disparu    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (profile_id, code),
     FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
   );
 
@@ -259,6 +295,24 @@ async function migrateSchema() {
   // elles. Vide = date jamais mise à jour depuis ce réglage. C'est ce qui
   // permet au rattrapage de ne toucher que ce qui n'est pas à jour.
   await addColumnIfMissing('suivi', 'release_region', 'TEXT');
+
+  // Notifications de sortie (figé le 2026-09-27) : la date à surveiller
+  // (sortie du film, ou prochain épisode de la série) et si l'élément doit
+  // encore être vérifié au prochain lancement. `DEFAULT 1` fait entrer dans le
+  // cycle, une bonne fois, tout ce qui était déjà suivi avant cette version —
+  // le premier passage du cycle triera ce qui a effectivement besoin d'être
+  // surveillé de ce qui ne l'a jamais été (déjà sorti, déjà terminée).
+  await addColumnIfMissing('suivi', 'notif_date', 'TEXT');
+  await addColumnIfMissing('suivi', 'notif_en_attente', 'INTEGER DEFAULT 1');
+
+  // Genres du titre, sous forme de clés de la liste unique de l'application
+  // (« action,drame »), indépendantes de la langue. Sert au filtre par genre
+  // de « Mes listes ». NULL = jamais demandé : le rattrapage du lancement
+  // (backfillReleaseDates) le remplit ; '' = demandé, aucun genre connu.
+  await addColumnIfMissing('suivi', 'genres', 'TEXT');
+
+  // Liste « privée » : jamais envoyée dans la fiche partagée. Publique par défaut.
+  await addColumnIfMissing('listes', 'prive', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 async function addColumnIfMissing(table, column, type) {

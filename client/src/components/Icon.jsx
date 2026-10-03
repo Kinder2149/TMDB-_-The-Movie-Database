@@ -35,12 +35,15 @@ const PATHS = {
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.6v.2" /></>,
   chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   chevron: <path d="m9 5 7 7-7 7" />,
+  offline: <path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5v.1M3 3l18 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
   check: <path d="m5 13 4.5 4.5L19 7" />,
   play: <path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none" />,
   refresh: <path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   back: <path d="M15 5 8 12l7 7" />,
+  calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></>,
+  bell: <path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0" />,
   // Étoile de notation : creuse par défaut, remplie par le CSS quand la note
   // est atteinte (`.rating__star.on`).
   star: (

@@ -9,6 +9,7 @@ vi.mock('../src/tmdb.js', () => ({
   getRecommendations: vi.fn(),
   getCardInfo: vi.fn(),
   getRuntime: vi.fn(),
+  getNotifInfo: vi.fn(),
 }));
 
 const FILM = { id: 1, mediaType: 'movie', title: 'Un film', year: '2020' };
@@ -193,6 +194,13 @@ describe('épisodes et progression', () => {
     });
   });
 
+  it('next porte la date de diffusion', async () => {
+    const debut = await store.getProgress(profil.id, 100);
+    expect(debut.next.airDate).toBe('2019-01-01');
+    await store.markWholeSeason(profil.id, 100, 1, [1, 2]);
+    expect((await store.getProgress(profil.id, 100)).next.airDate).toBe('2020-01-01');
+  });
+
   it("ne propose pas un épisode qui n'est pas encore diffusé", async () => {
     await store.markWholeSeason(profil.id, 100, 1, [1, 2]);
     await store.markEpisode(profil.id, 100, 2, 1);
@@ -350,6 +358,145 @@ describe('dates de sortie', () => {
   });
 });
 
+describe('notifications de sortie', () => {
+  // `notif_en_attente` vaut 1 par défaut (colonne ajoutée avec DEFAULT 1) :
+  // tout titre suivi entre dans le cycle tant qu'il n'a pas été classé une
+  // première fois.
+  beforeEach(async () => {
+    await store.addToSuivi(profil.id, { id: 1, mediaType: 'movie', title: 'Un film' });
+    await store.addToSuivi(profil.id, SERIE);
+  });
+
+  async function notifDeSuivi(mediaType, id) {
+    const rows = await db.query(
+      'SELECT notif_date AS notifDate, notif_en_attente AS notifEnAttente FROM suivi WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?',
+      [profil.id, id, mediaType]
+    );
+    return rows[0];
+  }
+
+  it('garde en attente un film pas encore sorti, avec sa date', async () => {
+    tmdb.getNotifInfo.mockResolvedValue({
+      releaseDate: '2029-12-19',
+      status: 'Post Production',
+      nextEpisodeDate: null,
+      seriesEnded: null,
+    });
+    expect(await store.checkNotifications(profil.id)).toBe(2);
+    const film = await notifDeSuivi('movie', 1);
+    expect(film).toMatchObject({ notifDate: '2029-12-19', notifEnAttente: 1 });
+  });
+
+  it('fait sortir du cycle un film déjà sorti', async () => {
+    tmdb.getNotifInfo.mockResolvedValue({
+      releaseDate: '2020-01-01',
+      status: 'Released',
+      nextEpisodeDate: null,
+      seriesEnded: null,
+    });
+    await store.checkNotifications(profil.id);
+    const film = await notifDeSuivi('movie', 1);
+    expect(film).toMatchObject({ notifDate: null, notifEnAttente: 0 });
+  });
+
+  it('garde en attente une série en cours, avec la date du prochain épisode', async () => {
+    tmdb.getNotifInfo.mockResolvedValue({
+      releaseDate: '2019-01-01',
+      status: null,
+      nextEpisodeDate: '2026-10-05',
+      seriesEnded: false,
+    });
+    await store.checkNotifications(profil.id);
+    const serie = await notifDeSuivi('tv', SERIE.id);
+    expect(serie).toMatchObject({ notifDate: '2026-10-05', notifEnAttente: 1 });
+  });
+
+  it('fait sortir du cycle une série terminée', async () => {
+    tmdb.getNotifInfo.mockResolvedValue({
+      releaseDate: '2019-01-01',
+      status: null,
+      nextEpisodeDate: null,
+      seriesEnded: true,
+    });
+    await store.checkNotifications(profil.id);
+    const serie = await notifDeSuivi('tv', SERIE.id);
+    expect(serie).toMatchObject({ notifDate: null, notifEnAttente: 0 });
+  });
+
+  it("ne revérifie plus ce qui est déjà sorti du cycle", async () => {
+    tmdb.getNotifInfo.mockResolvedValue({
+      releaseDate: '2020-01-01',
+      status: 'Released',
+      nextEpisodeDate: null,
+      seriesEnded: true,
+    });
+    await store.checkNotifications(profil.id);
+    tmdb.getNotifInfo.mockClear();
+    expect(await store.checkNotifications(profil.id)).toBe(0);
+    expect(tmdb.getNotifInfo).not.toHaveBeenCalled();
+  });
+
+  it('sort du cycle un titre marqué « Vu » ou « Abandonné »', async () => {
+    await store.setStatus(profil.id, 'movie', 1, 'vu');
+    await store.setStatus(profil.id, 'tv', SERIE.id, 'abandonne');
+    const film = await notifDeSuivi('movie', 1);
+    const serie = await notifDeSuivi('tv', SERIE.id);
+    expect(film.notifEnAttente).toBe(0);
+    expect(serie.notifEnAttente).toBe(0);
+  });
+
+  it('retente au prochain cycle quand le réseau a coupé', async () => {
+    tmdb.getNotifInfo.mockRejectedValue(new Error('réseau'));
+    expect(await store.checkNotifications(profil.id)).toBe(0);
+
+    tmdb.getNotifInfo.mockResolvedValue({
+      releaseDate: '2029-12-19',
+      status: 'Post Production',
+      nextEpisodeDate: null,
+      seriesEnded: null,
+    });
+    expect(await store.checkNotifications(profil.id)).toBe(2);
+  });
+});
+
+describe('notifications de sortie : titres dus', () => {
+  beforeEach(async () => {
+    await store.addToSuivi(profil.id, { id: 1, mediaType: 'movie', title: 'Un film' });
+    await store.addToSuivi(profil.id, SERIE);
+    await poserDate(profil.id, 'movie', 1, '2026-09-27'); // aujourd'hui : dû
+    await poserDate(profil.id, 'tv', SERIE.id, '2029-01-01'); // dans le futur : pas dû
+  });
+
+  // Pose directement `notif_date` (sans passer par `checkNotifications`, déjà
+  // testé plus haut) : ce qui est testé ici, c'est la sélection des titres
+  // dus, pas leur classification.
+  async function poserDate(profileId, mediaType, id, date) {
+    await db.run(
+      'UPDATE suivi SET notif_date = ? WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?',
+      [date, profileId, id, mediaType]
+    );
+  }
+
+  it('prend un titre dont la date est aujourd’hui, laisse le reste tranquille', async () => {
+    const dus = await store.takeDueNotifications(profil.id, '2026-09-27');
+    expect(dus).toEqual([{ id: 1, mediaType: 'movie', title: 'Un film' }]);
+  });
+
+  it('prend aussi un titre dont la date est déjà passée', async () => {
+    await poserDate(profil.id, 'tv', SERIE.id, '2026-09-01'); // déjà passée
+    const dus = await store.takeDueNotifications(profil.id, '2026-09-27');
+    expect(dus.map((t) => t.id).sort()).toEqual([1, SERIE.id].sort());
+  });
+
+  it('fait sortir du cycle ce qui vient d’être pris, une seule fois', async () => {
+    expect(await store.takeDueNotifications(profil.id, '2026-09-27')).toHaveLength(1);
+    expect(await store.takeDueNotifications(profil.id, '2026-09-27')).toEqual([]);
+  });
+
+  it('ne prend rien tant qu’aucune date n’est dépassée', async () => {
+    expect(await store.takeDueNotifications(profil.id, '2020-01-01')).toEqual([]);
+  });
+});
 
 describe('statistiques', () => {
   beforeEach(async () => {
@@ -625,5 +772,105 @@ describe('moitieMoitie', () => {
 
   it('garde tout quand il y a moins que demandé', () => {
     expect(compte(store.moitieMoitie(liste(3, 4), 30))).toEqual([3, 4]);
+  });
+});
+
+describe('genres des titres suivis', () => {
+  it('retient les genres à l’ajout, et le rattrapage remplit ceux qui manquent', async () => {
+    await store.addToSuivi(profil.id, { id: 1, mediaType: 'movie', title: 'A', genreKeys: ['action', 'drame'] });
+    await store.addToSuivi(profil.id, { id: 2, mediaType: 'movie', title: 'B' }); // d'avant : genre inconnu
+    let lignes = await store.listSuivi(profil.id);
+    expect(lignes.find((l) => l.id === 1).genres).toBe('action,drame');
+    expect(lignes.find((l) => l.id === 2).genres).toBeNull();
+
+    tmdb.getCardInfo.mockResolvedValue({ releaseDate: '2020-01-01', genreKeys: ['comedie'] });
+    await store.backfillReleaseDates();
+    lignes = await store.listSuivi(profil.id);
+    expect(lignes.find((l) => l.id === 2).genres).toBe('comedie');
+
+    // Un catalogue qui ne donne plus aucun genre n'efface pas ce qu'on savait.
+    await store.addToSuivi(profil.id, { id: 3, mediaType: 'movie', title: 'C', genreKeys: ['western'] });
+    tmdb.getCardInfo.mockResolvedValue({ releaseDate: '2020-01-01', genreKeys: [] });
+    await store.backfillReleaseDates();
+    lignes = await store.listSuivi(profil.id);
+    expect(lignes.find((l) => l.id === 3).genres).toBe('western');
+  });
+
+  it('le filtre par genre ne garde que les titres du genre', async () => {
+    const { appliquerFiltresBiblio, FILTRES_BIBLIO_VIDES } = await import('../src/filtres.js');
+    const items = [
+      { title: 'A', genres: 'action,drame' },
+      { title: 'B', genres: 'comedie' },
+      { title: 'C', genres: null },
+    ];
+    const r = appliquerFiltresBiblio(items, { ...FILTRES_BIBLIO_VIDES, genre: 'drame' });
+    expect(r.map((i) => i.title)).toEqual(['A']);
+  });
+});
+
+
+describe('mosaïque des listes (covers)', () => {
+  const film = (id) => ({ id, mediaType: 'movie', title: `F${id}`, posterUrl: `https://img/${id}.jpg` });
+
+  it('rend 0, 2 puis 4 affiches au plus, les plus récemment ajoutées d’abord', async () => {
+    const liste = await store.createListe(profil.id, 'Soirée');
+    expect((await store.listListes(profil.id))[0].covers).toEqual([]);
+
+    await store.addToListe(profil.id, liste.id, film(1));
+    await store.addToListe(profil.id, liste.id, film(2));
+    expect((await store.listListes(profil.id))[0].covers).toHaveLength(2);
+
+    for (const id of [3, 4, 5]) await store.addToListe(profil.id, liste.id, film(id));
+    const [l] = await store.listListes(profil.id);
+    expect(l.count).toBe(5);
+    expect(l.covers).toHaveLength(4);
+    expect(l.covers[0]).toBe('https://img/5.jpg');
+    expect(l.covers).not.toContain('https://img/1.jpg');
+  });
+
+  it('ignore les titres sans affiche et ne mélange pas les listes', async () => {
+    const a = await store.createListe(profil.id, 'A');
+    const b = await store.createListe(profil.id, 'B');
+    await store.addToListe(profil.id, a.id, { id: 1, mediaType: 'movie', title: 'Sans' });
+    await store.addToListe(profil.id, a.id, film(2));
+    await store.addToListe(profil.id, b.id, film(3));
+    const listes = await store.listListes(profil.id);
+    expect(listes.find((l) => l.id === a.id).covers).toEqual(['https://img/2.jpg']);
+    expect(listes.find((l) => l.id === b.id).covers).toEqual(['https://img/3.jpg']);
+  });
+});
+
+describe('genres les plus regardés (parGenre)', () => {
+  const t = (id, genres, status) => ({ id, genreKeys: genres, mediaType: 'movie', title: `T${id}`, status });
+
+  it('compte les genres des titres vus ou en cours, plafonné à 5', async () => {
+    const lignes = [
+      t(1, ['action', 'drame'], 'vu'),
+      t(2, ['action'], 'vu'),
+      t(3, ['drame', 'comedie'], 'vu'),
+      t(4, ['horreur'], 'vu'),
+      t(5, ['western'], 'vu'),
+      t(6, ['animation'], 'vu'),
+      t(7, ['scifi'], 'vu'),
+      t(8, ['action'], 'a_voir'),
+    ];
+    for (const l of lignes) {
+      await store.addToSuivi(profil.id, l);
+      await store.setStatus(profil.id, 'movie', l.id, l.status);
+    }
+    const { parGenre } = await store.getStats(profil.id);
+    expect(parGenre).toHaveLength(5);
+    expect(parGenre[0]).toEqual({ key: 'action', n: 2 });
+    expect(parGenre[1]).toEqual({ key: 'drame', n: 2 });
+    expect(parGenre.find((g) => g.key === 'action').n).toBe(2);
+  });
+
+  it('ignore les genres vides ou inconnus', async () => {
+    await store.addToSuivi(profil.id, { id: 1, mediaType: 'movie', title: 'A' });
+    await store.setStatus(profil.id, 'movie', 1, 'vu');
+    expect((await store.getStats(profil.id)).parGenre).toEqual([]);
+    expect(store.compterGenres([{ genres: '' }, { genres: null }, { genres: 'a,,a' }])).toEqual([
+      { key: 'a', n: 1 },
+    ]);
   });
 });

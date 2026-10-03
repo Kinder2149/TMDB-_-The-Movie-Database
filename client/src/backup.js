@@ -17,7 +17,10 @@ export const BACKUP_FORMAT = 'suivi-films-series';
 // Le numéro monte parce qu'une version plus ancienne de l'application, qui ne
 // connaît pas ces champs, les perdrait en silence en restaurant puis en
 // ré-exportant. Elle refuse donc le fichier plutôt que d'effacer des avis.
-export const BACKUP_VERSION = 3;
+// Version 4 : le profil partagé (code ami + clé secrète) et les listes privées.
+// Une ancienne version qui restaurerait puis ré-exporterait perdrait la clé, donc
+// l'accès à sa fiche en ligne : elle refuse le fichier.
+export const BACKUP_VERSION = 4;
 
 // --- Sauvegarde complète ---
 
@@ -32,7 +35,7 @@ export async function exportProfile(profileId) {
   const suivi = await query(
     `SELECT tmdb_id AS tmdbId, media_type AS mediaType, title, year,
             release_date AS releaseDate, poster_url AS posterUrl, status,
-            note, rating, runtime, release_region AS releaseRegion,
+            note, rating, runtime, release_region AS releaseRegion, genres,
             added_at AS addedAt
      FROM suivi WHERE profile_id = ? ORDER BY added_at`,
     [profileId]
@@ -55,7 +58,7 @@ export async function exportProfile(profileId) {
   );
 
   const listesRows = await query(
-    'SELECT id, name, created_at AS createdAt FROM listes WHERE profile_id = ? ORDER BY created_at',
+    'SELECT id, name, prive, created_at AS createdAt FROM listes WHERE profile_id = ? ORDER BY created_at',
     [profileId]
   );
   const listes = [];
@@ -67,8 +70,19 @@ export async function exportProfile(profileId) {
     );
     // Les listes s'exportent par leur *nom*, pas par leur numéro local : deux
     // appareils n'attribuent pas les mêmes numéros.
-    listes.push({ name: l.name, createdAt: l.createdAt, items });
+    listes.push({ name: l.name, prive: l.prive ? 1 : 0, createdAt: l.createdAt, items });
   }
+
+  const [p] = await query(
+    `SELECT code, cle, pseudo, actif, statuts_prives AS statutsPrives
+     FROM partage WHERE profile_id = ?`,
+    [profileId]
+  );
+  // Les amis suivis (code, pseudo, avatar) — pas la copie de leur fiche, qu'on relit.
+  const amis = await query(
+    'SELECT code, pseudo, avatar, ajoute FROM amis WHERE profile_id = ? ORDER BY ajoute',
+    [profileId]
+  );
 
   return {
     format: BACKUP_FORMAT,
@@ -79,6 +93,9 @@ export async function exportProfile(profileId) {
     episodesVus,
     visionnages,
     listes,
+    // Absent tant que le partage n'a jamais été activé sur ce profil.
+    ...(p ? { partage: p } : {}),
+    ...(amis.length ? { amis } : {}),
   };
 }
 
@@ -132,7 +149,7 @@ export async function importProfile(data) {
   if (existe) {
     blocs.push({ sql: 'UPDATE profiles SET name = ?, avatar = ? WHERE id = ?', params: [name, avatar, id] });
     // Les suppressions en cascade emportent listes, éléments et épisodes.
-    for (const table of ['suivi', 'episodes_vus', 'visionnages', 'listes']) {
+    for (const table of ['suivi', 'episodes_vus', 'visionnages', 'listes', 'partage', 'amis']) {
       blocs.push({ sql: `DELETE FROM ${table} WHERE profile_id = ?`, params: [id] });
     }
   } else {
@@ -144,8 +161,8 @@ export async function importProfile(data) {
       sql: `INSERT OR REPLACE INTO suivi
               (profile_id, tmdb_id, media_type, title, year, release_date,
                poster_url, status, note, rating, runtime, release_region,
-               added_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+               genres, added_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
       params: [
         id,
         s.tmdbId,
@@ -160,6 +177,7 @@ export async function importProfile(data) {
         s.rating ?? null,
         s.runtime ?? null,
         s.releaseRegion ?? null,
+        s.genres ?? null,
         s.addedAt ?? null,
       ],
     });
@@ -187,9 +205,9 @@ export async function importProfile(data) {
 
   for (const l of data.listes || []) {
     blocs.push({
-      sql: `INSERT INTO listes (profile_id, name, created_at)
-            VALUES (?, ?, COALESCE(?, datetime('now')))`,
-      params: [id, l.name, l.createdAt ?? null],
+      sql: `INSERT INTO listes (profile_id, name, prive, created_at)
+            VALUES (?, ?, ?, COALESCE(?, datetime('now')))`,
+      params: [id, l.name, l.prive ? 1 : 0, l.createdAt ?? null],
     });
     // Un élément de liste doit exister dans le suivi (contrainte de la base).
     const items = (l.items || []).filter((it) =>
@@ -205,6 +223,27 @@ export async function importProfile(data) {
         params: [id, id, it.tmdbId, it.mediaType, it.addedAt ?? null],
       });
     }
+  }
+
+  // Profil partagé : on garde le code et la clé, pour retrouver sa fiche en ligne
+  // sur ce nouvel appareil. L'empreinte est laissée vide : la première mise à jour
+  // republiera la fiche (et reprendra la propriété avec la clé).
+  if (data.partage?.code && data.partage?.cle) {
+    const p = data.partage;
+    blocs.push({
+      sql: `INSERT OR REPLACE INTO partage
+              (profile_id, code, cle, pseudo, actif, statuts_prives)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      params: [id, p.code, p.cle, p.pseudo || name, p.actif ? 1 : 0, p.statutsPrives || ''],
+    });
+  }
+
+  for (const a of data.amis || []) {
+    blocs.push({
+      sql: `INSERT OR REPLACE INTO amis (profile_id, code, pseudo, avatar, ajoute)
+            VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+      params: [id, a.code, a.pseudo, a.avatar ?? null, a.ajoute ?? null],
+    });
   }
 
   await runMany(blocs);

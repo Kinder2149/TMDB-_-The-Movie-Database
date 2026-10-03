@@ -8,7 +8,10 @@
 import * as tmdb from './tmdb.js';
 import * as store from './store.js';
 import * as lang from './lang.js';
+import * as notif from './notifications.js';
 import { markChanged, oublierProfil } from './backup.js';
+import * as partage from './partage.js';
+import * as amis from './amis.js';
 
 // Toute écriture passe par ici : la sauvegarde cloud doit savoir qu'il y a du
 // nouveau à envoyer. Sans compte Google relié, `markChanged` ne fait rien —
@@ -70,6 +73,15 @@ export async function countProfileData(id) {
 // rabattre. Sa sauvegarde Drive est retirée à la sauvegarde suivante, et il
 // n'est plus proposé à la restauration.
 export async function deleteProfile(id) {
+  // Une fiche partagée en ligne ne doit pas rester orpheline : on la retire d'abord
+  // (réseau requis). Si ça échoue, le profil reste et on le dit.
+  if ((await partage.getPartage(id))?.actif) {
+    try {
+      await partage.desactiver(id);
+    } catch (e) {
+      throw new Error(`Ce profil est partagé : retire d'abord sa fiche en ligne. ${e.message}`);
+    }
+  }
   const repli = await ecriture(store.deleteProfile(id));
   oublierProfil(id);
   return repli;
@@ -161,8 +173,8 @@ export async function getMoods() {
   return tmdb.getMoods();
 }
 
-export async function discoverMood({ mood, movie = true, tv = true, page = 1 }) {
-  return tmdb.discoverByMood({ mood, movie, tv, page });
+export async function discoverMood({ mood, movie = true, tv = true, page = 1, plateformes = [] }) {
+  return tmdb.discoverByMood({ mood, movie, tv, page, plateformes });
 }
 
 export async function searchTitles(query) {
@@ -221,11 +233,40 @@ export async function removeVisionnage(id) {
   return ecriture(store.deleteVisionnage(requireProfile(), id));
 }
 
+export async function setVisionnageDate(id, date) {
+  return ecriture(store.updateVisionnageDate(requireProfile(), id, date));
+}
+
+// « J'ai revu toute la saison » : +1 visionnage sur chaque épisode déjà vu.
+export async function rewatchSeason(seriesId, season) {
+  return ecriture(store.rewatchSeason(requireProfile(), seriesId, season));
+}
+
 // Met les dates de sortie à jour : celles qui manquent (fiches d'avant que
 // l'application ne les retienne) et celles qui viennent d'un autre pays que
 // celui de la langue choisie. Renvoie le nombre de fiches complétées.
 export async function mettreAJourDatesDeSortie() {
   return store.backfillReleaseDates();
+}
+
+// Cycle de vérification des notifications de sortie (figé le 2026-09-27) :
+// ne revérifie que les titres suivis « en attente » d'une date. Le rythme
+// « une fois par jour » est géré par l'appelant (App.jsx).
+export async function verifierNotifications() {
+  return store.checkNotifications(requireProfile());
+}
+
+// Notifie les titres suivis dont la date est atteinte. Si l'autorisation
+// système n'est pas accordée, ne prend rien dans le cycle — sinon un titre
+// suivi avant l'activation des notifications serait perdu sans jamais être
+// signalé, une fois sa date passée.
+export async function notifierSortiesDues() {
+  if (!(await notif.hasPermission())) return 0;
+  const dus = await store.takeDueNotifications(requireProfile());
+  for (const titre of dus) {
+    await notif.notifierSortie(titre).catch(() => {});
+  }
+  return dus.length;
 }
 
 // --- Statistiques ---
@@ -301,8 +342,15 @@ export async function createListe(name) {
   return ecriture(store.createListe(requireProfile(), name));
 }
 
+export async function setListePrive(id, prive) {
+  await ecriture(store.setListePrive(requireProfile(), id, prive));
+  partage.publierSiActif(requireProfile()).catch(() => {}); // une liste devenue privée quitte vite le serveur
+}
+
 export async function deleteListe(id) {
-  return ecriture(store.deleteListe(requireProfile(), id));
+  const res = await ecriture(store.deleteListe(requireProfile(), id));
+  partage.publierSiActif(requireProfile()).catch(() => {}); // elle quitte aussi la fiche
+  return res;
 }
 
 export async function getListeItems(id) {
@@ -320,4 +368,77 @@ export async function removeFromListe(id, mediaType, tmdbId) {
 // Ids des listes contenant un titre (pour la fiche).
 export async function getItemListes(mediaType, id) {
   return store.getItemListes(requireProfile(), mediaType, id);
+}
+
+// --- Profil partagé (amis par code) ---
+// Facultatif : tant que `activerPartage` n'est pas appelé, rien ne quitte l'appareil.
+
+export const partageDisponible = partage.configure;
+export { formater as formaterCode, STATUTS as STATUTS_PARTAGE, PSEUDO_MAX } from './partage.js';
+
+export async function getPartage() {
+  return partage.getPartage(requireProfile());
+}
+
+// Écrit le code et la clé : ils doivent partir au plus vite dans la sauvegarde Drive.
+export async function activerPartage(pseudo) {
+  return ecriture(partage.activer(requireProfile(), pseudo));
+}
+
+// Réinstallation / nouveau téléphone : reprend sa fiche avec le code ami + la clé.
+export async function retrouverPartage(code, cle) {
+  return ecriture(partage.retrouver(requireProfile(), code, cle));
+}
+
+export async function desactiverPartage() {
+  return ecriture(partage.desactiver(requireProfile()));
+}
+
+export async function changerPseudoPartage(pseudo) {
+  return ecriture(partage.changerPseudo(requireProfile(), pseudo));
+}
+
+export async function setStatutPartagePrive(statut, prive) {
+  return ecriture(partage.setStatutPrive(requireProfile(), statut, prive));
+}
+
+// Bouton « Mettre à jour maintenant » : force l'envoi.
+export async function mettreAJourPartage() {
+  return partage.publierSiActif(requireProfile(), { force: true });
+}
+
+// En quittant / en revenant : envoie ce qui a changé, sans jamais rien afficher.
+export async function publierPartageAuto() {
+  if (!activeProfileId) return;
+  return partage.publierAutomatique(activeProfileId);
+}
+
+// --- Amis (suivis par code) ---
+// Stockés sur le téléphone ; le serveur ne connaît que les fiches, pas qui suit qui.
+
+export async function getAmis() {
+  return amis.listerAmis(requireProfile());
+}
+
+export async function ajouterAmi(saisie) {
+  return ecriture(amis.ajouterAmi(requireProfile(), saisie));
+}
+
+export async function retirerAmi(code) {
+  return ecriture(amis.retirerAmi(requireProfile(), code));
+}
+
+// `force` : relit le serveur même si la copie a moins d'une heure.
+export async function ouvrirAmi(code, options) {
+  return amis.ouvrirAmi(requireProfile(), code, options);
+}
+
+// Affiches et titres d'une liste de { mediaType, id } (TMDB, par lots, mémorisés).
+export async function cartesDe(items) {
+  return amis.chargerCartes(items);
+}
+
+// Ce que tes amis ont aimé, du plus partagé au moins partagé : [{ mediaType, id, amis }].
+export async function getRecommandationsAmis() {
+  return amis.recommandationsAmis(requireProfile());
 }

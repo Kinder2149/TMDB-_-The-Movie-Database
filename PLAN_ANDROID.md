@@ -280,6 +280,74 @@ cd client/android && ./gradlew bundleRelease
 ```
 → `client/android/app/build/outputs/bundle/release/app-release.aab`
 
+#### Dossier Play Store de la version « amis par code » (préparé le 2026-10-03, à exécuter à la publication)
+**Interrupteur** : le partage est éteint dans tout `npm run build` (voir `src/firebase.js`) :
+la 2.2 déjà préparée se publie donc **sans rien changer au questionnaire**, sauf si
+`VITE_PARTAGE=1` a été ajouté à `client/.env.production`. Le jour de la version « amis » :
+1. mettre `VITE_PARTAGE=1` dans `client/.env.production` ; reconstruire (`.aab`, nouvelle
+   version) ;
+2. publier la politique de confidentialité mise à jour (`docs/index.html`, déjà rédigée) **avant**
+   d'envoyer la version en examen ;
+3. remplir les formulaires ci-dessous **dans la même opération** que l'envoi de la version
+   (Google lit Firebase dans le paquet : un décalage entre paquet et formulaire est le risque).
+
+**Sécurité des données** (réponses proposées — les libellés du formulaire changent, à relire
+dans la console) :
+- *Votre application collecte-t-elle des données ?* **Oui** (facultative : l'utilisateur doit
+  l'activer).
+- Types de données : **Identifiants d'utilisateur** (identifiant anonyme Firebase) ;
+  **Informations personnelles › Nom** (pseudo, qui peut être un vrai prénom) ; **Contenu
+  généré par l'utilisateur / activité dans l'application** (étoiles, noms et contenu des listes
+  partagés).
+- Pour chacun : **collecté** ; **non partagé** (Google/Firebase agit comme prestataire de
+  l'éditeur, ce n'est pas un partage au sens du formulaire) ; **facultatif** ; finalité
+  **Fonctionnalités de l'application** ; non traité de façon éphémère.
+- Sécurité : données **chiffrées en transit** (HTTPS) ; l'utilisateur **peut demander la
+  suppression** : oui.
+- *Suppression* : renseigner l'URL `…/#suppression` de la politique de confidentialité (ancre
+  `id="suppression"`) et déclarer la suppression dans l'application.
+- La sauvegarde Drive reste hors de ce formulaire (les données vont dans le Drive de
+  l'utilisateur, pas chez l'éditeur) — réponse précédente inchangée.
+
+**Autres déclarations** : questionnaire de classification (IARC) — répondre que les utilisateurs
+peuvent **interagir / partager du contenu** (code ami, pseudo libre) : l'étiquette change
+(« les utilisateurs interagissent »), pas le « Tout public » en soi, à relire après envoi.
+*Public cible* : inchangé. *Contenu généré par les utilisateurs* : rien n'est public ni
+parcourable, seulement lisible par code ; le contact de la politique sert de signalement.
+
+**Fiche** : remplacer « Aucun compte, aucune inscription » par « Aucun compte obligatoire »
+et ajouter une ligne : « Partage facultatif de vos listes avec vos proches, par code ami —
+désactivé tant que vous ne l'activez pas. » Mettre à jour la capture 4 si elle change.
+
+**À confirmer par Kinder avant publication** : l'emplacement de la base choisi à la création
+(la politique dit « Union européenne » : Paris ou Belgique conviennent, pas un emplacement
+américain) ; l'adresse e-mail de contact de la politique ; les 30 jours promis pour une
+suppression demandée par e-mail.
+
+#### Publication de la 2.3 « amis » — paquet préparé le 2026-10-03 (remplace la 2.2, jamais publiée)
+- **Paquet** : `client/android/app/build/outputs/bundle/release/app-release.aab`, version **2.3 (versionCode 7)**,
+  signé avec la clé de publication. Le partage est **allumé** (`client/.env.production` : `VITE_PARTAGE=1`). Il contient la
+  refonte visuelle, les amis par code (avec miniature d'avatar), les notifications corrigées, et tout ce que la 2.2 devait publier.
+- **Déjà fait** : règles Firebase déployées (avatar jusqu'à 4 000 caractères) ; politique de confidentialité réécrite
+  (`docs/index.html`, mention de la miniature de 48 px) et poussée sur GitHub Pages avec le dépôt.
+- **À faire dans la Play Console, dans cet ordre, dans la même séance** :
+  1. Vérifier que la politique publique est à jour (ouvrir son adresse, chercher « miniature »).
+  2. *Contenu de l'application › Sécurité des données* : appliquer les réponses de la section « Dossier Play Store de la
+     version amis » ci-dessus ; ajouter aux types de données **Photos** (miniature d'avatar, facultative) ; adresse de suppression =
+     adresse de la politique + `#suppression`.
+  3. *Classification du contenu (IARC)* : refaire le questionnaire en déclarant que les utilisateurs peuvent partager du contenu.
+  4. *Fiche principale* : description courte `Suivez vos films et séries, épisode par épisode. Sans pub, compte facultatif.`
+     (77 car.) ; dans la description complète, remplacer « Aucun compte, aucune inscription » par « Aucun compte obligatoire » et
+     ajouter « Partage facultatif de vos listes avec vos proches, par code ami — désactivé tant que vous ne l'activez pas. »
+  5. *Production › Créer une version* : déposer le `.aab`, coller les notes ci-dessous, envoyer en examen.
+- **Notes de version** (317 caractères) :
+  > Nouveautés de la 2.3 :
+  > • Nouveau look : « Ce soir » propose une idée du soir, « Mes listes » et les fiches sont plus claires, thème automatique clair/sombre.
+  > • Amis par code (facultatif) : partage tes listes avec tes proches, avatar compris.
+  > • Notifications de sortie corrigées.
+  > • Meilleure gestion du hors connexion.
+- **Ne plus rien changer après l'envoi** : une version publiée ne se retire pas.
+
 #### Publication de la 2.2 — paquet préparé le 2026-09-19 (pas encore publiée)
 - **Paquet prêt** : `client/android/app/build/outputs/bundle/release/app-release.aab`, version
   **2.2 (versionCode 6)**, signé avec la clé de publication (empreinte SHA-1 identique à celle
@@ -330,7 +398,6 @@ personnelle de Kinder.
 - Synchronisation entre plusieurs appareils (impliquerait un serveur).
 - Comptes utilisateurs, fonctions sociales.
 - Version iOS / App Store.
-- Notifications de nouvel épisode.
 
 ## Risque assumé
 Sans serveur, **une perte du téléphone sans sauvegarde = perte du suivi**. C'est

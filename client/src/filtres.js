@@ -51,17 +51,18 @@ export const FILTRES_BIBLIO_VIDES = Object.freeze({
   periode: null,
   tri: 'ajout',
   note: null,
+  genre: null, // clé de la liste unique de genres (tmdb.js)
 });
 
 export function filtresBiblioActifs(f) {
-  return !!f && (!!f.periode || !!f.note || f.tri !== 'ajout');
+  return !!f && (!!f.periode || !!f.note || !!f.genre || f.tri !== 'ajout');
 }
 
 // Filtre et trie une liste de la bibliothèque. Sans date de sortie, un titre
 // est écarté par un filtre d'année et passe en dernier d'un tri par date ; sans
 // note, il passe en dernier du tri par note. À égalité, l'ordre reçu est gardé.
 export function appliquerFiltresBiblio(items, filtres, aujourdhui = new Date()) {
-  const { periode, tri, note } = filtres;
+  const { periode, tri, note, genre } = filtres;
   let liste = items.map((it, i) => ({ it, i }));
 
   if (periode) {
@@ -71,6 +72,9 @@ export function appliquerFiltresBiblio(items, filtres, aujourdhui = new Date()) 
       return !!d && (!from || d >= from) && (!to || d <= to);
     });
   }
+  // Les genres d'un titre sont rangés « action,drame » ; un titre dont le genre
+  // n'est pas (encore) connu est écarté par ce filtre.
+  if (genre) liste = liste.filter(({ it }) => (it.genres || '').split(',').includes(genre));
   if (note === 'bien') liste = liste.filter(({ it }) => (it.rating ?? 0) >= 4);
   if (note === 'non') liste = liste.filter(({ it }) => !it.rating);
 

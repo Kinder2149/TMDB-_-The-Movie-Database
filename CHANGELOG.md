@@ -4,6 +4,132 @@
 > `PLAN_ANDROID.md` et `PROJET_CONTEXTE.md`. Écrit le 2026-09-19 à partir de ces fichiers et de
 > l'historique de versions.
 
+## Version 2.3 (versionCode 7) — préparée le 2026-10-03, à publier
+- Regroupe la refonte visuelle, les amis par code (partage allumé dans la version publiée), les notifications
+  corrigées et la miniature d'avatar. Règles Firebase déployées, politique de confidentialité mise à jour.
+  Marche à suivre : `PLAN_ANDROID.md`, « Publication de la 2.3 ».
+
+## Retours d'essai de la refonte (2026-10-03)
+- **Notifications** : le test (et les vraies notifications de sortie) n'apparaissaient pas, car Android retardait
+  l'alarme programmée. Elles s'affichent maintenant tout de suite.
+- **Avatar des amis** : une photo d'avatar part dans la fiche en miniature de 48 px (au lieu de rien : les amis
+  voyaient un rond doré avec l'initiale). Nécessite de déployer les règles Firebase ; voir `PLAN_V2.md`, point 4 bis.
+
+## Refonte visuelle, M6 et M7 — Réglages, données, mouvement (2026-10-03, codées, à essayer sur téléphone)
+- **Thème à trois états** : Automatique (suit le téléphone, y compris quand il change), Clair, Sombre. Un choix
+  déjà fait avant reste respecté.
+- **Mes profils** en cartes (nombre de titres, profil actif cerclé d'or). **Sauvegarde, Notifications, À propos** en
+  blocs ; l'interrupteur de sauvegarde automatique est un vrai interrupteur ; messages de réussite / d'erreur
+  homogènes. La mention TMDB de « À propos » est intacte. Aucune logique de sauvegarde, Drive ou profil touchée.
+- **Bienvenue** : « J'ai déjà une sauvegarde — la restaurer » ouvre l'écran de sauvegarde.
+- **Textes** : tutoiement partout (Sauvegarde, À propos, messages de fichier et de compte Google).
+- **Mouvement** : fondu et glissement de 6 px au changement d'onglet (pas rejoué entre sous-onglets), retour
+  tactile sur les lignes et tuiles, vibration de 10 ms en marquant « vu » ou en changeant de statut. Coupé si le
+  téléphone demande moins d'animations.
+- **Pas fait** : la bannière « À la une » de Découvrir (facultative).
+
+## Refonte visuelle, M5 — Recherche et états partout (2026-10-03, codée)
+- **Quatre états** : chargement en formes fantômes (plus aucun « Chargement… »), vide expliqué, hors connexion
+  (« Pas de connexion » + Réessayer) sur la Recherche, Découvrir, Suggestion et Découverte.
+- **Recherche** : en-tête « Résultats N », « Aucun résultat » / « Tu as déjà tout » en messages illustrés ;
+  Explorer : les genres défilent sur une ligne.
+- **Zones tactiles** : les petits boutons (Tout/Films/Séries, puces, « Tout voir ») ont une zone d'au moins 44 px.
+- `reseau.js` (détection du réseau, testé), `Fantomes.jsx`, `HorsLigne.jsx`.
+
+## Refonte visuelle, M4 — Mes listes et Statistiques (2026-10-03, codée, à essayer sur téléphone)
+- **Mes listes** : un bandeau de trois chiffres (titres, vus, note moyenne) qui ouvre les Statistiques ; les
+  quatre statuts en tuiles avec une jauge ; les listes personnalisées en cartes à mosaïque (4 affiches) avec
+  une carte « Nouvelle liste » ; une liste ouverte montre son nom, son compte, « Ajouter », « Supprimer » et
+  l'interrupteur « Visible par tes amis » (si le partage est actif) ; les genres du filtre défilent.
+- **États vides** : bibliothèque, liste, statut, recherche sans résultat ; formes fantômes au chargement.
+- **Statistiques** : mêmes chiffres en blocs, plus « Genres les plus regardés » (top 5 des titres vus ou en
+  cours, signalé « Nouveau », masqué s'il n'y a aucun genre connu).
+- **Données** : `listListes` renvoie `covers` ; `getStats` renvoie `parGenre` ; `resumeBiblio` (tests).
+
+## Refonte visuelle, M3 — Ce soir (2026-10-03, codée, à essayer sur téléphone)
+- **Idée du soir** : une grande carte (affiche floutée en fond) propose un titre « à voir » déjà sorti,
+  tiré au sort une fois par jour : la même toute la journée, même après relance. « Autre idée » passe à
+  la suivante sans jamais répéter tant qu'il en reste. Elle indique depuis quand le titre attend dans ta
+  liste. « Voir la fiche » l'ouvre. Pas de carte s'il n'y a rien « à voir ».
+- **Reprendre** : rangée d'affiches avec une barre de progression (vus / diffusés) et l'épisode suivant.
+- **À voir ce soir** : rangée + « Tout voir » (grille complète).
+- **Pas encore sorti** : une ligne repliée (nombre de titres, prochaine date) qui se déplie.
+- **Découverte** : une seule grille films + séries, formes fantômes pendant la recherche ; **Suggestion** : puces défilantes.
+- **Bibliothèque vide** : message et bouton « Chercher un titre ». Bandeau « pas encore sauvegardé » restylé.
+- **Données** : `listSuivi` renvoie la date d'ajout ; règle de l'idée du soir dans `idee.js` (tests).
+- Les barres repliables de couleur (`Bloc`) disparaissent. Plus aucun « Chargement… » dans Ce soir.
+
+## Refonte visuelle, M2 — Fiches film et série (2026-10-03, codée, à essayer sur téléphone)
+- **Fiche** : fond d'écran + affiche + titre et pastilles (année, durée ou saisons, genres) ; la
+  flèche de retour reste visible quand on fait défiler. `Detail.jsx` garde l'état ; l'affichage
+  est dans `FicheEntete`, `FicheStatut`, `FicheProgression`, `FicheSaisons`.
+- **Film** : 4 statuts, étoiles + bande-annonce sur une carte, « Où le regarder » avec les vrais
+  logos, synopsis replié (« Lire la suite »), têtes d'affiche, « Mes visionnages », avis, « Dans le
+  même esprit » et saga en rangées, mes listes.
+- **Série** : le statut est **calculé** d'après les épisodes (pastille) ; seul « Abandonner » est
+  manuel, « Reprendre le suivi » en sort. Anneau vus / diffusés, carte « Prochain épisode » avec sa
+  date de diffusion et un bouton « Marquer SxEy comme vu » (sans ouvrir la saison), « À jour » ou
+  « Pas encore diffusée » sinon. Saisons dépliables, coche ronde par épisode.
+- **États** : chargement en formes fantômes ; hors connexion, la fiche garde titre et affiche et
+  propose « Réessayer » ; titre non suivi : « Ajouter à mon suivi ». « Retirer de mon suivi » est
+  en bas de la fiche.
+- **Données** : `getProgress().next` porte `airDate` ; `getDetails` renvoie la durée du film et le
+  nombre de saisons (déjà dans la réponse TMDB, aucun appel de plus).
+- Texte du bouton doré et lien rouge un peu plus foncés (contraste ≥ 4,5 en clair).
+
+## Retours d'essai du 2026-10-03 — codés, vérifiés dans le navigateur en largeur téléphone
+- **Dates de visionnage** : chaque visionnage (film ou épisode) a une date qu'on peut
+  modifier ; un titre vu avant le journal propose « Saisir la date » (rien d'obligatoire).
+  Le 1er visionnage est repéré. Un bouton calendrier sous chaque épisode vu montre ses dates.
+- **« J'ai revu toute la saison »** : +1 visionnage sur chaque épisode déjà vu de la saison.
+- **Recherche / Ce soir** : la recherche à vide ne garde qu'une vue Tendances. « Ce soir » a
+  trois sous-onglets : En attente (inchangé), **Découverte** (l'ancien « Suggestions »),
+  **Suggestion** (Tendances / Nouveautés / À venir).
+- **Mes listes** : filtre par **genre** (nouvelle colonne `genres`, remplie à l'ajout et
+  rattrapée au lancement pour les titres déjà suivis ; incluse dans la sauvegarde).
+- **Découvrir** : trois étages — « Pour toi » (Comme [un titre aimé]), « Sélections » (Pépites
+  cachées, Soirée courte, Grands classiques, Le meilleur de l'année), « Thèmes » (les 4 packs)
+  — et un filtre « Sur mes plateformes » retenu d'un lancement à l'autre.
+- **Refonte visuelle validée** (2026-10-03) : missions M2 à M7 cadrées techniquement dans
+  `PLAN_V2.md` (protocole, pièges, tests, critères de fin) ; suivi par tableau.
+- **Refonte visuelle : plan complet écrit** (`PLAN_V2.md`, « Refonte visuelle — PLAN COMPLET ») et
+  maquette de 30 écrans vérifiée contre le code (7 phases, 6 points à valider).
+- **Passe de design, phase 1** : Découvrir en rangées d'affiches façon catalogue (« Tout voir »
+  pour la grille), en-têtes de page et de section communs, « Reprendre » en rangée, blocs et
+  interrupteurs pour Profil partagé / Amis, chargements fantômes, apparitions douces, flèche de
+  retour à gauche. Détail et reste à faire : `PLAN_V2.md`.
+- **Amis par code — étapes 1 et 2 codées** (cadrage et détail : `PLAN_V2.md`, point 4 bis) :
+  règles de sécurité Firebase publiées et testées ; Réglages > « Profil partagé » (code ami,
+  code de récupération, statuts et listes privés). Facultatif, désactivé par défaut.
+  Étape 3 : Réglages > « Mes amis » (ajouter par code, voir ses listes, ses étoiles, ajouter à
+  son suivi).
+  Pas de publication Play Store tant que le questionnaire et la politique de confidentialité ne
+  sont pas mis à jour.
+
+## Notifications de sortie — codées, restent à valider sur téléphone (figé le 2026-09-27)
+Notifier l'utilisateur quand un film suivi sort au cinéma, quand une série suivie diffuse un
+nouvel épisode, ou quand une nouvelle saison est annoncée (périmètre : listes, favoris, likes).
+Détail des décisions dans `PROJET_CONTEXTE.md`, section « Décisions figées ». Découpée en étapes,
+chacune testée avant la suivante :
+- **Étape 1 — badge de sortie sur la fiche**, codée et vérifiée à l'écran le 2026-09-27 : une
+  fiche suivie affiche « Sort le… », « Sortie annoncée — date inconnue », « Prochain épisode
+  le… » ou « Nouvelle saison à venir — date inconnue », selon ce que TMDB sait au moment de
+  l'ouverture.
+- **Étape 2 — cycle de vérification au lancement**, codée et vérifiée en base le 2026-09-27 :
+  deux colonnes ajoutées au suivi (`notif_date`, `notif_en_attente`) ; un cycle, au lancement,
+  ne revérifie que les titres « en attente » d'une date, sort du cycle un titre déjà sorti,
+  une série terminée, ou un titre marqué « Vu »/« Abandonné ».
+- **Étape 3 — activation des notifications**, codée le 2026-09-27 : dépendance
+  `@capacitor/local-notifications` ajoutée, nouvel écran Réglages → Notifications (autorisation
+  + notification de test).
+- **Étape 4 — la vraie notification**, codée et vérifiée en base le 2026-09-27 : à chaque
+  lancement, après le cycle, les titres « en attente » dont la date est atteinte sont notifiés
+  puis sortent définitivement du cycle. Sans autorisation accordée, rien n'est consommé — le
+  titre reste en attente jusqu'à ce que les notifications soient activées.
+- **Les 4 étapes du figeage sont codées.** Reste à vérifier sur ton téléphone : l'autorisation
+  système, la notification de test (étape 3) et une vraie notification de sortie (étape 4) — ni
+  l'une ni l'autre ne peuvent se tester dans le navigateur.
+
 ## 2.3 — en préparation (retours d'usage du 2026-09-21, missions M1 à M5 dans `PLAN_V2.md`)
 **M1 — Fiche enrichie** (2026-09-21) :
 - Fiche d'un film ou d'une série : toucher un acteur ouvre la liste de ses films et séries

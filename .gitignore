@@ -38,3 +38,11 @@ signature.properties
 # Identifiants OAuth téléchargés depuis Google Cloud — le fichier du client web
 # contient un secret. Jamais dans le dépôt.
 client_secret_*.json
+
+# Journaux de l'émulateur Firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# APK de test (binaire, se reconstruit)
+apk-test/

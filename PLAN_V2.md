@@ -239,6 +239,501 @@ fois la décision de mise en ligne prise.
 projet, et c'est pour elle que l'UUID portable des profils existe depuis la V1. Elle n'est
 pas décidée pour autant, et rien n'est engagé.
 
+### 4 bis. Amis par code — cadrage FIGÉ le 2026-10-03 (rien n'est codé)
+Remplace l'ancienne lecture du point 4 : plus besoin d'une mise en ligne complète (serveur,
+PostgreSQL, comptes). Un seul service externe, **Firebase**, pour une seule chose : une
+**fiche partagée facultative**. Kinder accepte que cela modifie les décisions figées « aucun
+serveur » et « données sur l'appareil » (voir `PROJET_CONTEXTE.md`), à condition de ne pas
+casser ce qui est publié sur le Play Store.
+
+**Deux étages séparés (décision de Kinder, 2026-10-03)**
+- **Privé** : la sauvegarde reste sur le **Drive de l'utilisateur** (`drive.appdata`).
+  L'éditeur n'y a aucun accès. Seule fonction qui demande un compte Google. Inchangée.
+- **Public** : la fiche partagée et le code ami vivent sur Firebase, **sans compte** (connexion
+  anonyme invisible). Aucun compte Google requis pour les amis.
+- Écarté : déplacer la sauvegarde sur Firebase. Il faudrait quand même une identité qui survit
+  au téléphone (compte ou code de récupération), la sauvegarde complète serait chez l'éditeur,
+  et Cloud Storage exige le forfait payant depuis le 2026-02-03.
+
+**Trois couches par profil**
+1. Profil local (privé, inchangé) : nom, avatar, suivi, avis, listes.
+2. Fiche partagée (facultative, **par profil**) : pseudo public (peut différer du nom local),
+   avatar, ce qui est montré, **code ami** long et impossible à deviner. Désactivée par défaut :
+   tant qu'on ne l'active pas, rien ne sort du téléphone.
+3. Mes amis (par profil, **stockés sur le téléphone**, inclus dans la sauvegarde) : une liste de
+   codes avec pseudo et avatar gardés en mémoire. Le serveur ne garde aucun réseau social.
+
+**Ce qui est partagé** : pseudo, avatar, titres vus avec leurs étoiles, et **toutes les listes**
+— les quatre statuts (À voir, En cours, Vu, Abandonné) comme les listes créées à la main — **sauf
+celles que l'utilisateur marque « privées »** (décision de Kinder, 2026-10-03 : une fiche
+complète, pas un choix liste par liste à l'activation). Le réglage « privée » se fait sur chaque
+liste et sur chaque statut. Une liste créée après l'activation est publique par défaut, mais le
+choix Publique / Privée est proposé dès sa création, et un résumé « Visible par tes amis : … »
+est affiché dans Mon profil. **Jamais** les avis écrits (évite la modération de contenu
+d'utilisateurs exigée par Google). Seuls des identifiants TMDB sont envoyés : affiches et textes
+viennent de TMDB comme aujourd'hui. Une liste privée n'est jamais envoyée au serveur, pas
+seulement masquée : retirer une liste de la fiche l'efface aussi côté serveur à la prochaine
+mise à jour. Aucune date n'est partagée : l'ordre des titres (du plus récent au plus ancien)
+suffit pour « vu récemment ».
+
+**Fonctionnement** : suivi à sens unique (comme Letterboxd), pas de demande d'ami, pas de
+recherche d'inconnus. Fiche mise à jour à la demande ou en quittant l'application, comme la
+sauvegarde Drive — pas en direct. Changer de code coupe tous les anciens accès. Règles Firebase :
+lecture d'une fiche seulement si on connaît son code, écriture seulement par son propriétaire ;
+Play Integrity (App Check) contre les abus. Données hébergées en Europe. Forfait gratuit
+(Spark) : pas de carte bancaire, coupure plutôt que facture. Pas de Cloud Functions.
+
+**Réinstallation** : l'identité anonyme disparaît avec l'application. La clé de la fiche est donc
+portée par la sauvegarde Drive, ou, pour qui n'a pas Drive, par un **code de récupération**
+affiché à l'activation.
+
+**Écrans**
+- *Mon profil* (depuis l'avatar) : pseudo et code ami (copier, partager, régénérer), choix de
+  partage, « voir ma fiche comme mes amis la voient », liste d'amis, « Supprimer ma fiche
+  partagée ».
+- *Fiche d'un ami* : avatar, pseudo, compteurs, puis un onglet par liste publique (statuts et
+  listes créées), titres vus avec étoiles ;
+  repère « déjà dans mon suivi » et bouton « Ajouter à mon À voir ».
+- Pas de 5ᵉ onglet : un rayon « Chez tes amis » dans **Découvrir**, la gestion dans Mon profil.
+
+**Play Store, à faire avant la publication de la version qui contient la fonction** (jamais
+après : Google détecte Firebase dans le paquet) : questionnaire « Sécurité des données » (collecte
+facultative : identifiant, pseudo, titres partagés ; Firebase = prestataire, pas un tiers),
+politique de confidentialité (`docs/index.html`), textes de la fiche (« sans compte », « vos
+données restent sur votre téléphone » à nuancer), bouton de suppression + adresse web de demande
+de suppression.
+
+**Étapes, chacune testée avant la suivante**
+1. Projet Firebase séparé (celui de l'écran de consentement Drive n'est pas touché), en Europe,
+   règles de sécurité testées hors application.
+2. Activer le partage, afficher le code ami.
+3. Ajouter un ami, voir sa fiche.
+4. « Ajouter à mon À voir » depuis la fiche d'un ami ; rayon « Chez tes amis ».
+5. Suppression de la fiche + clé retrouvée via Drive / code de récupération.
+6. Dossier Play Store et politique de confidentialité, puis publication.
+
+**Étape 1 — règles de sécurité écrites et testées (2026-10-03)** : `client/firebase/firestore.rules`,
+19 tests (`npm run test:regles`, émulateur local sur des ports à part, Java d'Android Studio ;
+jamais contre le vrai projet `vault-watch-amis`). Deux enseignements :
+- la première structure (une ligne « propriétaire » par code) avait une **faille** — un intrus
+  pouvait modifier la ligne et garder la clé déjà enregistrée. Corrigée : une ligne **par
+  identifiant** (`proprietaires/{code}/clefs/{uid}`), créable uniquement avec la bonne clé,
+  jamais modifiable. Conséquence assumée : après une reprise, l'ancien identifiant garde aussi la
+  main (c'est la même personne) ; « régénérer le code » reste le moyen de couper un accès ;
+- l'empreinte calculée par les règles est en hexadécimal **majuscule** : l'application doit
+  envoyer `cleHash` en minuscules (les règles ramènent le calcul en minuscules). Le mécanisme de
+  reprise par clé **fonctionne** : le repli « pas de reprise possible » n'est pas nécessaire.
+Règles **publiées dans le vrai projet** par Kinder, puis vérifiées contre lui le 2026-10-03 (8
+essais réels avec deux identifiants anonymes : création, lecture par code, parcours interdit, clé
+illisible, modification par un tiers refusée, mauvaise clé refusée, reprise avec la bonne clé ;
+fiche de test effacée). **Étape 1 terminée.** Reste, avant l'étape 2 : installer `firebase` en
+dépendance de l'application (aujourd'hui seulement en développement).
+
+**Étape 2 — activer le partage, code ami : codée et vérifiée (2026-10-03)**
+- Nouveaux fichiers : `firebase.js` (porte vers Firebase, chargée seulement à la première
+  action de partage), `partage.js` (quoi publier, état local), écran `Partage.jsx` (Réglages >
+  « Profil partagé »). Table locale `partage` ; colonne `listes.prive`.
+- Vérifié contre le vrai projet depuis l'application : activation, fiche relue par un autre
+  identifiant (identifiants et étoiles seulement), un statut passé en privé disparaît du serveur
+  aussitôt, « Arrêter le partage » supprime la fiche. 260 tests (dont 18 pour le partage).
+- La fiche se met à jour en quittant / en revenant dans l'application (même déclencheur que la
+  sauvegarde Drive), seulement si elle a changé, sans jamais rien afficher.
+- **Sauvegarde passée en version 4** (code ami, clé, listes privées). Conséquence assumée : la
+  version 2.1 déjà publiée refusera de restaurer une sauvegarde 4 plutôt que de perdre la clé.
+- Supprimer un profil partagé retire d'abord sa fiche en ligne (réseau requis).
+- À essayer sur le téléphone : bouton « Partager » (feuille d'Android), copie du code, et la
+  clé bien présente dans la sauvegarde Drive. Pas encore codé : ajouter un ami (étape 3).
+
+**Étape 3 — ajouter un ami, voir sa fiche : codée et vérifiée (2026-10-03)**
+- Réglages > « Mes amis » : champ de code (tolère minuscules, tirets, espaces), liste des amis,
+  fiche d'un ami avec un onglet par liste publique (statuts nommés en clair), ses étoiles sous
+  chaque affiche, le « + » qui l'ajoute à ton suivi. Suivre un ami ne demande pas d'avoir activé
+  son propre partage.
+- Table locale `amis` ; la sauvegarde emporte code, pseudo et avatar (pas la copie des fiches).
+  Copie de la fiche gardée une heure, gardée aussi hors connexion (signalé). Une fiche supprimée
+  est signalée sans effacer l'ami. Maximum 100 amis ; son propre code est refusé.
+- Les fiches viennent d'autres utilisateurs : tout est validé au décodage (forme exacte des
+  titres, textes tronqués, positions existantes) ; testé avec une fiche hostile.
+- Titres et affiches viennent de TMDB, par lots de 30 puis « Voir plus ».
+- **Modifié le 2026-10-03 (demande de Kinder, après essai)** : un avatar en **photo** part dans la fiche sous forme
+  d'une **miniature de 48 px** (JPEG, ~2 Ko, plafond 4 000 caractères ; la photo d'origine ne part jamais). Règle Firebase
+  `avatar <= 4000` (**à déployer**) ; côté lecture, seuls « couleur:symbole » et une miniature JPEG sont acceptés. Avant :
+  les amis voyaient l'initiale. **Avant publication Play Store** : la politique de confidentialité et le questionnaire
+  doivent mentionner cette miniature. Les amis doivent avoir la nouvelle version pour voir la photo des autres.
+- Vérifié contre le vrai projet : ajout par code, fiche affichée avec de vrais titres, ajout au
+  suivi, ouverture d'une affiche par-dessus. Reprise d'une fiche par la clé après « changement
+  d'identifiant » confirmée en réel. 279 tests.
+- Reste : étape 4 (« Ajouter à mon À voir » déjà là via le « + » ; rayon « Chez tes amis » dans
+  Découvrir), étape 5 (clé retrouvée via Drive / code de récupération saisi), étape 6 (Play).
+
+**Étapes 4, 5 et 6 (2026-10-03)**
+- *Étape 4* — rayon « Chez tes amis » dans Découvrir (« Pour toi ») : ce que tes amis ont noté
+  4-5 étoiles ou vu sans noter, classé par nombre d'amis puis par notes, ce que tu as déjà est
+  masqué, avec « Camille ★5 » sous l'affiche. Le « + » de la carte sert d'« ajouter à mon À voir ».
+- *Étape 5* — retrouver sa fiche : automatique si la sauvegarde Drive est restaurée (elle porte
+  la clé) ; sinon « J'avais déjà un code ami » dans Profil partagé (code ami + code de
+  récupération), vérifié contre la fiche en ligne avant d'écrire quoi que ce soit.
+- *Étape 6* — dossier Play Store et politique de confidentialité **rédigés, pas publiés**
+  (`PLAN_ANDROID.md` > « Dossier Play Store de la version amis », `docs/index.html`).
+- **Interrupteur de compilation** : le partage est éteint dans tout build publiable
+  (`VITE_PARTAGE=1` requis, présent seulement dans `.env.development`). La 2.2 déjà préparée peut
+  donc partir sans toucher au questionnaire ; les amis sortent dans une version suivante.
+
+### Refonte visuelle — PLAN COMPLET (2026-10-03)
+Retour de Kinder sur Découvrir (« moche, pas uniforme, bâclé ») élargi à tout le front. Maquette
+de référence : canvas « Vault Watch — proposition design », 30 écrans clair/sombre
+(https://claude.ai/artifact/7zWsa4mVaDFnkEx6Fy44Qd, privé). Ce plan est la version vérifiée contre
+le code : tout ce que la maquette montre est soit une donnée qui existe, soit une règle écrite
+ici, soit retiré.
+
+#### 0. État réel
+- **Phase 1 codée et vérifiée (293 tests)** : échelles communes (`--s-*`, `--t-*`, `--r-*`,
+  `--ease`), blocs (`.page-head`, `.sec`, `.rail`, `.chips-scroll`, `.panel`, `.field`, `.switch`,
+  `.skeleton`, `.vide`, `.message`), Découvrir en rangées (`Rail.jsx`, `VueRayon.jsx`), « Reprendre »
+  en rangée, en-têtes de page, Profil partagé / Amis / Fiche d'un ami en blocs, flèche de retour à
+  gauche, loupe en vraie icône, plus de clavier forcé à la Recherche.
+- **M2 à M7 codées le 2026-10-03** (voir le tableau de suivi plus bas) ; reste l'essai de Kinder sur téléphone avec l'APK
+  de fin de série, puis la clôture du chantier.
+
+#### 1. Principes
+1. **Identité conservée** (crème, doré, titres serif, couleurs de statut). Évolution, pas refonte.
+2. **Une hiérarchie** : H1 titre de page, H2 titre de section, H3 étiquette en petites capitales.
+3. **Rien d'inventé** : chaque élément affiché a sa donnée (§2) ou sa règle écrite.
+4. **Pas d'impasse** : chaque écran a une sortie évidente et chaque fonction est à ≤ 2 gestes (§3).
+5. **Quatre états par écran** : chargé, en chargement (affiches fantômes), vide, hors connexion.
+6. **Le mouvement sert** : apparition douce, retour tactile, transitions d'écran — jamais décoratif ;
+   coupé par `prefers-reduced-motion`.
+7. **Accessible** : cibles ≥ 44 px (le visuel peut rester à 34 px, la zone tactile s'étend),
+   contraste ≥ 4,5:1 vérifié en clair ET en sombre, texte ≥ 12 px, vrais `<button>`.
+
+#### 2. Audit de vérité : maquette contre code
+| Élément | Source réelle | Verdict |
+|---|---|---|
+| Accueil Recherche : Tendances seules | décision du 2026-10-03 (Nouveautés / À venir → Ce soir › Suggestion) | **Maquette v1 se trompait** (remettait 3 rangées) — corrigée |
+| Mes listes : titres · vus · note moyenne | `getStats` (base locale, instantané) | OK |
+| Mes listes : « 312 h regardées » | exige les durées, mesurées par le réseau à la 1re ouverture de Statistiques | **Retiré** de Mes listes, reste dans Statistiques |
+| Mosaïque 2×2 des listes | `suivi.poster_url` des 4 premiers titres | OK (1 requête groupée à écrire) |
+| Tuiles de statut + jauge | `parStatut` / nombre de titres | OK |
+| Statistiques (temps total / films / séries ; bibliothèque ; répartition ; note) | `getStats` + `completeRuntimes` | OK, conservés tels quels |
+| Statistiques : « Genres les plus regardés » | colonne `genres` (créée le 2026-10-03, remplie au lancement) | **Nouveauté**, signalée « Nouveau » ; ne compte que les titres dont le genre est connu |
+| Ce soir : « idée du soir » | **aucune règle n'existait** | Règle écrite §4.2 |
+| « dans ta liste depuis 3 semaines » | `suivi.added_at` existe mais `listSuivi` ne le renvoie pas | À ajouter au SELECT, sinon mention retirée |
+| Reprendre : barre de progression sur l'affiche | `getProgress` : watched / aired | OK |
+| Reprendre / fiche série : « S2E04 · titre » | `progress.next.{season,episode,name}` | OK |
+| Fiche série : « diffusé le … » | `progress.next` n'a pas la date ; les épisodes l'ont (`airDate`) | À ajouter à `next` (1 champ) |
+| Fiche série : « 47 min · sorti il y a 3 jours » | durée d'épisode non disponible par épisode | **Retiré** |
+| Fiche série : choix de statut à 4 boutons | **faux** : le statut d'une série est dérivé de la progression ; seul « Abandonné » est manuel (`statusDisabled`) | **Maquette corrigée** : pastille de statut calculé + bouton « Abandonner » |
+| « Tu seras prévenu » (nouvelle saison) | dépend de l'autorisation et du cycle de notifications | **Retiré** ; reste le badge `releaseBadge` |
+| Fiche : « Casting » | l'application dit « Têtes d'affiche » | Renommé |
+| Fiche film : « Dans le même esprit » | existe (recommandations TMDB) | Ajouté à la maquette |
+| Fiche : « Où le regarder » | `providers` FR : abonnement, location + achat, logos w45 | OK (logos réels à la place des lettres) |
+| Découvrir : bannière « À la une » | `toCardItem` ne garde ni le fond d'écran (`backdrop_path`) ni… | Possible : ajouter `backdropUrl` ; **phase 7, facultatif** |
+| Découvrir : avatars d'amis + « Mes amis » | `listerAmis` (pseudo, avatar) | OK |
+| Thème « Automatique » | aujourd'hui 2 états (bascule clair/sombre, sombre par défaut) | À faire : 3 états |
+| Bandeau « pas encore sauvegardé », menu d'appui long, conflit Drive, écran de bienvenue | existent dans le code | **Ajoutés à la maquette** pour être restylés |
+| États vide / hors connexion / chargement | `Chargement…` en texte (13 fois), aucun état vide illustré | À généraliser (composants `.vide`, `.skeleton`) |
+| « vous » / « tu » | Suggestions disait « vous » | Corrigé en « tu » ; relecture de tous les textes en phase 6 |
+| Homonymie « Découverte » (sous-onglet de Ce soir) / « Découvrir » (onglet) | décision de Kinder (2026-10-03) | **Gardée**, mais chacun a un sous-titre qui dit ce qu'il est (§4.2, §4.4) |
+
+#### 3. Carte de navigation (qui mène où)
+- **Barre du bas** : Recherche · Ce soir · Mes listes · Découvrir. **Avatar** (en haut) → Réglages.
+- **Réglages** → Mes profils · Profil partagé · Mes amis · Thème · Langue · Notifications ·
+  Sauvegarder / restaurer · Statistiques · Sources et mentions légales.
+- **Chemins ajoutés** (avant : 3 niveaux de profondeur) : *Mes listes → bandeau de chiffres →
+  Statistiques* ; *Découvrir → rangée d'avatars → Mes amis* ; *bandeau « pas sauvegardé » →
+  Sauvegarder* (existe) ; *état vide → Recherche* ; *carte « idée du soir » → fiche*.
+- **Toute affiche** → fiche du titre, qui revient à l'écran d'où l'on vient (déjà géré :
+  `ficheOrigine`, superpositions). **Appui long** sur une affiche → menu des statuts.
+- **Bouton retour d'Android** : fiche d'un titre > fiche d'un ami > écran superposé > onglet précédent
+  > Recherche > quitter. Ordre déjà codé dans `backRef` ; chaque nouvel écran superposé s'y inscrit.
+- Aucune impasse : tout écran superposé a une flèche de retour à gauche et un retour Android.
+
+#### 4. Spécification écran par écran
+**4.1 Recherche** — champ (sans clavier forcé) · sélecteur Titre / Acteur / Explorer · *Accueil
+(champ vide)* : « Tendances » en grille 3 colonnes, filtre Tout / Films / Séries (compact), « Voir
+plus » (3 pages d'un coup, titres déjà suivis masqués) · *Résultats* : filtres Année / Trier par,
+titres déjà suivis visibles (pastille + liseré) · *Explorer* : genres en puces défilantes, filtre
+Films / Séries, mention « N titres que tu as déjà sont masqués ». États : chargement (affiches
+fantômes), aucun résultat, hors connexion (bloc `.vide` + « Réessayer »).
+
+**4.2 Ce soir** (sous-titre : « Reprends une série, pioche dans ta liste, ou laisse-toi guider »)
+- *En attente* : **idée du soir** (carte) · **Reprendre** (rangée, barre de progression, épisode
+  suivant) · **À voir ce soir** (rangée, titres déjà sortis) · **Pas encore sorti** (ligne repliée,
+  compte + prochaine date). Vide : « Ta bibliothèque est vide » + bouton vers la Recherche.
+- *Règle de l'idée du soir* : parmi les titres « À voir » **déjà sortis**, un seul, tiré par une
+  graine = (profil + date du jour) → stable toute la journée, identique après relance ; « Autre idée »
+  passe au suivant dans le même tirage (jamais deux fois le même dans la journée tant qu'il en
+  reste). Aucune idée s'il n'y a rien « à voir » → la carte disparaît. Elle n'ouvre pas de lecture :
+  « Voir la fiche ». (Les séries à reprendre ont déjà leur rangée : elles ne sont pas proposées ici.)
+- *Découverte* (sous-titre « Parce que tu as aimé… ») : mélange films / séries d'après tes titres
+  notés ou vus, bouton Actualiser — logique actuelle conservée, présentation en grille.
+- *Suggestion* : Tendances / Nouveautés / À venir (puces défilantes) + grille — comme décidé.
+- Bandeau de sauvegarde (si modifications non envoyées) sous la barre d'application, fermable.
+
+**4.3 Mes listes** — en-tête (compte de titres) · bandeau de 3 chiffres (titres, vus, note moyenne ;
+touche → Statistiques) · recherche dans la bibliothèque · 4 tuiles de statut avec jauge · « Listes
+personnalisées » (cartes à mosaïque + « Nouvelle liste ») · outils (Films / Séries, Filtres) · grille
+par Films / Séries. *Une liste* : titre + compte, interrupteur « Visible par tes amis » (si le
+partage est actif), Ajouter, Supprimer. Vide : bloc `.vide` par statut (« Rien ici pour l'instant »).
+
+**4.4 Découvrir** (sous-titre « Des idées pour ta prochaine soirée, choisies pour toi ») — rangée
+« Chez tes amis » (légende « Camille ★5 », ce que tu n'as pas déjà) · « Comme [titre] » ×2 ·
+sélections (Pépites cachées, Soirée courte, Grands classiques, Le meilleur de l'année) · thèmes ·
+filtre « Sur mes plateformes » + rangée d'avatars d'amis → Mes amis · chaque rangée a « Tout voir »
+(grille complète, Films / Séries, « Voir plus »). Rangées chargées à l'approche de l'écran, une
+rangée vide disparaît. États : fantômes, hors connexion, « Rien de neuf chez tes amis ».
+*Facultatif (phase 7)* : bannière « À la une » = premier titre de « Le meilleur de l'année » avec son
+fond d'écran.
+
+**4.5 Fiche film** — fond d'écran + affiche · titre, année, durée, genres · statut (4 boutons) ·
+note en étoiles + bande-annonce · où le regarder · synopsis (replié, « Lire la suite ») · têtes
+d'affiche · **Mes visionnages** (dates modifiables, « J'ai revu », ajout d'une date) · mon avis ·
+dans le même esprit · saga · mes listes.
+
+**4.6 Fiche série** — mêmes en-têtes · **statut calculé** + « Abandonner » · anneau de progression
+(vus / diffusés) + **prochain épisode** (numéro, titre, date) + bouton « Marquer … comme vu » ·
+badge de sortie (`releaseBadge`) · saisons dépliables (coche ronde par épisode, ×N, calendrier des
+dates, « J'ai revu la saison ») · « J'ai vu toute la série » · synopsis · têtes d'affiche · même
+esprit · mes listes.
+
+**4.7 Partage, amis** — comme codés en phase 1 (blocs, interrupteurs, états vides, fiche d'un ami).
+
+**4.8 Réglages et sous-écrans** — cartes groupées (Profil · Amis · Affichage · Notifications · Mes
+données · À propos) ; Thème à 3 états ; Mes profils (liste, profil actif coché, renommer / avatar /
+supprimer, nombre de titres) ; Statistiques (§2) ; Sauvegarder / restaurer (état du compte, dernier
+envoi, interrupteur automatique, boutons, **écran de conflit** à 2 versions, confirmations) ;
+Notifications ; À propos (mention TMDB obligatoire, intacte) ; **Bienvenue** (langue + « restaurer
+une sauvegarde »).
+
+#### 5. Système (déjà posé en phase 1, à compléter)
+- Tokens : espacement 4-8-12-16-24-36, texte 12-14-16-20-26, arrondis 8-14-pilule, mouvement 220 ms.
+- Composants à ajouter : `Vide` (icône + titre + consigne + action), `Hero`, `Anneau` (progression),
+  `Switch` (déjà en CSS), `Tuile` (statut + jauge), `Mosaique` (liste), `Bandeau`.
+- Remplacer tous les `Chargement…` texte par des fantômes (13 occurrences).
+- Zone tactile ≥ 44 px pour `.seg--sm` et les puces (pseudo-élément), sans grossir le visuel.
+
+#### 6. Missions — cadrage technique (VALIDÉ par Kinder le 2026-10-03, ordre figé)
+
+**Suivi** (à tenir à jour à la fin de chaque mission : case, date, version de l'APK essayée)
+| Mission | Contenu | Statut |
+|---|---|---|
+| M1 | Fondations + Découvrir + écrans de partage | ✅ codée et vérifiée (2026-10-03) |
+| M2 | Fiches film et série | ✅ validée par Kinder (2026-10-03) |
+| M3 | Ce soir | ✅ codée et vérifiée (2026-10-03) — à essayer sur téléphone |
+| M4 | Mes listes + Statistiques | ✅ codée et vérifiée (2026-10-03) — APK à essayer sur téléphone |
+| M5 | Recherche + états partout | ✅ codée et vérifiée (2026-10-03) |
+| M6 | Réglages et données | ✅ codée et vérifiée (2026-10-03) |
+| M7 | Dynamique | ✅ codée (2026-10-03) — bannière « À la une » non faite (facultative) |
+Règle : **une mission à la fois**, essayée sur téléphone par Kinder avant la suivante. Une mission
+n'est « finie » que si toutes ses cases du « Critère de fin » sont cochées.
+
+**Protocole commun à chaque mission** (dans cet ordre)
+1. Relire la mission ci-dessous et la ou les planches de la maquette (lien en tête de section).
+2. Coder en modifiant l'existant avant d'en créer ; 3 couches (UI / logique / données) ; la logique
+   nouvelle va dans un module pur testable (`client/src/*.js`), l'écran dans `components/`.
+3. `cd client && npx vitest run` (293 tests verts au départ, jamais moins) puis `npx vite build`.
+4. Vérifier à l'écran, largeur téléphone (390 px), **avec une base remplie** (voir « Données de
+   démonstration » plus bas) : états plein, vide, chargement, hors connexion.
+5. **Vérifier sur le moteur Android réel** : `VITE_PARTAGE=1 npx vite build`, `npx cap sync android`,
+   `cd android && ./gradlew.bat assembleDebug` (avec `JAVA_HOME` = `C:/Program Files/Android/Android
+   Studio/jbr`), APK → `apk-test/vault-watch-test-amis.apk`. L'émulateur Android déjà lancé sert à
+   un autre projet de Kinder (« Le_comptoir ») : **ne rien y installer sans lui demander**.
+6. Mettre à jour : tableau de suivi ci-dessus, `CHANGELOG.md`, et si une décision change,
+   `PROJET_CONTEXTE.md`. Ne pas commiter sans demande.
+7. **S'arrêter**, donner l'APK à Kinder, attendre sa validation avant la mission suivante.
+
+**Pièges déjà rencontrés (à ne pas refaire)**
+- **Aucun commentaire SQL (`--`) ni point-virgule/apostrophe dans le schéma de `db.js`** : le moteur
+  SQLite du téléphone s'y étrangle (« execute: not an error (code 0) ») et l'application ne démarre
+  plus ; le navigateur ne le voit pas. Gardé par `tests/schema-telephone.test.js`.
+- Entiers de 13 chiffres (millisecondes) en base : utiliser des secondes.
+- Après un `vite build` ou un changement d'`.env`, **redémarrer le serveur de développement**
+  (`preview_stop` puis `preview_start`) : sinon deux copies de React (« Invalid hook call »).
+- Dans l'outil de commande, une *here-document* bash contenant des apostrophes échoue : écrire les
+  scripts avec l'outil Write puis les lancer.
+- Les captures du panneau navigateur sont instables (délai, image en 4 tuiles) : la tuile en haut à
+  gauche est fidèle ; sinon relancer, et s'appuyer sur `javascript_tool` (mesures, texte, états).
+- `IntersectionObserver` peut ne pas se déclencher dans ce panneau : `Rail.jsx` a un filet.
+- Interrupteur du partage : `VITE_PARTAGE=1` (présent seulement dans `.env.development`) ; ne pas
+  l'ajouter à `.env.production` (voir « Dossier Play Store »).
+
+**Données de démonstration** (navigateur, base locale vide au départ) : dans la console de la page,
+`const api = await import('/src/api.js')` puis `getRubrique({rubrique:'tendances',mediaType:'all',page:1})`
+→ `addToSuivi`, `setStatus`, `setNote`, `createListe`, `addToListe`. Prévoir : ≥ 30 titres, les 4
+statuts, des étoiles, 2 listes, une série en cours (cocher des épisodes), un ami (publier une fiche de test avec un petit script
+Node qui utilise `firebase` — format dans `client/firebase/tests/fiches.rules.test.js` — puis la
+supprimer ; code ami à 12 caractères sans 0/O/1/I).
+
+---
+**M2 — Fiches film et série** · planches : *Fiche · Film*, *Fiche · Série*, *Fiche série · sombre*
+- *Objectif* : la fiche (écran le plus ouvert) devient lisible d'un coup d'œil : où j'en suis, quoi
+  faire ensuite.
+- *Données* : `store.getProgress` → `next` gagne `airDate` (`firstUnwatched.airDate`) ; test dans
+  `tests/store.test.js` (« next porte la date de diffusion »). Rien d'autre en base.
+- *Découpage* : `Detail.jsx` (920 lignes) garde l'état et les appels ; extraire le rendu en
+  composants de présentation `FicheEntete.jsx` (fond + affiche + titre + métas), `FicheStatut.jsx`,
+  `FicheProgression.jsx` (anneau + prochain épisode + bouton), `FicheSaisons.jsx`. Aucun changement
+  de signature dans `api.js`.
+- *Film* : statut à 4 boutons (inchangé) · étoiles + bande-annonce · « Où le regarder » (logos
+  réels `providers`, abonnement puis location/achat) · synopsis replié à 4 lignes + « Lire la
+  suite » · têtes d'affiche (ronds, photo ou initiale) · `Visionnages.jsx` · avis · « Dans le même
+  esprit » et saga en `.rail` · mes listes.
+- *Série* : **statut calculé** = `current` (jamais 4 boutons) + bouton « Abandonner » ; si abandonné :
+  « Reprendre le suivi » (`pickStatus` → `deriveSeriesStatus`) — conserver `statusDisabled`. Anneau
+  = `watched / aired` (`--p` en %, `conic-gradient`). Carte « Prochain épisode » : `S{n}E{nn} · nom`,
+  « Diffusé le … » ; bouton « Marquer SxEy comme vu » → `markEpisode` puis `refreshProgress` et
+  rechargement des épisodes. `next === null` : « À jour » (+ nombre d'épisodes annoncés à part,
+  logique `aVenir` existante). Badge `releaseBadge` conservé. Saisons dépliables : coche ronde,
+  ×N, calendrier, « J'ai revu la saison », « J'ai vu toute la série ».
+- *États* : chargement = fond + affiche fantômes ; hors connexion (`info` null) = données du suivi
+  (titre, année, affiche) + `.vide` « Détails indisponibles » + Réessayer ; titre non suivi : le statut
+  devient « Ajouter à mon suivi » (bouton principal).
+- *Tests* : `next.airDate` ; helper pur `libelleProchain(next)` dans `status.js` (+ tests) ;
+  vérification à l'écran sur : film non suivi, film vu, série en cours, série à jour, série
+  abandonnée, série à venir.
+- *Critère de fin* : ☐ tests verts ☐ 6 cas vérifiés ☐ clair et sombre ☐ moteur Android ☐ retour
+  Android ferme la fiche ☐ aucun style `.section h4` orphelin.
+
+**M3 — Ce soir** · planches : *Ce soir · En attente*, *· Suggestion*, *Bandeau de sauvegarde*, *États*
+- *Objectif* : une page qui répond à « qu'est-ce que je regarde ce soir ? ».
+- *Données* : `listSuivi` renvoie aussi `s.added_at AS addedAt`.
+- *Logique pure* (nouveau `client/src/idee.js`, **à tester**) : `ideeDuSoir(items, { profileId, date, rang })`
+  — candidats = `status === 'a_voir' && !isUpcoming(item)` ; mélange déterministe (PRNG type
+  mulberry32 amorcé par un hachage de `${profileId}|${date}`), l'élément `rang % candidats.length` ;
+  `null` si aucun candidat. Rang mémorisé dans `localStorage` (`idee:${profileId}:${date}`) :
+  « Autre idée » l'incrémente, relancer l'application garde la même idée. Aussi `depuisLibelle(addedAt, now)`
+  (« depuis 3 semaines », « depuis hier », « depuis 2 mois »).
+- *Écran* : `Hero.jsx` (fond = affiche floutée et assombrie, repli dégradé par teinte du titre ;
+  kicker, titre, sous-titre, 2 boutons) · « Reprendre » en `.rail` avec barre `watched/aired` sur
+  l'affiche (`progress` déjà chargé dans `Tonight`) · « À voir ce soir » en `.rail` + « Tout voir »
+  (réutiliser `VueRayon` avec `pagine={false}`) · « Pas encore sorti » = ligne `.panel` (compte +
+  prochaine date) qui déplie `Upcoming` · « Découverte » en grille `.rail__item rise` · « Suggestion »
+  = `Rubriques` avec `chips-scroll`. Bandeau de sauvegarde (`.rappel`) restylé en `.panel.accent`.
+- *États* : bibliothèque vide → `Vide` avec bouton « Chercher un titre » (nouvelle prop `onSearch`
+  = `goTo('search')`) ; rien « à voir » → pas de héros ; seulement des titres à venir → ligne
+  « Pas encore sorti » seule.
+- *Tests* : `tests/idee.test.js` — même idée le même jour, idée différente un autre jour, « Autre
+  idée » parcourt tous les candidats sans répétition puis boucle, exclut à venir / en cours / vu,
+  `null` si vide, `depuisLibelle` (hier, 3 semaines, 2 mois).
+- *Critère de fin* : ☑ tests (308) ☑ 4 cas de bibliothèque (vide, que du « à voir », que du « à venir », riche)
+  ☑ clair/sombre ☐ moteur Android (APK construit, à essayer par Kinder) ☑ « Reprendre » ouvre la fiche ☑ plus de `Chargement…` ici.
+- *Écarts constatés* : `Bloc.jsx` (barres repliables) supprimé, remplacé par des sections `.sec` ; « Pas encore sorti » est
+  une ligne `.panel--ligne` ; « Tout voir » de « À voir ce soir » n'apparaît qu'au-delà de 6 titres ; « Autre idée »
+  n'apparaît que s'il y a plus d'un candidat ; « Suggestion » : les puces de rubrique défilent (`chips-scroll`).
+  La carte « idée » dit « dans ta liste depuis… » ou « ajouté aujourd'hui ».
+
+**M4 — Mes listes + Statistiques** · planches : *Mes listes*, *Mes listes · une liste*, *Statistiques*
+- *Données* : `listListes` renvoie `covers` (jusqu'à 4 affiches) via sous-requête
+  `(SELECT group_concat(poster_url, '|') FROM (SELECT s.poster_url … ORDER BY li.added_at DESC LIMIT 4))`
+  — **sans commentaire SQL** ; découper sur `|` côté JS. `getStats` renvoie aussi
+  `parGenre: [{ key, n }]` (top 5 sur les titres « vu » et « en cours », `genres` CSV ignoré si vide ou
+  NULL) ; noms via `getGenres`.
+- *Écran* : en-tête de page + bandeau de 3 chiffres (`getStats`: `titres`, `parStatut.vu`,
+  `noteMoyenne` ; touche → `onOpenStats`) · recherche · 4 `Tuile` (compte + jauge `n / titres`,
+  sélection = comportement actuel) · « Listes personnalisées » : `.rail` de cartes à mosaïque 2×2
+  (`Mosaique`) + carte « Nouvelle liste » · outils sur une ligne (`.toolbar`, déjà posée) · grille.
+  Une liste : titre + compte, `.panel.flush` avec interrupteur « Visible par tes amis » (seulement si
+  `partageActif`), Ajouter, Supprimer. `Filtres.jsx` : genres en `chips-scroll`.
+- *Statistiques* : mêmes sections qu'aujourd'hui (temps passé, bibliothèque, répartition, note) en
+  blocs `.panel` + « Genres les plus regardés » (pastille « Nouveau » ; masqué si aucun genre connu).
+  Conserver la barre « Récupération des durées… ».
+- *Tests* : `listListes.covers` (0, 2, 5 titres ; ordre), `getStats.parGenre` (CSV, vides, NULL,
+  plafond 5) dans `tests/listes.test.js` / `store.test.js`.
+- *Critère de fin* : ☑ tests (313) ☑ liste vide / 1 titre / 10 titres ☑ bibliothèque vide (composant `Vide`) ☑ clair/sombre ☐
+  moteur Android (la sous-requête `group_concat` passe : APK construit, à essayer par Kinder) ☑ Statistiques atteignable en 1 geste.
+- *Écarts constatés* : le bandeau de 3 chiffres est calculé sur les titres déjà chargés (`resumeBiblio`, instantané),
+  pas par `getStats` ; `Chargement…` de la liste remplacé par des fantômes ; l'interrupteur « Visible par tes amis »
+  n'apparaît que si le partage est actif (non vérifié à l'écran : profil non activé en démonstration).
+
+**M5 — Recherche + états partout** · planches : *Recherche · accueil / résultats / Explorer*, *États*
+- *Composants* : `Vide.jsx` (`icone`, `titre`, `texte`, `action`) et `Fantomes.jsx` (`Poster` et `Ligne`
+  réutilisables : grille, rangée) ; remplacer **les 13** `Chargement…` (`grep -rn "Chargement" src`).
+- *Recherche* : accueil = « Tendances » en grille (`Rubriques` avec une seule rubrique), filtre
+  `seg--sm`, « Voir plus » ; résultats : en-tête « Résultats N » ; panneau `Filtres` en `.panel` ;
+  Explorer : genres en `chips-scroll` ; mention « N titres déjà suivis masqués ».
+- *Hors connexion* : les erreurs réseau des appels TMDB (`Rubriques`, `Decouvrir`, recherche,
+  fiches) basculent un état local `horsLigne` → `Vide` « Pas de connexion » + « Réessayer ».
+- *Cibles tactiles* : règle CSS générale (pseudo-élément `::after` ±6 px) pour `.seg--sm button`,
+  `.chip`, `.sec__all` ; vérifier qu'aucune cible ne mesure < 44 px de zone.
+- *Critère de fin* : ☑ `grep Chargement` = 0 (hors messages d'envoi) ☑ hors connexion simulé
+  (`fetch` en échec + `navigator.onLine` à faux : Recherche, Découvrir, Suggestion, Découverte) ☑ clair/sombre ☐ moteur
+  Android (APK en fin de série) ☑ clavier jamais forcé.
+- *Écarts constatés* : composants `Fantomes.jsx` (grille, rangée, puces), `HorsLigne.jsx` ; `reseau.js` (test) détecte
+  l'absence de réseau ; la fiche d'un titre garde son propre état hors connexion (M2). Zones tactiles : `.seg--sm`,
+  `.chip`, `.sec__all` ≥ 44 px mesurées.
+
+**M6 — Réglages et données** · planches : *Réglages*, *Mes profils*, *Sauvegarde*, *Conflit Drive*,
+*Notifications*, *À propos*, *Premier lancement*, *Réglages · sombre*
+- *Thème 3 états* : nouveau `client/src/theme.js` — `lireChoix()` (`'auto'` si rien en mémoire),
+  `resoudre(choix, systemeSombre)`, `appliquer(choix)` (pose `data-theme`, écoute
+  `matchMedia('(prefers-color-scheme: dark)')` quand `auto`) ; `main.jsx` l'appelle ; Réglages :
+  ligne « Thème » qui ouvre 3 choix (Automatique, Clair, Sombre). Tests purs de `resoudre`.
+- *Restyle seulement, aucune logique touchée* pour `Backup.jsx` (554 lignes), `Profiles.jsx`,
+  `Notifications.jsx`, `About.jsx`, `CatalogLanguage.jsx` : classes/markup vers `.panel`, `.row`,
+  `.switch`, `.message`, `.btn`. Les tests `cloud.*.test.js`, `backup.test.js` restent verts sans
+  modification. Écran de conflit : 2 versions côte à côte (Drive / ce téléphone) + 3 boutons.
+- *Bienvenue* : lien « J'ai déjà une sauvegarde — la restaurer » → ouvre Sauvegarde (le profil par
+  défaut existe : `ensureDefaultProfile`).
+- *Textes* : relecture « tu » partout (`grep -rn "vous\|votre" src`), `À propos` intact (mention TMDB).
+- *Critère de fin* : ☑ tests (dont `cloud.*`, sans modification) ☑ thème Auto : test unitaire du suivi en direct (l'émulation du panneau
+  n'envoie pas l'événement : à confirmer sur téléphone) ☐ Drive : connexion, sauvegarde, restauration, conflit toujours
+  fonctionnels (Kinder, sur téléphone) ☑ clair/sombre ☐ moteur Android (APK de fin de série).
+- *Écarts constatés* : l'écran de conflit Drive garde sa logique ; il est restylé en bloc (la version « ce téléphone » n'a pas de
+  résumé chiffré, donc pas de colonnes côte à côte : rien d'inventé). L'interrupteur de sauvegarde automatique est un vrai
+  `.switch`. « Mes profils » affiche le nombre de titres (`listProfiles`). Messages passés au tutoiement (sauf l'erreur Google
+  « Reconnectez-vous », figée par un test `cloud`). Bienvenue : lien « J'ai déjà une sauvegarde ».
+
+**M7 — Dynamique** · planches : toutes, en sombre et clair
+- *Transition d'onglet* : le contenu de la vue est enveloppé d'un `div` à clé `view` avec
+  `.view-enter` (fondu + glissement 6 px, 180 ms) — pas rejouée au changement de sous-onglet ;
+  coupée par `prefers-reduced-motion`.
+- *Retour tactile* généralisé (`.settings__line--btn:active`, `.tile:active`, `.ligne-ami:active`,
+  `.statuspick__btn:active`) ; vibration 10 ms sur « Marquer vu » et changement de statut
+  (`navigator.vibrate?.(10)`).
+- *Facultatif — bannière « À la une »* (Découvrir) : `toCardItem` gagne `backdropUrl`
+  (`w780`, `backdrop_path`) ; premier titre de « Le meilleur de l'année » avec son fond, note et
+  nombre de votes ; chargée seulement si visible. Si le rendu pèse sur un vrai téléphone : abandonner.
+- *Critère de fin* : ☐ aucune saccade (essai de Kinder sur téléphone) ☑ `prefers-reduced-motion`
+  respecté (règle globale existante) ☑ tests (320) ☐ moteur Android (APK de fin de série) ☑ plan et documentation mis à jour ;
+  **chantier clos après l'essai de Kinder**.
+- *Écarts constatés* : bannière « À la une » non faite (facultative, et son poids sur un vrai téléphone ne peut pas être jugé ici).
+  Vibration de 10 ms (`tactile.js`) sur « Marquer vu », « Marquer le prochain », saison entière et changement de statut.
+
+#### 7. Risques et garde-fous
+- **Performance** : rangées chargées à l'approche de l'écran, images `loading="lazy"`, jamais plus
+  de ~12 appels TMDB à l'ouverture de Découvrir ; fond d'écran (phase 7) chargé seulement si visible.
+- **Régressions** : les 293 tests existants restent verts ; chaque règle nouvelle a ses tests.
+- **Base** : aucune migration nécessaire (les colonnes utiles existent) ; si une est ajoutée, pas de
+  commentaire SQL dans le schéma.
+- **Cohérence Play Store** : rien dans cette refonte ne change les données collectées ; le partage
+  reste derrière son interrupteur de compilation.
+- **Lisibilité** : contrastes à vérifier en sombre sur les petits textes (`--muted`, légendes).
+
+#### 8. Points validés par Kinder (2026-10-03) — figés
+1. « Idée du soir » selon la règle §4.2. 2. Statistiques accessibles depuis Mes listes. 3. Rangée
+d'avatars d'amis dans Découvrir. 4. Thème « Automatique ». 5. « Découverte » (Ce soir) et « Découvrir »
+(onglet) gardés malgré l'homonymie, avec sous-titres explicites. 6. Bannière « À la une » en M7
+seulement, facultative. **Ordre des missions : M2 → M7, une à la fois.**
+
+**Trois points tranchés le 2026-10-03**
+- *Reprise après réinstallation* : clé secrète tirée au hasard à l'activation, gardée sur le
+  téléphone et dans la sauvegarde Drive, montrée une fois comme **code de récupération**. Le
+  serveur ne garde que son empreinte publique ; la clé elle-même est rangée dans une zone
+  illisible que seules les règles consultent. Sans clé ni Drive : nouvelle fiche, nouveau code.
+  **À vérifier à l'étape 1** dans l'émulateur (fonction d'empreinte des règles Firebase) ; repli
+  si elle manque : pas de reprise possible.
+- *Taille* : plafond de **5 000 titres distincts** et **50 listes**, pseudo de 24 caractères,
+  aucune date. Un titre présent dans plusieurs listes n'est envoyé qu'une fois (les listes
+  pointent vers lui).
+- *Code ami* : 12 caractères en 3 blocs de 4 (`K7F2-M9QX-3DTB`), sans caractères ambigus (0/O,
+  1/I), saisie insensible à la casse, ~10¹⁸ combinaisons. Parcourir les fiches est interdit
+  par les règles ; donné via la feuille de partage d'Android (pas de lien cliquable).
+- Garde-fous : 100 amis par profil au maximum ; une fiche ami n'est relue qu'à l'ouverture de
+  l'écran et au plus une fois par heure (copie gardée sur le téléphone).
+
+**À trancher au moment du codage** : l'emplacement exact du réglage « privée » dans l'écran
+d'une liste, et la liste des statuts privés par défaut (aucun).
+
 ### 5. ~~Récupérer l'historique Netflix / Canal+ / Disney+~~ — ABANDONNÉ (2026-08-27)
 Aucun de ces services n'expose l'historique d'un compte personnel : pas d'API publique
 (Netflix a fermé la sienne en 2014), pas de programme partenaire ouvert à un développeur

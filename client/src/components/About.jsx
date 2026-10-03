@@ -20,18 +20,22 @@ export default function About({ onClose }) {
             de films et de séries.
           </p>
 
-          <h3 className="about__title">Vos données</h3>
+          <section className="panel">
+          <h3 className="panel__title">Tes données</h3>
           <p>
             Tout est enregistré <strong>sur cet appareil uniquement</strong> : profils,
             suivi, épisodes vus et listes. Rien n'est envoyé sur un serveur, et
             l'application ne crée aucun compte.
           </p>
-          <p className="about__warn">
-            Pensez à faire une sauvegarde : si vous perdez l'appareil, vous perdez
-            votre suivi.
+          <p className="message message--attention">
+            Pense à faire une sauvegarde : si tu perds l'appareil, tu perds
+            ton suivi.
           </p>
 
-          <h3 className="about__title">Source des données</h3>
+          </section>
+
+          <section className="panel">
+          <h3 className="panel__title">Source des données</h3>
           <p>
             Les fiches, affiches, castings et disponibilités proviennent de{' '}
             <strong>TMDB</strong>. Les disponibilités en streaming sont fournies par
@@ -55,6 +59,7 @@ export default function About({ onClose }) {
               certified, or otherwise approved by TMDB.
             </p>
           </div>
+          </section>
         </div>
       </div>
     </div>

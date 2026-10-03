@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// Règles de sécurité des fiches partagées (amis par code) — PLAN_V2.md, point 4 bis.
+//
+// Deux collections :
+//  - fiches/{code}                     la fiche publique. Lisible *seulement* par qui connaît
+//                                      le code (get) ; impossible à parcourir (list). Écrite
+//                                      par son propriétaire seulement.
+//  - proprietaires/{code}/clefs/{uid}  { cle } : la preuve qu'un identifiant (uid) est
+//                                      propriétaire. Illisible pour tout le monde — seules
+//                                      ces règles la consultent. Une ligne par identifiant,
+//                                      créable uniquement avec la clé secrète dont l'empreinte
+//                                      figure dans la fiche. C'est ce qui permet de retrouver
+//                                      sa fiche après une réinstallation : la connexion
+//                                      anonyme change, la clé, elle, est gardée dans la
+//                                      sauvegarde Drive (ou notée par l'utilisateur).
+//    (Une première version avait une seule ligne par code : un intrus pouvait la modifier et
+//    garder la clé déjà enregistrée. Les tests l'ont montré ; d'où une ligne par identifiant,
+//    jamais modifiable.)
+//
+// Le code est de 12 caractères sans ambiguïté (ni 0/O, ni 1/I) : environ 10^18 combinaisons.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function connecte() {
+      return request.auth != null;
+    }
+
+    function codeValide(code) {
+      return code.matches('[A-HJ-NP-Z2-9]{12}');
+    }
+
+    // Empreinte (SHA-256, en hexadécimal minuscule) de la clé : la seule chose publique.
+    // Les règles rendent l'hexadécimal en MAJUSCULES : on le ramène en minuscules, comme
+    // le fait l'application (vérifié contre l'émulateur).
+    function empreinte(cle) {
+      return hashing.sha256(cle).toHexString().lower();
+    }
+
+    function estProprietaire(code) {
+      return connecte()
+        && exists(/databases/$(database)/documents/proprietaires/$(code)/clefs/$(request.auth.uid));
+    }
+
+    // Ce qu'une fiche a le droit de contenir. Pas de date, pas d'avis écrit : voir le
+    // cadrage. La taille totale est bornée par la limite d'un document (1 Mo) ; les listes
+    // sont bornées en nombre.
+    function ficheValide(d) {
+      return d.keys().hasOnly(['v', 'pseudo', 'avatar', 'maj', 'cleHash', 'titres', 'listes'])
+        && d.keys().hasAll(['v', 'pseudo', 'avatar', 'maj', 'cleHash', 'titres', 'listes'])
+        && d.v == 1
+        && d.pseudo is string && d.pseudo.size() >= 1 && d.pseudo.size() <= 24
+        && d.avatar is string && d.avatar.size() <= 4000
+        && d.maj == request.time
+        && d.cleHash is string && d.cleHash.size() == 64
+        && d.titres is list && d.titres.size() <= 5000
+        && d.listes is list && d.listes.size() <= 50;
+    }
+
+    match /fiches/{code} {
+      allow get: if connecte() && codeValide(code);
+      allow list: if false;
+
+      // Création : la fiche et son propriétaire s'écrivent dans le même lot.
+      allow create: if connecte() && codeValide(code) && ficheValide(request.resource.data)
+        && existsAfter(/databases/$(database)/documents/proprietaires/$(code)/clefs/$(request.auth.uid));
+
+      // Mise à jour : propriétaire seulement, et l'empreinte ne change jamais.
+      allow update: if estProprietaire(code) && ficheValide(request.resource.data)
+        && request.resource.data.cleHash == resource.data.cleHash;
+
+      allow delete: if estProprietaire(code);
+    }
+
+    match /proprietaires/{code}/clefs/{uid} {
+      allow get, list, update: if false;
+
+      // Réclamer une fiche (première fois, ou après réinstallation) : on ne peut créer que
+      // sa propre ligne, et seulement avec la clé dont l'empreinte est celle de la fiche.
+      allow create: if connecte() && codeValide(code) && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['cle'])
+        && request.resource.data.cle is string
+        && request.resource.data.cle.size() >= 20 && request.resource.data.cle.size() <= 64
+        && empreinte(request.resource.data.cle)
+           == getAfter(/databases/$(database)/documents/fiches/$(code)).data.cleHash;
+
+      // Retirer sa propre ligne (avec la suppression de la fiche).
+      allow delete: if connecte() && uid == request.auth.uid;
+    }
+
+    // Tout le reste est fermé.
+    match /{autre=**} {
+      allow read, write: if false;
+    }
+  }
+}

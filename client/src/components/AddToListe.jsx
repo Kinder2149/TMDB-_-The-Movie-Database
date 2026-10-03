@@ -79,7 +79,7 @@ export default function AddToListe({ liste, items, dejaDedans, onValider, onClos
         <div className="detail-pad">
           <div className="search-bar">
             <span className="search-bar__icon" aria-hidden="true">
-              🔍
+              <Icon name="search" size={18} />
             </span>
             <input
               type="text"
@@ -90,7 +90,7 @@ export default function AddToListe({ liste, items, dejaDedans, onValider, onClos
             />
           </div>
 
-          <div className="seg">
+          <div className="seg seg--sm">
             {[
               { value: 'all', label: 'Tout' },
               { value: 'movie', label: 'Films' },

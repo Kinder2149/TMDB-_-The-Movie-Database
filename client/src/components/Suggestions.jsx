@@ -1,7 +1,11 @@
 import MovieCard from './MovieCard.jsx';
 import Icon from './Icon.jsx';
+import Vide from './Vide.jsx';
+import HorsLigne from './HorsLigne.jsx';
+import { GrilleFantome } from './Fantomes.jsx';
+import { useEnLigne } from '../reseau.js';
 
-// Section « Parce que vous avez aimé… » : recommandations TMDB agrégées depuis
+// Section « Parce que tu as aimé… » : recommandations TMDB agrégées depuis
 // les titres marqués vus / en cours du profil. Affichée à l'intérieur de
 // « Ce soir » (embedded), plus d'onglet dédié.
 export default function Suggestions({
@@ -12,49 +16,36 @@ export default function Suggestions({
   cardProps,
   embedded = false,
 }) {
-  const sugFilms = suggestions.filter((i) => i.mediaType === 'movie');
-  const sugSeries = suggestions.filter((i) => i.mediaType === 'tv');
   const byKey = new Map(items.map((i) => [`${i.mediaType}-${i.id}`, i]));
 
-  const grid = (list) => (
+  // Films et séries mélangés dans une seule grille : le tirage les alterne déjà.
+  const enLigne = useEnLigne();
+  const body = suggestionsLoading ? (
+    <GrilleFantome />
+  ) : suggestions.length === 0 && !enLigne ? (
+    <HorsLigne onRetry={onRefreshSuggestions} />
+  ) : suggestions.length === 0 ? (
+    <Vide
+      icone="star"
+      titre="Pas encore de suggestion"
+      texte="Marque des titres comme vus ou en cours, et note-les : les idées viendront de là."
+    />
+  ) : (
     <div className="grid">
-      {list.map((item) => {
+      {suggestions.map((item, i) => {
         const key = `${item.mediaType}-${item.id}`;
         const followed = byKey.get(key);
         return (
-          <MovieCard
+          <div
+            className="rail__item rise"
             key={key}
-            item={item}
-            isFollowed={!!followed}
-            status={followed?.status}
-            {...cardProps}
-          />
+            style={{ animationDelay: `${Math.min(i % 12, 8) * 30}ms` }}
+          >
+            <MovieCard item={item} isFollowed={!!followed} status={followed?.status} {...cardProps} />
+          </div>
         );
       })}
     </div>
-  );
-
-  const body = suggestionsLoading ? (
-    <p className="hint">Recherche de suggestions…</p>
-  ) : suggestions.length === 0 ? (
-    <p className="hint">
-      Marque des titres comme vus ou en cours pour recevoir des suggestions.
-    </p>
-  ) : (
-    <>
-      {sugFilms.length > 0 && (
-        <div className="media-section">
-          <h4 className="subhead">Films</h4>
-          {grid(sugFilms)}
-        </div>
-      )}
-      {sugSeries.length > 0 && (
-        <div className="media-section">
-          <h4 className="subhead">Séries</h4>
-          {grid(sugSeries)}
-        </div>
-      )}
-    </>
   );
 
   const actualiser = (enBas) => (
@@ -74,10 +65,13 @@ export default function Suggestions({
 
   return (
     <section className={embedded ? 'tonight__section' : 'tonight'}>
-      <h3 className="tonight__title">
-        Parce que vous avez aimé…
+      <header className="sec__head">
+        <div className="sec__txt">
+          <h3 className="sec__title">Parce que tu as aimé…</h3>
+          <p className="sec__sub">Choisis d'après ce que tu as vu et noté</p>
+        </div>
         {actualiser(false)}
-      </h3>
+      </header>
       {body}
       {/* Même bouton en pied de liste : on n'a pas à remonter pour relancer. */}
       {!suggestionsLoading && suggestions.length > 0 && (

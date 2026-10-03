@@ -4,6 +4,10 @@ import SearchBar from './components/SearchBar.jsx';
 import MovieCard from './components/MovieCard.jsx';
 import Detail from './components/Detail.jsx';
 import Lists from './components/Lists.jsx';
+import Rubriques from './components/Rubriques.jsx';
+import Partage from './components/Partage.jsx';
+import Amis from './components/Amis.jsx';
+import Decouvrir from './components/Decouvrir.jsx';
 import Tonight from './components/Tonight.jsx';
 import Settings from './components/Settings.jsx';
 import StatusMenu from './components/StatusMenu.jsx';
@@ -12,9 +16,16 @@ import Filtres from './components/Filtres.jsx';
 import Icon from './components/Icon.jsx';
 import About from './components/About.jsx';
 import Backup from './components/Backup.jsx';
+import Notifications from './components/Notifications.jsx';
 import Profiles from './components/Profiles.jsx';
 import Stats from './components/Stats.jsx';
 import Avatar from './components/Avatar.jsx';
+import Vide from './components/Vide.jsx';
+import HorsLigne from './components/HorsLigne.jsx';
+import { GrilleFantome } from './components/Fantomes.jsx';
+import { estErreurReseau } from './reseau.js';
+import { vibre } from './tactile.js';
+import { lireChoix, appliquer as appliquerTheme } from './theme.js';
 import {
   searchTitles,
   searchByActor,
@@ -23,9 +34,6 @@ import {
   getGenres,
   discoverGenre,
   getPlateformes,
-  getRubrique,
-  getMoods,
-  discoverMood,
   getSuggestions,
   getSuivi,
   addToSuivi,
@@ -46,8 +54,14 @@ import {
   changeCatalogLanguage,
   getListes,
   mettreAJourDatesDeSortie,
+  verifierNotifications,
+  notifierSortiesDues,
   createListe as apiCreateListe,
   deleteListe as apiDeleteListe,
+  setListePrive as apiSetListePrive,
+  getPartage,
+  publierPartageAuto,
+  partageDisponible,
   addToListe as apiAddToListe,
   removeFromListe as apiRemoveFromListe,
 } from './api.js';
@@ -82,9 +96,9 @@ export default function App() {
   const [mediaFilter, setMediaFilter] = useState('all'); // all | movie | tv
   const [searchMode, setSearchMode] = useState('title'); // title | actor | genre
   const [person, setPerson] = useState(null); // acteur résolu (mode acteur)
+  const derniereRecherche = useRef('');
+  const [erreurReseau, setErreurReseau] = useState(false);
   const [genres, setGenres] = useState([]); // [{ key, name }] — liste unique films + séries
-  const [moods, setMoods] = useState([]); // [{ key, name }] — rayons de l'accueil (M5)
-  const [trending, setTrending] = useState([]); // accueil de la recherche (champ vide)
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [genrePage, setGenrePage] = useState(1);
   const [genreMore, setGenreMore] = useState(true);
@@ -104,8 +118,6 @@ export default function App() {
   const [filtres, setFiltres] = useState(FILTRES_VIDES);
   const [filtresOuverts, setFiltresOuverts] = useState(false);
   const [plateformes, setPlateformes] = useState([]);
-  // Rubrique de l'accueil de la recherche (champ vide, Titre/Acteur).
-  const [rubrique, setRubrique] = useState('tendances');
   // Suivi complet : clé -> item (avec status et listStatus).
   const [suivi, setSuivi] = useState(() => new Map());
   const [openDetail, setOpenDetail] = useState(null);
@@ -113,8 +125,14 @@ export default function App() {
   const [statusMenu, setStatusMenu] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfiles, setShowProfiles] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showPartage, setShowPartage] = useState(false);
+  const [showAmis, setShowAmis] = useState(false);
+  // Profil partagé (amis par code) du profil actif, ou null s'il n'est pas activé.
+  const [partage, setPartage] = useState(null);
+  const rafraichirPartage = () => getPartage().then(setPartage).catch(() => setPartage(null));
   // Écran ouvert par-dessus un onglet (ex. « Ajouter des titres » dans une
   // liste) : il possède son propre état, mais c'est ici qu'on sait dans quel
   // ordre le bouton retour doit fermer les choses.
@@ -133,20 +151,12 @@ export default function App() {
   // lance aucune opération de suivi (elles sont toujours scopées par profil).
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(getActiveProfileId());
-  // Thème clair / sombre (posé sur <html> par main.jsx au démarrage).
-  const [theme, setTheme] = useState(
-    () => document.documentElement.dataset.theme || 'dark'
-  );
+  // Thème : Automatique / Clair / Sombre (posé sur <html> par main.jsx au démarrage).
+  const [choixTheme, setChoixTheme] = useState(lireChoix);
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem('theme', next);
-    } catch {
-      /* localStorage indisponible : le thème reste juste pour la session */
-    }
+  function changerTheme(choix) {
+    setChoixTheme(choix);
+    appliquerTheme(choix);
   }
 
   const [listes, setListes] = useState([]);
@@ -220,109 +230,34 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
 
-  // Accueil de la recherche : Tendances, Nouveautés, À venir. Une page TMDB
-  // (20 titres), une fois masqué ce qu'on a déjà, n'en laissait parfois qu'une
-  // poignée : on en charge 3 d'un coup, et « Voir plus » en ajoute 3 autres.
-  const [tendancesPage, setTendancesPage] = useState(0); // dernière page chargée
-  const [tendancesPlus, setTendancesPlus] = useState(true);
-  const [accueilCharge, setAccueilCharge] = useState(false);
-  const tendancesSeq = useRef(0);
-
-  async function chargerAccueil(quelleRubrique, filtre, ajouter = false) {
-    const seq = ++tendancesSeq.current;
-    setAccueilCharge(true);
-    const depuis = ajouter ? tendancesPage + 1 : 1;
-    const pages = [depuis, depuis + 1, depuis + 2];
-    try {
-      const lots = await Promise.all(
-        pages.map((page) =>
-          getRubrique({ rubrique: quelleRubrique, mediaType: filtre, page }).catch(() => [])
-        )
-      );
-      if (seq !== tendancesSeq.current) return; // rubrique/filtre changé entre-temps
-      const nouveaux = lots.flat();
-      setTendancesPage(depuis + 2);
-      setTendancesPlus(lots[2].length > 0);
-      setTrending((prev) => {
-        const base = ajouter ? prev : [];
-        const vus = new Set(base.map(keyOf));
-        return [...base, ...nouveaux.filter((r) => !vus.has(keyOf(r)) && vus.add(keyOf(r)))];
-      });
-    } catch {
-      /* réseau indisponible : l'écran reste sans Tendances */
-    } finally {
-      if (seq === tendancesSeq.current) setAccueilCharge(false);
-    }
-  }
-
-  // --- Onglet Découvrir (M5) : les moods, indépendants de l'accueil de la
-  // recherche. Même mécanique de pagination (3 pages, « Voir plus »), une
-  // porte différente (`discoverMood`, genre/mots-clés fixes plutôt que
-  // tendances TMDB) et son propre état — rien ne se mélange avec Tendances /
-  // Nouveautés / À venir.
-  const [mood, setMood] = useState(null); // aucun choisi au départ
-  const [decouvrir, setDecouvrir] = useState([]);
-  const [decouvrirPage, setDecouvrirPage] = useState(0);
-  const [decouvrirPlus, setDecouvrirPlus] = useState(true);
-  const [decouvrirCharge, setDecouvrirCharge] = useState(false);
-  const decouvrirSeq = useRef(0);
-
-  async function chargerDecouvrir(quelMood, filtre, ajouter = false) {
-    if (!quelMood) return;
-    const seq = ++decouvrirSeq.current;
-    setDecouvrirCharge(true);
-    const depuis = ajouter ? decouvrirPage + 1 : 1;
-    const pages = [depuis, depuis + 1, depuis + 2];
-    try {
-      const lots = await Promise.all(
-        pages.map((page) =>
-          discoverMood({
-            mood: quelMood,
-            movie: filtre !== 'tv',
-            tv: filtre !== 'movie',
-            page,
-          }).catch(() => [])
-        )
-      );
-      if (seq !== decouvrirSeq.current) return;
-      const nouveaux = lots.flat();
-      setDecouvrirPage(depuis + 2);
-      setDecouvrirPlus(lots[2].length > 0);
-      setDecouvrir((prev) => {
-        const base = ajouter ? prev : [];
-        const vus = new Set(base.map(keyOf));
-        return [...base, ...nouveaux.filter((r) => !vus.has(keyOf(r)) && vus.add(keyOf(r)))];
-      });
-    } catch {
-      /* réseau indisponible : l'écran reste sans rien */
-    } finally {
-      if (seq === decouvrirSeq.current) setDecouvrirCharge(false);
-    }
-  }
-
-  // Relance à chaque changement de mood, ou de filtre Films/Séries tant qu'un
-  // mood est choisi.
+  // Cycle de vérification des notifications de sortie (figé le 2026-09-27) :
+  // ne revérifie que les titres suivis « en attente » d'une date, au plus une
+  // fois par jour — sinon rester l'application ouverte redemanderait les mêmes
+  // fiches à TMDB sans arrêt. La date du dernier passage est gardée par
+  // profil, hors base : ce n'est pas une donnée de suivi, juste un repère
+  // local à l'appareil.
+  // Une fois le cycle passé (ou déjà fait aujourd'hui), on regarde — à chaque
+  // lancement, sans condition de date : une lecture locale, sans appel réseau,
+  // rien ne justifie de l'espacer — si des titres sont désormais dus, et on
+  // les notifie. C'est ce dernier pas qui envoie la vraie notification.
   useEffect(() => {
-    if (!mood) return;
-    setDecouvrir([]);
-    chargerDecouvrir(mood, mediaFilter);
+    if (!activeProfile) return;
+    const cle = `notif-cycle:${activeProfile}`;
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const cycle =
+      localStorage.getItem(cle) === aujourdhui
+        ? Promise.resolve()
+        : verifierNotifications()
+            .then(() => localStorage.setItem(cle, aujourdhui))
+            .catch(() => {});
+    cycle.then(() => notifierSortiesDues()).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mood, mediaFilter]);
+  }, [activeProfile]);
 
-  // Genres et moods chargés une fois (indépendants du profil).
+  // Genres chargés une fois (indépendants du profil).
   useEffect(() => {
     getGenres().then(setGenres).catch(() => {});
-    getMoods().then(setMoods).catch(() => {});
   }, []);
-
-  // Accueil : rechargé quand on change de rubrique ou qu'on passe de Tout à
-  // Films ou Séries. Vidé d'abord : on ne montre pas les Tendances sous le titre
-  // « Nouveautés » le temps que la réponse arrive.
-  useEffect(() => {
-    setTrending([]);
-    chargerAccueil(rubrique, mediaFilter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaFilter, rubrique]);
 
   // Explorer : la découverte se relance à l'entrée dans le mode, et quand le
   // filtre Films/Séries ou l'un des filtres change. Le genre est facultatif.
@@ -408,8 +343,10 @@ export default function App() {
       setHasSearched(false);
       return;
     }
+    derniereRecherche.current = query;
     setStatus('loading');
     setError('');
+    setErreurReseau(false);
     setHasSearched(true);
     try {
       if (searchMode === 'actor') {
@@ -431,6 +368,7 @@ export default function App() {
       // On ignore les réponses dépassées (frappe rapide).
       if (seq === searchSeq.current) {
         setError(err.message);
+        setErreurReseau(estErreurReseau(err));
         setStatus('error');
       }
     }
@@ -581,6 +519,7 @@ export default function App() {
   async function handleSetStatus(item, newStatus) {
     try {
       await apiSetStatus(item.mediaType, item.id, newStatus);
+      vibre();
       loadSuivi();
     } catch (err) {
       setError(err.message);
@@ -598,6 +537,7 @@ export default function App() {
         garderAffiche(keyOf(item));
       }
       await apiSetStatus(item.mediaType, item.id, newStatus);
+      vibre();
       loadSuivi();
     } catch (err) {
       setError(err.message);
@@ -630,8 +570,6 @@ export default function App() {
     loadSuivi(); // les titres et affiches en base ont changé
     setSuggestions([]); // recalculées dans la nouvelle langue au prochain passage
     setResults([]);
-    setTrending([]);
-    chargerAccueil(rubrique, mediaFilter);
     getGenres().then(setGenres).catch(() => {});
     return res;
   }
@@ -639,8 +577,24 @@ export default function App() {
   async function handleCreateListe(name) {
     try {
       const created = await apiCreateListe(name);
+      // Une liste créée est visible par les amis : on propose tout de suite de la
+      // garder pour soi, plutôt que de la découvrir publique plus tard.
+      if (partage?.actif && window.confirm(
+        `La liste « ${name} » sera visible par tes amis. La passer en privée ?`
+      )) {
+        await apiSetListePrive(created.id, true);
+      }
       loadListes();
       return created;
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleSetListePrive(id, prive) {
+    try {
+      await apiSetListePrive(id, prive);
+      loadListes();
     } catch (err) {
       setError(err.message);
     }
@@ -704,9 +658,13 @@ export default function App() {
     if (showLanguage) setShowLanguage(false);
     else if (statusMenu) setStatusMenu(null);
     else if (showStats) setShowStats(false);
+    else if (showAmis && openDetail) closeDetail(); // la fiche d'un titre ouverte depuis un ami
+    else if (showPartage) setShowPartage(false);
     else if (showProfiles) setShowProfiles(false);
     else if (surcouche) surcouche.fermer();
+    else if (showAmis) setShowAmis(false);
     else if (showBackup) setShowBackup(false);
+    else if (showNotifications) setShowNotifications(false);
     else if (showAbout) setShowAbout(false);
     else if (openDetail) closeDetail();
     else if (ficheOrigine) retourFiche();
@@ -746,6 +704,9 @@ export default function App() {
   // fois**, et va lire l'état courant au moment où elle se déclenche.
   const autoSauvegardeRef = useRef(() => {});
   autoSauvegardeRef.current = async () => {
+    // La fiche partagée suit le même rythme que la sauvegarde : en quittant, en
+    // revenant. Discret, et sans effet si le partage n'est pas activé.
+    publierPartageAuto();
     const resultat = await sauvegardeAutomatique();
     if (resultat.fait) setRappelSauvegarde(false);
     else setRappelSauvegarde(hasPendingChanges());
@@ -764,6 +725,7 @@ export default function App() {
   // indéfiniment.
   useEffect(() => {
     if (!activeProfile) return;
+    rafraichirPartage();
     autoSauvegardeRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
@@ -830,14 +792,6 @@ export default function App() {
   // Écran de recherche à vide (titre / acteur, avant toute frappe) : on propose
   // l'accueil (Tendances / Nouveautés / À venir) plutôt qu'un écran vide.
   const isDefault = searchMode !== 'genre' && !hasSearched;
-  const trendingFiltered = (
-    mediaFilter === 'all'
-      ? trending
-      : trending.filter((r) => r.mediaType === mediaFilter)
-  ).filter((r) => !dejaChezMoi(r));
-
-  const decouvrirFiltered = decouvrir.filter((r) => !dejaChezMoi(r));
-
   // Passage d'un onglet à l'autre : on rafraîchit les données dont il a besoin.
   // `push` alimente l'historique de navigation ; on le laisse à false quand
   // c'est justement le retour qui nous amène là (sinon on tournerait en rond).
@@ -865,7 +819,22 @@ export default function App() {
   // Premier lancement : on demande la langue du catalogue avant d'entrer.
   if (needLanguage) {
     return (
-      <CatalogLanguage current={null} onApply={applyInitialLanguage} welcome />
+      <>
+        <CatalogLanguage
+          current={null}
+          onApply={applyInitialLanguage}
+          welcome
+          onRestore={() => setShowBackup(true)}
+        />
+        {showBackup && activeProfile && (
+          <Backup
+            profileId={activeProfile}
+            profileName={profiles.find((p) => p.id === activeProfile)?.name || 'Mon profil'}
+            onRestored={handleRestored}
+            onClose={() => setShowBackup(false)}
+          />
+        )}
+      </>
     );
   }
 
@@ -889,7 +858,7 @@ export default function App() {
       </header>
 
       {rappelSauvegarde && !showBackup && (
-        <div className="rappel">
+        <div className="rappel panel panel--accent">
           <span>
             Des modifications ne sont pas encore sauvegardées
             {sauvegardeAutoActive()
@@ -910,6 +879,7 @@ export default function App() {
       )}
 
       <main className="content">
+      <div key={view} className="view-enter">
 
       {view === 'search' && (
         <>
@@ -945,7 +915,7 @@ export default function App() {
           </div>
 
           {searchMode === 'genre' && (
-            <div className="genre-picker">
+            <div className="chips-scroll chips-scroll--page">
               {genres.map((g) => (
                 <button
                   key={g.key}
@@ -959,7 +929,7 @@ export default function App() {
           )}
 
           {(hasSearched || isDefault) && (
-            <div className="seg">
+            <div className="seg seg--sm">
               {[
                 ['all', 'Tout'],
                 ['movie', 'Films'],
@@ -1025,8 +995,13 @@ export default function App() {
             </div>
           )}
 
-          {status === 'loading' && <p className="hint">Recherche en cours…</p>}
-          {status === 'error' && <p className="error">{error}</p>}
+          {status === 'loading' && <GrilleFantome />}
+          {status === 'error' &&
+            (erreurReseau ? (
+              <HorsLigne onRetry={() => handleSearch(derniereRecherche.current)} />
+            ) : (
+              <Vide icone="info" titre="La recherche a échoué" texte={error} />
+            ))}
           {status === 'done' &&
             hasSearched &&
             searchMode === 'actor' &&
@@ -1035,13 +1010,17 @@ export default function App() {
             hasSearched &&
             filteredResults.length === 0 &&
             !(searchMode === 'actor' && !person) && (
-              <p className="hint">
-                {filtresToutEcarte
-                  ? 'Aucun résultat avec ces filtres.'
-                  : masques > 0
-                    ? 'Tu as déjà tous ces titres.'
-                    : 'Aucun résultat.'}
-              </p>
+              <Vide
+                icone="search"
+                titre={masques > 0 && !filtresToutEcarte ? 'Tu as déjà tout' : 'Aucun résultat'}
+                texte={
+                  filtresToutEcarte
+                    ? 'Aucun titre ne correspond à ces filtres.'
+                    : masques > 0
+                      ? 'Tu as déjà tous ces titres dans ton suivi.'
+                      : 'Essaie une autre orthographe, ou cherche par acteur.'
+                }
+              />
             )}
           {status === 'done' && decouverte && masques > 0 && filteredResults.length > 0 && (
             <p className="hint hint--small">
@@ -1051,50 +1030,32 @@ export default function App() {
             </p>
           )}
 
+          {status === 'done' && hasSearched && filteredResults.length > 0 && (
+            <header className="sec__head">
+              <div className="sec__txt">
+                <h3 className="sec__title">
+                  Résultats <span className="sec__count">{filteredResults.length}</span>
+                </h3>
+              </div>
+            </header>
+          )}
+
           {isDefault && (
             <>
-              <div className="rubriques" role="group" aria-label="Rubrique">
-                {[
-                  ['tendances', '✨ Tendances'],
-                  ['nouveautes', 'Nouveautés'],
-                  ['avenir', 'À venir'],
-                ].map(([v, label]) => (
-                  <button
-                    key={v}
-                    className={`chip ${rubrique === v ? 'on' : ''}`}
-                    aria-pressed={rubrique === v}
-                    onClick={() => setRubrique(v)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {trendingFiltered.length === 0 && (
-                <p className="hint">
-                  {accueilCharge ? 'Chargement…' : 'Rien à afficher pour le moment.'}
-                </p>
-              )}
-              <section className="grid">
-                {trendingFiltered.map((item) => (
-                  <MovieCard
-                    key={keyOf(item)}
-                    item={item}
-                    isFollowed={suivi.has(keyOf(item))}
-                    status={suivi.get(keyOf(item))?.status}
-                    {...cardProps}
-                  />
-                ))}
-              </section>
-              {tendancesPlus && trendingFiltered.length > 0 && (
-                <div className="voirplus">
-                  <button
-                    className="btn btn--ghost"
-                    onClick={() => chargerAccueil(rubrique, mediaFilter, true)}
-                  >
-                    Voir plus
-                  </button>
+              <header className="sec__head">
+                <div className="sec__txt">
+                  <h3 className="sec__title">Tendances</h3>
+                  <p className="sec__sub">Ce que tout le monde regarde en ce moment</p>
                 </div>
-              )}
+              </header>
+              <Rubriques
+                rubriques={[['tendances', 'Tendances']]}
+                mediaFilter={mediaFilter}
+                suivi={suivi}
+                dejaChezMoi={dejaChezMoi}
+                cardProps={cardProps}
+                resetKey={catalogLang}
+              />
             </>
           )}
 
@@ -1134,10 +1095,15 @@ export default function App() {
           listes={listes}
           onCreateListe={handleCreateListe}
           onDeleteListe={handleDeleteListe}
+          onSetPrive={handleSetListePrive}
+          partageActif={!!partage?.actif}
           onAddManyToListe={handleAddManyToListe}
           onSurcouche={setSurcouche}
           filtres={filtresListes}
           onFiltres={setFiltresListes}
+          genres={genres}
+          onOpenStats={() => setShowStats(true)}
+          onSearch={() => goTo('search')}
           {...cardProps}
         />
       )}
@@ -1149,8 +1115,13 @@ export default function App() {
           suggestions={suggestions}
           suggestionsLoading={suggestionsLoading}
           onRefreshSuggestions={loadSuggestions}
+          suivi={suivi}
+          dejaChezMoi={dejaChezMoi}
+          catalogLang={catalogLang}
           subTab={tonightTab}
           onSubTab={setTonightTab}
+          onSearch={() => goTo('search')}
+          profileId={activeProfile}
         />
       )}
 
@@ -1160,86 +1131,33 @@ export default function App() {
           activeProfile={activeProfile}
           onOpenProfiles={() => setShowProfiles(true)}
           onOpenStats={() => setShowStats(true)}
+          onOpenPartage={() => setShowPartage(true)}
+          onOpenAmis={() => setShowAmis(true)}
+          partageDisponible={partageDisponible()}
+          partageActif={!!partage?.actif}
           onSelectProfile={handleSelectProfile}
-          theme={theme}
-          onToggleTheme={toggleTheme}
+          choixTheme={choixTheme}
+          onChoixTheme={changerTheme}
           catalogLang={catalogLang}
           catalogLangLabel={languageLabel(catalogLang)}
           onOpenLanguage={() => setShowLanguage(true)}
           onOpenBackup={() => setShowBackup(true)}
+          onOpenNotifications={() => setShowNotifications(true)}
           onOpenAbout={() => setShowAbout(true)}
           suiviCount={suivi.size}
         />
       )}
 
       {view === 'discover' && (
-        <>
-          <h2 className="tonight__title">Découvrir</h2>
-          <p className="hint">Des rayons prêts à l'emploi, par thème.</p>
-
-          <div className="rubriques" role="group" aria-label="Mood">
-            {moods.map((m) => (
-              <button
-                key={m.key}
-                className={`chip ${mood === m.key ? 'on' : ''}`}
-                aria-pressed={mood === m.key}
-                onClick={() => setMood(m.key)}
-              >
-                {m.name}
-              </button>
-            ))}
-          </div>
-
-          {!mood && <p className="hint">Choisis un rayon ci-dessus.</p>}
-
-          {mood && (
-            <>
-              <div className="seg">
-                {[
-                  ['all', 'Tout'],
-                  ['movie', 'Films'],
-                  ['tv', 'Séries'],
-                ].map(([v, label]) => (
-                  <button
-                    key={v}
-                    className={mediaFilter === v ? 'on' : ''}
-                    onClick={() => setMediaFilter(v)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {decouvrirFiltered.length === 0 && (
-                <p className="hint">
-                  {decouvrirCharge ? 'Chargement…' : 'Rien à afficher pour le moment.'}
-                </p>
-              )}
-              <section className="grid">
-                {decouvrirFiltered.map((item) => (
-                  <MovieCard
-                    key={keyOf(item)}
-                    item={item}
-                    isFollowed={suivi.has(keyOf(item))}
-                    status={suivi.get(keyOf(item))?.status}
-                    {...cardProps}
-                  />
-                ))}
-              </section>
-              {decouvrirPlus && decouvrirFiltered.length > 0 && (
-                <div className="voirplus">
-                  <button
-                    className="btn btn--ghost"
-                    onClick={() => chargerDecouvrir(mood, mediaFilter, true)}
-                  >
-                    Voir plus
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </>
+        <Decouvrir
+          items={Array.from(suivi.values())}
+          suivi={suivi}
+          dejaChezMoi={dejaChezMoi}
+          cardProps={cardProps}
+          resetKey={catalogLang}
+        />
       )}
+      </div>
       </main>
 
       <nav className="tabbar">
@@ -1260,6 +1178,16 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {/* Avant la fiche d'un titre : celle-ci s'ouvre par-dessus quand on touche une affiche. */}
+      {showAmis && activeProfile && (
+        <Amis
+          cardProps={cardProps}
+          suivi={suivi}
+          onSurcouche={setSurcouche}
+          onClose={() => setShowAmis(false)}
+        />
+      )}
 
       {openDetail && (
         <Detail
@@ -1282,7 +1210,18 @@ export default function App() {
         />
       )}
 
-      {showStats && <Stats onClose={() => setShowStats(false)} />}
+      {showStats && <Stats genres={genres} onClose={() => setShowStats(false)} />}
+
+      {showPartage && activeProfile && (
+        <Partage
+          profileName={profiles.find((p) => p.id === activeProfile)?.name || ''}
+          onChanged={() => {
+            rafraichirPartage();
+            loadListes();
+          }}
+          onClose={() => setShowPartage(false)}
+        />
+      )}
 
       {showProfiles && (
         <Profiles
@@ -1311,6 +1250,10 @@ export default function App() {
             setRappelSauvegarde(hasPendingChanges());
           }}
         />
+      )}
+
+      {showNotifications && (
+        <Notifications onClose={() => setShowNotifications(false)} />
       )}
 
       {showAbout && <About onClose={() => setShowAbout(false)} />}

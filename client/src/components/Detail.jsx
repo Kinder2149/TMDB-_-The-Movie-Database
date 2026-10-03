@@ -1,3 +1,4 @@
+import { vibre } from '../tactile.js';
 import { useState, useEffect, useRef } from 'react';
 import {
   getDetails,
@@ -17,15 +18,23 @@ import {
   getVisionnages,
   addVisionnage,
   removeVisionnage,
+  setVisionnageDate,
+  rewatchSeason,
   getCollection,
   getRecommendations,
 } from '../api.js';
-import { STATUSES, deriveSeriesStatus } from '../status.js';
+import { deriveSeriesStatus, releaseBadge } from '../status.js';
 import Icon from './Icon.jsx';
+import Visionnages from './Visionnages.jsx';
 import MovieCard from './MovieCard.jsx';
+import FicheEntete from './FicheEntete.jsx';
+import FicheStatut from './FicheStatut.jsx';
+import FicheProgression from './FicheProgression.jsx';
+import FicheSaisons from './FicheSaisons.jsx';
 
 // Fiche détail générique (film ou série). Pour une série suivie, la
 // progression et les saisons/épisodes sont intégrées ici.
+// Ce fichier garde l'état et les appels ; l'affichage est dans les Fiche*.jsx.
 export default function Detail({
   item,
   isFollowed,
@@ -192,6 +201,42 @@ export default function Detail({
     setVisionnages(await getVisionnages(item.mediaType, item.id));
   }
 
+  async function changerDateVisionnage(id, date) {
+    try {
+      await setVisionnageDate(id, date);
+      setVisionnages(await getVisionnages(item.mediaType, item.id));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Ajoute un visionnage à une date choisie : sert surtout au 1er visionnage
+  // des titres vus avant que le journal n'existe.
+  async function ajouterVisionnageDate(options, date) {
+    try {
+      await addVisionnage(item.mediaType, item.id, { ...options, date });
+      setVisionnages(await getVisionnages(item.mediaType, item.id));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Épisode dont on montre les dates (un seul à la fois).
+  const [episodeDates, setEpisodeDates] = useState(null);
+
+  // « J'ai revu toute la saison » : +1 visionnage sur chaque épisode déjà vu.
+  async function revoirSaison() {
+    setBusy(true);
+    try {
+      await rewatchSeason(item.id, expanded);
+      setVisionnages(await getVisionnages(item.mediaType, item.id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // --- Épisodes (séries suivies uniquement) ---
   const [seasons, setSeasons] = useState([]);
   const [progress, setProgress] = useState(null);
@@ -200,9 +245,18 @@ export default function Detail({
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const [busy, setBusy] = useState(false); // un raccourci est en cours
 
+  // Le catalogue injoignable ne vide pas la fiche : on garde ce que le suivi sait déjà
+  // (titre, affiche) et on propose de réessayer.
+  const [detailsErreur, setDetailsErreur] = useState(false);
+  const [essai, setEssai] = useState(0);
+  const [synopsisOuvert, setSynopsisOuvert] = useState(false);
+
   useEffect(() => {
-    getDetails(item.mediaType, item.id).then(setInfo).catch((e) => setError(e.message));
-  }, [item.id, item.mediaType]);
+    setDetailsErreur(false);
+    getDetails(item.mediaType, item.id)
+      .then(setInfo)
+      .catch(() => setDetailsErreur(true));
+  }, [item.id, item.mediaType, essai]);
 
   // --- Saga ---
   // Chargée après la fiche, dont on a besoin pour savoir s'il y a une saga.
@@ -334,7 +388,10 @@ export default function Detail({
   async function toggleEpisode(ep) {
     try {
       if (ep.watched) await unmarkEpisode(item.id, expanded, ep.episodeNumber);
-      else await markEpisode(item.id, expanded, ep.episodeNumber);
+      else {
+        await markEpisode(item.id, expanded, ep.episodeNumber);
+        vibre();
+      }
       setEpisodes((prev) =>
         prev.map((e) =>
           e.episodeNumber === ep.episodeNumber ? { ...e, watched: !e.watched } : e
@@ -355,6 +412,7 @@ export default function Detail({
         setEpisodes((prev) => prev.map((e) => ({ ...e, watched: false })));
       } else {
         await markWholeSeason(item.id, expanded, episodes.map((e) => e.episodeNumber));
+        vibre();
         setEpisodes((prev) => prev.map((e) => ({ ...e, watched: true })));
       }
       refreshProgress();
@@ -371,6 +429,26 @@ export default function Detail({
   const pct = diffuses ? Math.round((progress.watched / diffuses) * 100) : 0;
   const current = status || 'a_voir';
 
+
+  // « Marquer S2E10 comme vu » : l'épisode suivant, sans ouvrir la saison.
+  async function marquerProchain() {
+    const next = progress?.next;
+    if (!next) return;
+    setBusy(true);
+    try {
+      await markEpisode(item.id, next.season, next.episode);
+      vibre();
+      if (expanded === next.season) {
+        setEpisodes(await getSeasonEpisodes(item.id, next.season));
+      }
+      await refreshProgress();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Location et achat sont souvent la même liste : on fusionne et dédoublonne.
   const providers = info?.providers;
   const locationAchat = providers
@@ -381,464 +459,399 @@ export default function Detail({
   const hasStreaming =
     providers && (providers.flatrate.length > 0 || locationAchat.length > 0);
 
-  // Statut d'une série : dérivé de la progression, sauf « Abandonné » qui est
-  // le seul choix manuel. On montre quand même les 4 pour que la lecture soit
-  // la même partout ; les trois dérivés ne sont cliquables que pour sortir
-  // d'un abandon (ils rendent alors la série à sa progression réelle).
+  // Statut d'une série : dérivé de la progression, sauf « Abandonné » qui est le seul choix
+  // manuel (et « Reprendre le suivi » qui en sort : le statut revient à la progression réelle).
   function pickStatus(value) {
-    if (!isSeries) return onSetStatus(item, value);
-    if (value === 'abandonne') return onSetStatus(item, 'abandonne');
-    if (current === 'abandonne') return onSetStatus(item, deriveSeriesStatus(progress));
+    const poser = (statut) => {
+      vibre();
+      return onSetStatus(item, statut);
+    };
+    if (!isSeries) return poser(value);
+    if (value === 'abandonne') return poser('abandonne');
+    if (current === 'abandonne') return poser(deriveSeriesStatus(progress));
   }
 
-  const statusDisabled = (value) =>
-    isSeries && value !== 'abandonne' && current !== 'abandonne';
+  const enChargement = !info && !detailsErreur;
+  const horsConnexion = !info && detailsErreur;
+  const badge =
+    isFollowed && info
+      ? releaseBadge({
+          isSeries,
+          releaseDate: info.releaseDate,
+          status: info.status,
+          nextEpisodeDate: info.nextEpisodeDate,
+          seriesEnded: info.seriesEnded,
+        })
+      : null;
+  const synopsisLong = (info?.overview || '').length > 190;
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <header className="sheet__head">
-          <button className="sheet__back" onClick={onClose} aria-label="Retour">
-            <Icon name="back" size={22} />
-          </button>
-          <h2>{info?.title || item.title}</h2>
-        </header>
+      <div className="sheet fiche" onClick={(e) => e.stopPropagation()}>
+        <FicheEntete
+          item={item}
+          info={info}
+          isSeries={isSeries}
+          enChargement={enChargement}
+          onClose={onClose}
+        />
 
-        {/* En-tête : affiche posée sur l'image de fond du titre. */}
-        <div
-          className="detail-hero"
-          style={
-            info?.backdropUrl
-              ? { backgroundImage: `url(${info.backdropUrl})` }
-              : undefined
-          }
-        >
-          <div className="detail-hero__scrim">
-            {info?.posterUrl && (
-              <img className="detail-hero__poster" src={info.posterUrl} alt={info.title} />
-            )}
-            <div className="detail-hero__info">
-              <h3 className="detail-hero__title">{info?.title || item.title}</h3>
-              <div className="detail-hero__sub">
-                {isSeries ? 'Série' : 'Film'}
-                {info?.year && ` · ${info.year}`}
-                {info?.genres?.length > 0 && ` · ${info.genres.join(', ')}`}
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="fiche__corps">
+          <FicheStatut
+            isSeries={isSeries}
+            isFollowed={isFollowed}
+            current={current}
+            onPick={pickStatus}
+            onAjouter={() => onToggleFollow(item)}
+          />
 
-        <div className="detail-pad">
-          <button
-            className={`btn btn--wide ${isFollowed ? 'btn--ghost' : 'btn--primary'}`}
-            onClick={() => onToggleFollow(item)}
-          >
-            <Icon name={isFollowed ? 'check' : 'plus'} size={16} />
-            {isFollowed ? 'Dans mon suivi — retirer' : 'Ajouter à mon suivi'}
-          </button>
+          {error && <p className="message message--erreur">{error}</p>}
 
-          {isFollowed && (
-            <div className="statuspick">
-              {STATUSES.map((st) => (
-                <button
-                  key={st.value}
-                  className={`statuspick__btn status--${st.value} ${
-                    current === st.value ? 'on' : ''
-                  }`}
-                  disabled={statusDisabled(st.value)}
-                  title={
-                    statusDisabled(st.value)
-                      ? 'Pour une série, ce statut suit les épisodes cochés'
-                      : st.label
-                  }
-                  onClick={() => pickStatus(st.value)}
-                >
-                  {st.label}
+          {horsConnexion && (
+            <div className="panel">
+              <div className="vide">
+                <span className="vide__ico">
+                  <Icon name="info" size={28} />
+                </span>
+                <p className="vide__titre">Détails indisponibles</p>
+                <p className="vide__texte">
+                  Impossible de joindre le catalogue. Vérifie ta connexion.
+                </p>
+                <button className="btn btn--ghost" onClick={() => setEssai((n) => n + 1)}>
+                  <Icon name="refresh" size={15} /> Réessayer
                 </button>
-              ))}
+              </div>
             </div>
           )}
 
-          {/* Journal de visionnages (M4) : un film seulement, une série se
-              revoit épisode par épisode, plus bas. */}
-          {!isSeries && isFollowed && (
-            <div className="revisionnage">
-              <button
-                className="btn btn--ghost btn--wide"
-                onClick={revoirLeFilm}
-                disabled={revoirEnCours}
-              >
-                <Icon name="check" size={15} />
-                J'ai revu ce film
-              </button>
-              {visionnagesFilm.length > 0 && (
-                <>
-                  <p className="hint hint--small">
-                    {visionnagesFilm.length === 1
-                      ? 'Vu 1 fois.'
-                      : `Vu ${visionnagesFilm.length} fois.`}
-                  </p>
-                  <ul className="visionnage-liste">
-                    {visionnagesFilm.map((v) => (
-                      <li key={v.id}>
-                        <span>{v.date}</span>
-                        <button
-                          type="button"
-                          aria-label="Retirer ce visionnage"
-                          title="Retirer ce visionnage"
-                          onClick={() => retirerVisionnage(v.id)}
-                        >
-                          <Icon name="trash" size={14} />
-                        </button>
-                      </li>
+          {badge && (
+            <div className="panel panel--accent fiche__badge">
+              <span className="tag">
+                <Icon name="calendar" size={14} />
+                {badge}
+              </span>
+            </div>
+          )}
+
+          {/* Série suivie : où j'en suis, puis les saisons. */}
+          {isSeries && isFollowed && (
+            <>
+              <FicheProgression
+                progress={progress}
+                diffuses={diffuses}
+                aVenir={aVenir}
+                pct={pct}
+                busy={busy}
+                onMarquer={marquerProchain}
+              />
+              <FicheSaisons
+                seasons={seasons}
+                expanded={expanded}
+                episodes={episodes}
+                loadingEpisodes={loadingEpisodes}
+                busy={busy}
+                serieVue={serieVue}
+                allWatched={allWatched}
+                visionnagesParEpisode={visionnagesParEpisode}
+                episodeDates={episodeDates}
+                saisonVue={saisonVue}
+                onOpenSeason={openSeason}
+                onToggleSaison={toggleSaisonDepuisLaListe}
+                onToggleSerie={toggleSerieEntiere}
+                onToggleWholeSeason={toggleWholeSeason}
+                onRevoirSaison={revoirSaison}
+                onToggleEpisode={toggleEpisode}
+                onRevoirEpisode={revoirEpisode}
+                onToggleDates={(n) => setEpisodeDates(episodeDates === n ? null : n)}
+                onRetirerVisionnage={retirerVisionnage}
+                onChangeDate={changerDateVisionnage}
+                onAjouterDate={ajouterVisionnageDate}
+              />
+            </>
+          )}
+
+          {isSeries && !isFollowed && (
+            <p className="panel__note">Ajoute la série à ton suivi pour cocher les épisodes.</p>
+          )}
+
+          {/* Ma note (étoiles) et bande-annonce : sur une même carte. */}
+          {(isFollowed || info?.trailer) && (
+            <div className="panel fiche__note">
+              {isFollowed && (
+                <div className="fiche__etoiles">
+                  <p className="eyebrow">Ma note</p>
+                  <div className="rating" role="group" aria-label="Note en étoiles">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        className={`rating__star ${rating >= n ? 'on' : ''}`}
+                        aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
+                        aria-pressed={rating >= n}
+                        onClick={() => cliqueEtoile(n)}
+                      >
+                        <Icon name="star" size={26} />
+                      </button>
                     ))}
-                  </ul>
-                </>
+                  </div>
+                  <p className="rating__value">{rating ? `${rating} / 5` : 'Pas encore noté'}</p>
+                </div>
+              )}
+              {info?.trailer && (
+                <a
+                  className="btn btn--ghost fiche__trailer"
+                  href={info.trailer.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Icon name="play" size={14} />
+                  {info.trailer.recherche ? 'Chercher la bande-annonce' : 'Bande-annonce'}
+                </a>
               )}
             </div>
           )}
 
-          {info?.trailer && (
-            <a
-              className="btn btn--primary btn--wide"
-              href={info.trailer.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Icon name="play" size={15} />
-              {info.trailer.recherche ? 'Chercher la bande-annonce' : 'Bande-annonce'}
-            </a>
+          {enChargement && (
+            <div className="skeleton skeleton--bloc" aria-hidden="true" />
+          )}
+
+          {info && (
+            <section className="sec">
+              <header className="sec__head">
+                <div className="sec__txt">
+                  <h3 className="sec__title">Où le regarder</h3>
+                  <p className="sec__sub">En France</p>
+                </div>
+              </header>
+              {hasStreaming ? (
+                <>
+                  {providers.flatrate.length > 0 && (
+                    <Plateformes etiquette="Abonnement" liste={providers.flatrate} />
+                  )}
+                  {locationAchat.length > 0 && (
+                    <Plateformes etiquette="Location et achat" liste={locationAchat} />
+                  )}
+                  <p className="attn">Disponibilité fournie par JustWatch (via TMDB).</p>
+                </>
+              ) : (
+                <p className="panel__note">Pas d’info de disponibilité pour le moment.</p>
+              )}
+            </section>
+          )}
+
+          {info?.overview && (
+            <section className="sec">
+              <header className="sec__head">
+                <div className="sec__txt">
+                  <h3 className="sec__title">Synopsis</h3>
+                </div>
+              </header>
+              <p className={`synopsis ${synopsisLong && !synopsisOuvert ? 'synopsis--replie' : ''}`}>
+                {info.overview}
+              </p>
+              {synopsisLong && (
+                <button className="lien lien--gauche" onClick={() => setSynopsisOuvert((o) => !o)}>
+                  {synopsisOuvert ? 'Réduire' : 'Lire la suite'}
+                </button>
+              )}
+            </section>
+          )}
+
+          {info?.cast?.length > 0 && (
+            <section className="sec">
+              <header className="sec__head">
+                <div className="sec__txt">
+                  <h3 className="sec__title">Têtes d’affiche</h3>
+                </div>
+              </header>
+              <div className="cast">
+                {info.cast.map((a) => (
+                  <button
+                    className="actor"
+                    key={a.id}
+                    onClick={() => onOpenActor(a)}
+                    aria-label={`Voir les films et séries avec ${a.name}`}
+                  >
+                    {a.photoUrl ? (
+                      <img className="actor__ph" src={a.photoUrl} alt="" />
+                    ) : (
+                      <div className="actor__ph actor__ph--empty">{a.name.charAt(0)}</div>
+                    )}
+                    <span className="actor__n">{a.name}</span>
+                    {a.character && <span className="actor__r">{a.character}</span>}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Journal de visionnages (M4) : un film seulement, une série se revoit épisode par
+              épisode, dans ses saisons. */}
+          {!isSeries && isFollowed && (
+            <section className="sec">
+              <div className="panel">
+                <h3 className="panel__title">Mes visionnages</h3>
+                <p className="panel__note">
+                  {visionnagesFilm.length > 1
+                    ? `Vu ${visionnagesFilm.length} fois. Une date par fois, modifiable.`
+                    : 'Une date par fois, modifiable. Rien d’obligatoire.'}
+                </p>
+                <Visionnages
+                  liste={visionnagesFilm}
+                  onChangeDate={changerDateVisionnage}
+                  onRemove={retirerVisionnage}
+                  onAdd={(date) => ajouterVisionnageDate({}, date)}
+                />
+                <button
+                  className="btn btn--primary btn--wide fiche__revoir"
+                  onClick={revoirLeFilm}
+                  disabled={revoirEnCours}
+                >
+                  <Icon name="refresh" size={16} />
+                  J’ai revu ce film
+                </button>
+              </div>
+            </section>
+          )}
+
+          {isFollowed && (
+            <section className="sec">
+              <div className="panel">
+                <h3 className="panel__title">Mon avis</h3>
+                <textarea
+                  className="avis"
+                  rows={3}
+                  placeholder="Ce que j'en ai pensé…"
+                  value={avis}
+                  onChange={(e) => tapeAvis(e.target.value)}
+                  onBlur={sauveAvis}
+                />
+                <p className="panel__note rating__state">
+                  {noteEnregistree ? 'Enregistré' : 'Non enregistré'}
+                </p>
+              </div>
+            </section>
+          )}
+
+          {similaires.length > 0 && (
+            <section className="sec">
+              <header className="sec__head">
+                <div className="sec__txt">
+                  <h3 className="sec__title">Dans le même esprit</h3>
+                </div>
+              </header>
+              <div className="rail" role="list">
+                {similaires.map((s, i) => {
+                  const cle = `${s.mediaType}-${s.id}`;
+                  return (
+                    <div
+                      key={cle}
+                      className="rail__item rise"
+                      role="listitem"
+                      style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                    >
+                      <MovieCard
+                        item={s}
+                        isFollowed={suivi.has(cle)}
+                        status={suivi.get(cle)?.status}
+                        {...cardProps}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Saga : les films dans l'ordre de sortie, celui qu'on regarde repéré à sa place.
+              Ce sont les cartes des grilles — même liseré d'état, même pastille d'ajout,
+              même appui long — pour compléter une saga sans ouvrir chaque fiche. */}
+          {saga?.length > 1 && (
+            <section className="sec">
+              <header className="sec__head">
+                <div className="sec__txt">
+                  <h3 className="sec__title">{info.collection.name}</h3>
+                  <p className="sec__sub">{saga.length} films, dans l’ordre de sortie</p>
+                </div>
+              </header>
+              <div className="rail" role="list" ref={sagaRef}>
+                {saga.map((film, i) => {
+                  const cle = `movie-${film.id}`;
+                  const ici = film.id === item.id;
+                  return (
+                    <div
+                      key={cle}
+                      role="listitem"
+                      className={`rail__item rise ${ici ? 'is-here' : ''}`}
+                      style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                    >
+                      <MovieCard
+                        item={film}
+                        isFollowed={suivi.has(cle)}
+                        status={suivi.get(cle)?.status}
+                        {...cardProps}
+                        // Toucher le film ouvert ne rouvre pas la même fiche.
+                        onOpenDetail={ici ? () => {} : cardProps.onOpenDetail}
+                      />
+                      <span className="rail__legende">{ici ? 'Ce film' : `${i + 1}`}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {isFollowed && (
+            <section className="sec">
+              <div className="panel">
+                <h3 className="panel__title">Mes listes</h3>
+                <div className="liste-toggles">
+                  {listes.map((l) => (
+                    <button
+                      key={l.id}
+                      className={`chip-toggle ${listeIds.includes(l.id) ? 'on' : ''}`}
+                      onClick={() => toggleListe(l)}
+                    >
+                      {listeIds.includes(l.id) && <Icon name="check" size={13} />}
+                      {l.name}
+                    </button>
+                  ))}
+                  <button className="chip-toggle chip-toggle--new" onClick={handleNewListe}>
+                    <Icon name="plus" size={13} /> Nouvelle liste
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {isFollowed && (
+            <button className="lien lien--danger" onClick={() => onToggleFollow(item)}>
+              Retirer de mon suivi
+            </button>
           )}
         </div>
-
-        {error && <p className="error detail-pad">{error}</p>}
-
-        {/* Séries : progression + saisons/épisodes (si suivie) */}
-        {isSeries && !isFollowed && (
-          <div className="section">
-            <p className="hint">
-              Ajoute la série à ton suivi pour cocher les épisodes.
-            </p>
-          </div>
-        )}
-
-        {isSeries && isFollowed && (
-          <>
-            {progress && (
-              <div className="progress">
-                <div className="progress__bar">
-                  <div className="progress__fill" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="progress__text">
-                  {progress.watched} / {diffuses} épisodes vus
-                  {' · '}
-                  {progress.next ? (
-                    <span>
-                      Prochain : S{progress.next.season}E
-                      {String(progress.next.episode).padStart(2, '0')} —{' '}
-                      {progress.next.name}
-                    </span>
-                  ) : (
-                    <span className="progress__done">À jour</span>
-                  )}
-                </p>
-                {aVenir > 0 && (
-                  <p className="hint">
-                    {aVenir === 1
-                      ? '1 épisode annoncé, pas encore diffusé.'
-                      : `${aVenir} épisodes annoncés, pas encore diffusés.`}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <button
-              className="btn btn--ghost btn--wide season-all"
-              onClick={toggleSerieEntiere}
-              disabled={busy}
-            >
-              <Icon name="check" size={16} />
-              {serieVue ? "Je n'ai pas vu cette série" : "J'ai vu toute la série"}
-            </button>
-
-            <ul className="season-list">
-              {seasons.map((s) => (
-                <li key={s.seasonNumber} className="season">
-                  {/* Deux commandes distinctes sur la même ligne : ouvrir la
-                      saison, ou la marquer vue sans l'ouvrir. */}
-                  <div className="season__head">
-                    <button
-                      className="season__open"
-                      onClick={() => openSeason(s.seasonNumber)}
-                    >
-                      <span>{s.name}</span>
-                      <span className="season__count">
-                        {s.watched} / {s.aired} ép.
-                      </span>
-                    </button>
-                    <button
-                      className={`season__tick ${saisonVue(s) ? 'on' : ''}`}
-                      disabled={busy}
-                      title={saisonVue(s) ? 'Décocher la saison' : 'Marquer la saison vue'}
-                      aria-label={
-                        saisonVue(s) ? 'Décocher la saison' : 'Marquer la saison vue'
-                      }
-                      onClick={(e) => toggleSaisonDepuisLaListe(s, e)}
-                    >
-                      <Icon name="check" size={15} />
-                    </button>
-                  </div>
-
-                  {expanded === s.seasonNumber && (
-                    <div className="season__body">
-                      {loadingEpisodes ? (
-                        <p className="hint">Chargement des épisodes…</p>
-                      ) : (
-                        <>
-                          <button className="season__all" onClick={toggleWholeSeason}>
-                            {allWatched
-                              ? 'Décocher toute la saison'
-                              : 'Cocher toute la saison'}
-                          </button>
-                          <ul className="episode-list">
-                            {episodes.map((ep) => {
-                              const vus =
-                                visionnagesParEpisode.get(`${expanded}-${ep.episodeNumber}`) || [];
-                              return (
-                                <li key={ep.episodeNumber}>
-                                  <label className="episode">
-                                    <input
-                                      type="checkbox"
-                                      checked={ep.watched}
-                                      onChange={() => toggleEpisode(ep)}
-                                    />
-                                    <span className="episode__num">
-                                      E{String(ep.episodeNumber).padStart(2, '0')}
-                                    </span>
-                                    <span className="episode__name">{ep.name}</span>
-                                  </label>
-                                  {/* Journal (M4) : ne revoir qu'un épisode déjà vu, sans
-                                      toucher à la case ni tout redéplier. Au-delà d'un
-                                      visionnage, un bouton retire le dernier posé. */}
-                                  {ep.watched && (
-                                    <span className="episode__journal">
-                                      <button
-                                        type="button"
-                                        className="episode__revoir"
-                                        title="J'ai revu cet épisode"
-                                        aria-label="J'ai revu cet épisode"
-                                        onClick={() => revoirEpisode(expanded, ep.episodeNumber)}
-                                      >
-                                        <Icon name="refresh" size={13} />
-                                        {vus.length > 1 && <span>×{vus.length}</span>}
-                                      </button>
-                                      {vus.length > 0 && (
-                                        <button
-                                          type="button"
-                                          className="episode__revoir episode__revoir--retirer"
-                                          title="Retirer le dernier visionnage"
-                                          aria-label="Retirer le dernier visionnage"
-                                          onClick={() => retirerVisionnage(vus[0].id)}
-                                        >
-                                          <Icon name="trash" size={13} />
-                                        </button>
-                                      )}
-                                    </span>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-
-        {info?.overview && (
-          <div className="section">
-            <h4>Synopsis</h4>
-            <p className="synopsis">{info.overview}</p>
-          </div>
-        )}
-
-        {/* Saga : les films dans l'ordre de sortie, celui qu'on regarde repéré
-            à sa place. Ce sont les cartes des grilles — même liseré d'état, même
-            pastille d'ajout, même appui long — pour compléter une saga sans
-            ouvrir chaque fiche. */}
-        {saga?.length > 1 && (
-          <div className="section">
-            <h4>{info.collection.name}</h4>
-            <p className="hint saga__hint">
-              {saga.length} films, dans l'ordre de sortie.
-            </p>
-            <div className="saga" ref={sagaRef}>
-              {saga.map((film, i) => {
-                const cle = `movie-${film.id}`;
-                const ici = film.id === item.id;
-                return (
-                  <div key={cle} className={`saga__item ${ici ? 'is-here' : ''}`}>
-                    <span className="saga__rank">{ici ? 'Ce film' : `${i + 1}`}</span>
-                    <MovieCard
-                      item={film}
-                      isFollowed={suivi.has(cle)}
-                      status={suivi.get(cle)?.status}
-                      {...cardProps}
-                      // Toucher le film ouvert ne rouvre pas la même fiche.
-                      onOpenDetail={ici ? () => {} : cardProps.onOpenDetail}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {isFollowed && (
-          <div className="section">
-            <h4>Ma note</h4>
-            <div className="rating" role="group" aria-label="Note en étoiles">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  className={`rating__star ${rating >= n ? 'on' : ''}`}
-                  aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
-                  aria-pressed={rating >= n}
-                  onClick={() => cliqueEtoile(n)}
-                >
-                  <Icon name="star" size={26} />
-                </button>
-              ))}
-              <span className="rating__value">
-                {rating ? `${rating} / 5` : 'Pas encore noté'}
-              </span>
-            </div>
-
-            <textarea
-              className="avis"
-              rows={3}
-              placeholder="Ce que j'en ai pensé…"
-              value={avis}
-              onChange={(e) => tapeAvis(e.target.value)}
-              onBlur={sauveAvis}
-            />
-            <p className="hint rating__state">
-              {noteEnregistree ? 'Enregistré' : 'Non enregistré'}
-            </p>
-          </div>
-        )}
-
-        <div className="section">
-          <h4>Mes listes</h4>
-          <div className="liste-toggles">
-            {listes.map((l) => (
-              <button
-                key={l.id}
-                className={`chip-toggle ${listeIds.includes(l.id) ? 'on' : ''}`}
-                onClick={() => toggleListe(l)}
-              >
-                {listeIds.includes(l.id) && <Icon name="check" size={13} />}
-                {l.name}
-              </button>
-            ))}
-            <button className="chip-toggle chip-toggle--new" onClick={handleNewListe}>
-              + Nouvelle liste
-            </button>
-          </div>
-        </div>
-
-        {info && (
-          <div className="section">
-            <h4>Où le voir en France</h4>
-            {hasStreaming ? (
-              <>
-                {providers.flatrate.length > 0 && (
-                  <div className="prov-group">
-                    <span className="prov-label">En abonnement</span>
-                    <div className="providers">
-                      {providers.flatrate.map((p) => (
-                        <span className="prov" key={p.name}>
-                          {p.logoUrl && <img className="prov__logo" src={p.logoUrl} alt="" />}
-                          {p.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {locationAchat.length > 0 && (
-                  <div className="prov-group">
-                    <span className="prov-label">Location / Achat</span>
-                    <div className="providers">
-                      {locationAchat.map((p) => (
-                        <span className="prov" key={p.name}>
-                          {p.logoUrl && <img className="prov__logo" src={p.logoUrl} alt="" />}
-                          {p.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <p className="attn">Disponibilité fournie par JustWatch (via TMDB).</p>
-              </>
-            ) : (
-              <p className="hint">Pas d'info de disponibilité pour le moment.</p>
-            )}
-          </div>
-        )}
-
-        {info?.cast?.length > 0 && (
-          <div className="section">
-            <h4>Têtes d'affiche</h4>
-            <div className="cast">
-              {info.cast.map((a) => (
-                <button
-                  className="actor"
-                  key={a.id}
-                  onClick={() => onOpenActor(a)}
-                  aria-label={`Voir les films et séries avec ${a.name}`}
-                >
-                  {a.photoUrl ? (
-                    <img className="actor__ph" src={a.photoUrl} alt="" />
-                  ) : (
-                    <div className="actor__ph actor__ph--empty">{a.name.charAt(0)}</div>
-                  )}
-                  <span className="actor__n">{a.name}</span>
-                  {a.character && <span className="actor__r">{a.character}</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Dans le même esprit : mêmes cartes que la saga. Les titres déjà suivis
-            restent affichés, avec leur état — on est dans une fiche, pas dans une
-            liste où l'on cherche du neuf. */}
-        {similaires.length > 0 && (
-          <div className="section">
-            <h4>Dans le même esprit</h4>
-            <div className="saga">
-              {similaires.map((s) => {
-                const cle = `${s.mediaType}-${s.id}`;
-                return (
-                  <div key={cle} className="saga__item">
-                    <MovieCard
-                      item={s}
-                      isFollowed={suivi.has(cle)}
-                      status={suivi.get(cle)?.status}
-                      {...cardProps}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
       </div>
+    </div>
+  );
+}
+
+// Logos des plateformes (abonnement, location / achat) : l'image porte l'information, les
+// noms sont écrits dessous pour qui ne reconnaît pas un logo.
+function Plateformes({ etiquette, liste }) {
+  return (
+    <div className="prov-groupe">
+      <p className="eyebrow">{etiquette}</p>
+      <div className="prov-logos">
+        {liste.map((p) =>
+          p.logoUrl ? (
+            <img className="prov-logo" key={p.name} src={p.logoUrl} alt={p.name} title={p.name} />
+          ) : (
+            <span className="prov-logo prov-logo--lettre" key={p.name} title={p.name}>
+              {p.name.charAt(0)}
+            </span>
+          )
+        )}
+      </div>
+      <p className="panel__note">{liste.map((p) => p.name).join(', ')}</p>
     </div>
   );
 }

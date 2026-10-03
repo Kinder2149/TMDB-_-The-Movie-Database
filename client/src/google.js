@@ -164,7 +164,7 @@ function readableError(error) {
   const code = error?.code;
   if (code === 'SIGN_IN_CANCELED') return null; // annulation : pas une erreur
   if (code === 'NO_CREDENTIAL_AVAILABLE') {
-    return "Aucun compte Google sur cet appareil. Ajoutez-en un dans les réglages d'Android.";
+    return "Aucun compte Google sur cet appareil. Ajoutes-en un dans les réglages d'Android.";
   }
   if (code === 'PROVIDER_CONFIGURATION_ERROR') {
     return 'Les services Google Play sont absents ou à mettre à jour sur cet appareil.';

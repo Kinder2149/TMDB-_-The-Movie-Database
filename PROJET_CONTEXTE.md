@@ -89,6 +89,33 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
 - **Le code serveur n'est pas supprimé** : il reste dans le dépôt comme base d'une
   éventuelle mise en ligne. Mis de côté, pas jeté.
 - **Rattachement : socle Application locale React** (D40 de la Révision Outil IA, 2026-09-18), avec l'option sauvegarde vers le Drive de l'utilisateur. L'ancienne stack V1 est archivée dans `_archives\STACK_STANDARD_V1.md`.
+- **Notifications de sortie (figé le 2026-09-27).** Notifier l'utilisateur quand un film suivi
+  sort au cinéma, quand une série suivie diffuse un nouvel épisode, ou quand une nouvelle saison
+  est annoncée. Périmètre : listes, favoris et likes de l'utilisateur.
+  1. Si TMDB donne déjà une date connue au moment où l'élément est suivi, une notification
+     locale est programmée pour ce jour-là, une seule fois — pas de revérification pour cet
+     élément.
+  2. Si la date n'est pas encore connue, l'élément passe au statut « en attente » et entre dans
+     un cycle de vérification périodique.
+  3. Le cycle ne traite que les éléments « en attente » (jamais toute la bibliothèque), tourne au
+     maximum une fois par jour, déclenché au lancement de l'application — pas de tâche de fond,
+     pas de serveur.
+  4. Le cycle corrige aussi une date qui aurait changé (report de sortie) tant que l'élément est
+     « en attente ».
+  5. Un élément notifié ou marqué « terminé » sort définitivement du cycle.
+  6. Compromis accepté : si l'application reste fermée le jour J, la notification part en retard,
+     au prochain lancement.
+  7. Nouvelle dépendance validée : un plugin de notifications locales Android pour Capacitor
+     (ex. `@capacitor/local-notifications`), l'application n'ayant aujourd'hui aucun moyen de
+     notifier hors de l'application ouverte.
+
+- **Refonte visuelle (figée le 2026-10-03).** Identité conservée (crème, doré, titres serif) ; une
+  hiérarchie de titres, des échelles communes, des blocs communs ; Découvrir en rangées d'affiches ;
+  quatre états par écran (chargé, chargement en fantômes, vide, hors connexion). Plan complet,
+  maquette (30 écrans) et missions M1 à M7 : `PLAN_V2.md`, « Refonte visuelle — PLAN COMPLET ».
+  Une mission à la fois, essayée sur téléphone par Kinder avant la suivante. M1 et M2 validées ; M3 à M7 codées le 2026-10-03 (Kinder teste à la fin de la série, décision du jour) ; chantier clos après son essai sur téléphone.
+- **Règle de schéma (2026-10-03).** Aucun commentaire SQL ni apostrophe/point-virgule parasite dans le
+  schéma de `db.js` : le moteur SQLite du téléphone s'y étrangle et l'application ne démarre plus.
 
 ## Contraintes projet
 - 3 couches uniquement (UI / Logique / Données).
@@ -98,6 +125,12 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
 - Le plafond V1 « 20 modules » a été volontairement relevé pour la V2 (voir `PLAN_V2.md`).
 
 ## Ce qui reste ouvert
+- **Amis par code (codé, embarqué dans la 2.3 le 2026-10-03 ; ex-« cadré, rien de codé »)** : fiche partagée facultative sur
+  Firebase, sans compte, sauvegarde privée toujours sur le Drive de l'utilisateur. Si elle est
+  construite, elle **modifie** deux décisions figées (« aucun serveur », « données sur
+  l'appareil ») — uniquement pour cette fiche facultative — et impose de mettre à jour le
+  questionnaire Play Store et la politique de confidentialité *avant* publication. Détail dans
+  `PLAN_V2.md`, point 4 bis.
 - **La mise en ligne** — idée conservée, **non décidée**. Elle conditionne tout ce qui est
   social (voir les profils d'autres utilisateurs, partager des listes). Ce n'est pas une
   fonction de plus : c'est le moment où l'application cesse d'être locale, avec hébergement,
@@ -108,3 +141,8 @@ l'autorisation Drive sans réafficher l'écran de compte Google.
 - **Retours d'usage du 2026-09-10** : tous traités le 2026-09-11 et validés à l'écran le
   2026-09-19 (détail dans `PLAN_V2.md`, point 13). **Reste l'essai sur l'appareil** pour les
   gestes propres au téléphone, puis publication en 2.2.
+
+## Décision du 2026-10-03 — la 2.3 publie les amis
+Le partage (amis par code) est allumé dans la version publiée (`client/.env.production`). Les deux décisions figées
+« aucun serveur » et « données sur l'appareil » sont donc modifiées pour cette seule fiche facultative (Firebase).
+L'avatar en photo part en miniature de 48 px. Politique de confidentialité et formulaire Play Store mis en conformité.

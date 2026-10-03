@@ -122,7 +122,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
       setAccount(null);
       setLastBackup(null);
       setPendingChanges(false);
-      setNote('Compte Google déconnecté. La sauvegarde reste dans votre Drive.');
+      setNote('Compte Google déconnecté. La sauvegarde reste dans ton Drive.');
     } finally {
       setBusy('');
     }
@@ -149,7 +149,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
         ecran: 'Google a demandé de confirmer le compte',
       }[dernierModeAutorisation()];
       setNote(
-        `Sauvegarde envoyée dans votre Drive (${profils} profil${
+        `Sauvegarde envoyée dans ton Drive (${profils} profil${
           profils > 1 ? 's' : ''
         })${mode ? ` — ${mode}.` : '.'}`
       );
@@ -222,7 +222,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
       if (!jeton) return;
       const trouvees = await listCloudBackups(jeton);
       if (trouvees.length === 0) {
-        setNote('Aucune sauvegarde dans votre Drive pour le moment.');
+        setNote('Aucune sauvegarde dans ton Drive pour le moment.');
         return;
       }
       setCloudPending({ jeton, sauvegardes: trouvees });
@@ -240,7 +240,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
       const id = await restoreFromDrive(cloudPending.jeton, cloudPending.sauvegardes);
       setCloudPending(null);
       setPendingChanges(false);
-      setNote('Sauvegarde restaurée depuis votre Drive.');
+      setNote('Sauvegarde restaurée depuis ton Drive.');
       if (id) onRestored(id);
     } catch (e) {
       setError(e.message);
@@ -336,12 +336,13 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
         </header>
 
         <div className="detail-pad about">
-          <p className="about__warn">
-            Vos données ne vivent que sur cet appareil. Sans sauvegarde, les perdre
+          <p className="message message--attention">
+            Tes données ne vivent que sur cet appareil. Sans sauvegarde, les perdre
             est définitif.
           </p>
 
-          <h3 className="about__title">Sauvegarde cloud</h3>
+          <section className="panel">
+          <h3 className="panel__title">Sauvegarde cloud</h3>
           {!googleSupported() ? (
             <p>
               La connexion Google n’est disponible que dans l’application
@@ -355,7 +356,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
             <>
               <p>
                 Connecté en tant que <strong>{account.email || account.displayName}</strong>.
-                Votre sauvegarde va dans un dossier privé de votre propre Google
+                Ta sauvegarde va dans un dossier privé de ton propre Google
                 Drive, invisible et réservé à cette application.
               </p>
               <p className={pendingChanges ? 'about__warn' : undefined}>
@@ -372,18 +373,18 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
                       : 'Désactivée : rien ne part sans le bouton ci-dessous.'}
                   </span>
                 </div>
-                <button
-                  className={`chip-toggle ${autoActive ? 'on' : ''}`}
+                <input
+                  type="checkbox"
+                  className="switch"
                   role="switch"
-                  aria-checked={autoActive}
-                  onClick={() => {
+                  aria-label="Sauvegarde automatique"
+                  checked={autoActive}
+                  onChange={() => {
                     const suivant = !autoActive;
                     reglerSauvegardeAuto(suivant);
                     setAutoActive(suivant);
                   }}
-                >
-                  {autoActive ? 'Activée' : 'Désactivée'}
-                </button>
+                />
               </div>
               {autoActive && (
                 <p className="hint">Dernière tentative : {texteEssaiAuto(essaiAuto)}</p>
@@ -400,8 +401,8 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
               {conflit && (
                 <div className="backup__confirm">
                   <p>
-                    <strong>Un autre appareil a modifié votre sauvegarde Drive</strong> depuis la
-                    dernière fois. Rien n'a été écrasé. Que voulez-vous garder ?
+                    <strong>Un autre appareil a modifié ta sauvegarde Drive</strong> depuis la
+                    dernière fois. Rien n'a été écrasé. Que veux-tu garder ?
                   </p>
                   <ul>
                     {conflit.conflits.map((c) => (
@@ -431,8 +432,8 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
                 <div className="backup__confirm">
                   <p>
                     {cloudPending.spontane
-                      ? 'Une sauvegarde vous attend dans votre Drive. Voulez-vous récupérer votre suivi ?'
-                      : `${cloudPending.sauvegardes.length} profil(s) trouvé(s) dans votre Drive :`}
+                      ? 'Une sauvegarde t’attend dans ton Drive. Veux-tu récupérer ton suivi ?'
+                      : `${cloudPending.sauvegardes.length} profil(s) trouvé(s) dans ton Drive :`}
                   </p>
                   <ul>
                     {cloudPending.sauvegardes.map((s) => (
@@ -470,33 +471,37 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
                 </div>
               )}
 
-              <button className="btn" onClick={handleDisconnect} disabled={!!busy}>
+              <button className="btn btn--ghost btn--wide backup__deconnexion" onClick={handleDisconnect} disabled={!!busy}>
                 Se déconnecter
               </button>
             </>
           ) : (
             <>
               <p>
-                Facultatif. Reliez un compte Google pour retrouver votre suivi sur
-                un autre appareil. Vos données restent dans <strong>votre</strong>{' '}
+                Facultatif. Relie un compte Google pour retrouver ton suivi sur
+                un autre appareil. Tes données restent dans <strong>ton</strong>{' '}
                 Drive : elles ne passent par aucun serveur.
               </p>
-              <button className="btn" onClick={handleConnect} disabled={!!busy}>
+              <button className="btn btn--primary btn--wide" onClick={handleConnect} disabled={!!busy}>
                 {busy === 'google' ? 'Connexion…' : 'Se connecter avec Google'}
               </button>
             </>
           )}
+          </section>
 
-          <h3 className="about__title">Sauvegarder</h3>
+          <section className="panel">
+          <h3 className="panel__title">Sauvegarder</h3>
           <p>
             Enregistre tout le profil « {profileName} » : titres suivis, épisodes
             vus et listes.
           </p>
-          <button className="btn" onClick={handleExport} disabled={!!busy}>
+          <button className="btn btn--ghost btn--wide" onClick={handleExport} disabled={!!busy}>
             {busy === 'export' ? 'Préparation…' : 'Enregistrer une sauvegarde'}
           </button>
+          </section>
 
-          <h3 className="about__title">Restaurer</h3>
+          <section className="panel">
+          <h3 className="panel__title">Restaurer</h3>
           <p>
             Recharge une sauvegarde. Le contenu du profil sera{' '}
             <strong>remplacé</strong> par celui du fichier.
@@ -509,7 +514,7 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
             hidden
           />
           <button
-            className="btn"
+            className="btn btn--ghost btn--wide"
             onClick={() => fileInput.current?.click()}
             disabled={!!busy}
           >
@@ -534,19 +539,22 @@ export default function Backup({ profileId, profileName, onRestored, onClose }) 
               </div>
             </div>
           )}
+          </section>
 
-          <h3 className="about__title">Exporter vers un autre service</h3>
+          <section className="panel">
+          <h3 className="panel__title">Exporter vers un autre service</h3>
           <p>
             Fichier CSV lisible par Letterboxd et Trakt.{' '}
             <span className="about__warn">Films uniquement</span> — ces services
             n'importent pas les séries.
           </p>
-          <button className="btn" onClick={handleCsv} disabled={!!busy}>
+          <button className="btn btn--ghost btn--wide" onClick={handleCsv} disabled={!!busy}>
             {busy === 'csv' ? 'Préparation…' : 'Exporter les films (CSV)'}
           </button>
+          </section>
 
-          {note && <p className="backup__note">{note}</p>}
-          {error && <p className="backup__error">{error}</p>}
+          {note && <p className="message message--ok">{note}</p>}
+          {error && <p className="message message--erreur">{error}</p>}
         </div>
       </div>
     </div>

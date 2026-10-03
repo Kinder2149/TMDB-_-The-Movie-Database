@@ -15,6 +15,7 @@ export default function CatalogLanguage({
   onApply, // (langue, onProgress) => { total, done, failed }
   onClose, // absent en mode bienvenue : on ne peut pas passer sans choisir
   welcome = false,
+  onRestore, // mode bienvenue : « J'ai déjà une sauvegarde »
 }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null); // { done, total }
@@ -88,7 +89,7 @@ export default function CatalogLanguage({
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="message message--erreur">{error}</p>}
 
       {failed > 0 && !busy && (
         <div className="lang__retry">
@@ -113,6 +114,11 @@ export default function CatalogLanguage({
           Dans quelle langue veux-tu voir les films et les séries ?
         </p>
         {body}
+        {onRestore && !busy && (
+          <button className="lien welcome__restaurer" onClick={onRestore}>
+            J’ai déjà une sauvegarde — la restaurer
+          </button>
+        )}
       </div>
     );
   }

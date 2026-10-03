@@ -1,3 +1,4 @@
+import { PucesFantome } from './Fantomes.jsx';
 import {
   PERIODES,
   TRIS,
@@ -21,6 +22,7 @@ export default function Filtres({
   indicationPlateforme = false, // dit où choisir une plateforme (Titre, Acteur)
   tris = TRIS,
   avecNote = false, // filtre « Ma note » (Mes listes)
+  genres = null, // [{ key, name }] : filtre par genre (Mes listes)
   vides = FILTRES_VIDES,
   actifs = filtresActifs,
 }) {
@@ -41,7 +43,7 @@ export default function Filtres({
         <div className="filtres__groupe">
           <span className="filtres__label">Plateforme</span>
           <div className="filtres__chips">
-            {plateformes.length === 0 && <span className="hint">Chargement…</span>}
+            {plateformes.length === 0 && <PucesFantome />}
             {plateformes.map((p) => (
               <button
                 key={p.id}
@@ -76,6 +78,24 @@ export default function Filtres({
           ))}
         </div>
       </div>
+
+      {genres && genres.length > 0 && (
+        <div className="filtres__groupe">
+          <span className="filtres__label">Genre</span>
+          <div className="filtres__chips filtres__chips--defile">
+            {genres.map((g) => (
+              <button
+                key={g.key}
+                className={`chip ${filtres.genre === g.key ? 'on' : ''}`}
+                aria-pressed={filtres.genre === g.key}
+                onClick={() => maj({ genre: filtres.genre === g.key ? null : g.key })}
+              >
+                {g.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {avecNote && (
         <div className="filtres__groupe">

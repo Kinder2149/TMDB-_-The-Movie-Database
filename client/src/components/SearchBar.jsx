@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from './Icon.jsx';
 
 // Recherche instantanée : on lance la recherche au fil de la frappe (avec un
 // court délai). Change aussi de mode (titre / acteur) sans re-taper.
@@ -15,7 +16,7 @@ export default function SearchBar({ onSearch, mode = 'title', placeholder }) {
   return (
     <div className="search-bar">
       <span className="search-bar__icon" aria-hidden="true">
-        🔍
+        <Icon name="search" size={18} />
       </span>
       <input
         type="text"
@@ -23,7 +24,6 @@ export default function SearchBar({ onSearch, mode = 'title', placeholder }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         aria-label="Recherche"
-        autoFocus
       />
     </div>
   );

@@ -49,7 +49,7 @@ export async function saveTextFile(fileName, contents, mimeType = 'application/j
     files: [uri],
     dialogTitle: 'Enregistrer la sauvegarde',
   });
-  return `Fichier « ${fileName} » prêt : choisissez où l'enregistrer.`;
+  return `Fichier « ${fileName} » prêt : choisis où l'enregistrer.`;
 }
 
 // Lit un fichier choisi par l'utilisateur (<input type="file">).

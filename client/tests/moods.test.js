@@ -28,8 +28,12 @@ afterEach(() => {
 });
 
 describe('liste des moods', () => {
-  it('propose les 4 moods retenus, un nom dans la langue du catalogue', async () => {
-    expect(MOODS.map((m) => m.key)).toEqual(['superheros', 'braquage', 'halloween', 'romance']);
+  it('propose les 4 thèmes puis les 4 sélections, un nom dans la langue du catalogue', async () => {
+    expect(MOODS.map((m) => m.key)).toEqual([
+      'superheros', 'braquage', 'halloween', 'romance',
+      'pepites', 'courts', 'classiques', 'annee',
+    ]);
+    expect((await getMoods()).filter((m) => m.groupe === 'selection')).toHaveLength(4);
     setCatalogLanguage('fr');
     expect((await getMoods()).find((m) => m.key === 'halloween').name).toBe('Halloween');
     setCatalogLanguage('en');
@@ -79,5 +83,44 @@ describe('liste des moods', () => {
     }));
     const items = await discoverByMood({ mood: 'braquage', movie: true, tv: true });
     expect(items.map((i) => i.title)).toEqual(['Série', 'Film']);
+  });
+});
+
+describe('sélections (note, durée, époque)', () => {
+  it('Pépites cachées : bien noté, plafond de votes, triées par note', async () => {
+    fauxTmdb(() => ({ results: [] }));
+    await discoverByMood({ mood: 'pepites', movie: true, tv: false });
+    expect(appels[0].params).toMatchObject({
+      sort_by: 'vote_average.desc',
+      'vote_average.gte': '7.6',
+      'vote_count.lte': '5000',
+    });
+    // Rien de moins d'un an (notes de nouveautés gonflées par les fans).
+    const limite = new Date(Date.now() - 360 * 864e5).toISOString().slice(0, 10);
+    expect(appels[0].params['primary_release_date.lte'] <= limite).toBe(true);
+  });
+
+  it('Soirée courte : films de 60 à 90 minutes, séries de 30 minutes au plus', async () => {
+    fauxTmdb(() => ({ results: [] }));
+    await discoverByMood({ mood: 'courts' });
+    const film = appels.find((a) => a.chemin === '/discover/movie').params;
+    const serie = appels.find((a) => a.chemin === '/discover/tv').params;
+    expect(film).toMatchObject({ 'with_runtime.gte': '60', 'with_runtime.lte': '90' });
+    expect(serie['with_runtime.lte']).toBe('30');
+  });
+
+  it("Le meilleur de l'année : seulement l'année en cours, déjà sorti", async () => {
+    fauxTmdb(() => ({ results: [] }));
+    await discoverByMood({ mood: 'annee', movie: true, tv: false });
+    const an = String(new Date().getUTCFullYear());
+    const p = appels[0].params;
+    expect(p['primary_release_date.gte']).toBe(`${an}-01-01`);
+    expect(p['primary_release_date.lte'] <= new Date().toISOString().slice(0, 10)).toBe(true);
+  });
+
+  it('« Sur mes plateformes » ajoute les plateformes et la région à la demande', async () => {
+    fauxTmdb(() => ({ results: [] }));
+    await discoverByMood({ mood: 'halloween', movie: true, tv: false, plateformes: [8, 337] });
+    expect(appels[0].params).toMatchObject({ with_watch_providers: '8|337', watch_region: 'FR' });
   });
 });

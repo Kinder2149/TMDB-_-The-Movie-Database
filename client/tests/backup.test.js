@@ -55,7 +55,7 @@ describe('export', () => {
     const fichier = await backup.exportProfile(profil.id);
 
     expect(fichier.format).toBe('suivi-films-series');
-    expect(fichier.version).toBe(3);
+    expect(fichier.version).toBe(4);
     expect(fichier.profile).toEqual({
       id: profil.id,
       name: 'Mon profil',

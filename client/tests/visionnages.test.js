@@ -147,7 +147,7 @@ describe('sauvegarde', () => {
     const backup = await import('../src/backup.js');
     const fichier = await backup.exportProfile(profil.id);
     expect(fichier.visionnages).toHaveLength(2);
-    expect(fichier.version).toBe(3);
+    expect(fichier.version).toBe(4);
 
     const autreId = crypto.randomUUID();
     await backup.importProfile({ ...fichier, profile: { ...fichier.profile, id: autreId } });
@@ -183,5 +183,31 @@ describe('sauvegarde', () => {
     const fichier = await backup.exportProfile(profil.id);
     const { csv } = backup.toLetterboxdCsv(fichier.suivi); // sans 2e argument
     expect(csv.split('\n')[1]).toContain((fichier.suivi[0].addedAt || '').slice(0, 10));
+  });
+});
+
+describe('dates modifiables et saison revue', () => {
+  it('on corrige la date d’un visionnage, et une date invalide est refusée', async () => {
+    await store.addVisionnage(profil.id, 'movie', 1, { date: '2024-01-01' });
+    const [v] = await store.listVisionnages(profil.id, 'movie', 1);
+    await store.updateVisionnageDate(profil.id, v.id, '2019-06-15');
+    expect((await store.listVisionnages(profil.id, 'movie', 1))[0].date).toBe('2019-06-15');
+    await expect(store.updateVisionnageDate(profil.id, v.id, 'hier')).rejects.toThrow();
+    await expect(store.updateVisionnageDate(profil.id, v.id, '2019-13-45')).rejects.toThrow();
+  });
+
+  it('un titre vu avant le journal accepte une date saisie après coup', async () => {
+    expect(await store.listVisionnages(profil.id, 'movie', 1)).toHaveLength(0);
+    await store.addVisionnage(profil.id, 'movie', 1, { date: '2018-03-02' });
+    expect(await store.listVisionnages(profil.id, 'movie', 1)).toHaveLength(1);
+  });
+
+  it('« J’ai revu toute la saison » ajoute un visionnage aux seuls épisodes déjà vus', async () => {
+    await store.markEpisode(profil.id, 100, 1, 1); // E1 vu, E2 pas vu
+    const n = await store.rewatchSeason(profil.id, 100, 1);
+    expect(n).toBe(1);
+    const lignes = await store.listVisionnages(profil.id, 'tv', 100);
+    expect(lignes.filter((l) => l.episode === 1)).toHaveLength(2);
+    expect(lignes.filter((l) => l.episode === 2)).toHaveLength(0);
   });
 });

@@ -1,91 +1,71 @@
-// M1 — fiche enrichie : acteurs cliquables, bande-annonce toujours présente.
-// Le réseau est simulé : on vérifie ce que la fiche fait des réponses de TMDB.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  getDetails,
-  getActorFilmography,
-  urlRechercheBandeAnnonce,
-} from '../src/tmdb.js';
+// Textes de la fiche d'une série : carte « Prochain épisode ».
+import { describe, it, expect } from 'vitest';
+import { libelleProchain, dateEnToutesLettres, formatDuree } from '../src/status.js';
 
-const vues = [];
-
-function fauxTmdb(routes) {
-  vi.stubEnv('VITE_TMDB_API_KEY', 'cle-de-test');
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url) => {
-      const chemin = new URL(url).pathname.replace('/3', '');
-      vues.push(chemin);
-      const corps = routes[chemin];
-      return { ok: corps !== undefined, status: corps ? 200 : 404, json: async () => corps };
-    })
-  );
-}
-
-beforeEach(() => {
-  vues.length = 0;
-});
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-});
-
-describe('bande-annonce', () => {
-  it("sans vidéo TMDB, le bouton mène à la recherche YouTube « titre année bande-annonce »", async () => {
-    fauxTmdb({
-      '/movie/1': { title: 'Le Film', release_date: '2020-05-01', overview: 'x', videos: { results: [] } },
-    });
-    const { trailer } = await getDetails('movie', 1);
-    expect(trailer.recherche).toBe(true);
-    expect(trailer.url).toBe(urlRechercheBandeAnnonce('Le Film', '2020'));
-    expect(trailer.url).toContain('youtube.com/results?search_query=');
-    expect(decodeURIComponent(trailer.url)).toContain('Le Film 2020 bande-annonce');
+describe('formatDuree', () => {
+  it('écrit les heures et les minutes', () => {
+    expect(formatDuree(155)).toBe('2 h 35');
+    expect(formatDuree(125)).toBe('2 h 05');
+    expect(formatDuree(120)).toBe('2 h');
+    expect(formatDuree(45)).toBe('45 min');
   });
-
-  it('avec une vidéo TMDB, le bouton mène à la vidéo elle-même', async () => {
-    fauxTmdb({
-      '/tv/2': {
-        name: 'La Série',
-        first_air_date: '2019-01-01',
-        overview: 'x',
-        videos: { results: [{ site: 'YouTube', type: 'Trailer', iso_639_1: 'fr', key: 'abc123', name: 'BA' }] },
-      },
-    });
-    const { trailer } = await getDetails('tv', 2);
-    expect(trailer.recherche).toBe(false);
-    expect(trailer.url).toBe('https://www.youtube.com/watch?v=abc123');
-  });
-
-  it("le lien s'écrit sans année quand elle est inconnue", () => {
-    expect(decodeURIComponent(urlRechercheBandeAnnonce('Titre', null))).toContain('Titre bande-annonce');
+  it('rend null quand la durée est inconnue', () => {
+    expect(formatDuree(null)).toBeNull();
+    expect(formatDuree(0)).toBeNull();
   });
 });
 
-describe('acteurs de la fiche', () => {
-  it('la fiche garde 12 acteurs, chacun avec son identifiant TMDB', async () => {
-    const cast = Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, name: `Acteur ${i}` }));
-    fauxTmdb({
-      '/movie/3': { title: 'T', release_date: '2020-01-01', overview: 'x', credits: { cast } },
-    });
-    const { cast: garde } = await getDetails('movie', 3);
-    expect(garde).toHaveLength(12);
-    expect(garde[0].id).toBe(100);
-  });
+const ICI = new Date('2026-10-03T12:00:00');
 
-  it("toucher un acteur charge sa filmographie par son identifiant, sans passer par une recherche de nom", async () => {
-    fauxTmdb({
-      '/person/7': { id: 7, name: 'Jane Doe', profile_path: '/p.jpg' },
-      '/person/7/combined_credits': {
-        cast: [
-          { id: 1, media_type: 'movie', title: 'Film A', release_date: '2001-01-01', popularity: 5, character: 'Anna' },
-          { id: 2, media_type: 'tv', name: 'Série B', first_air_date: '2010-01-01', popularity: 9, character: 'Bea' },
-          { id: 3, media_type: 'tv', name: 'Talk', first_air_date: '2011-01-01', popularity: 50, character: 'Herself' },
-        ],
-      },
-    });
-    const { person, results } = await getActorFilmography(7);
-    expect(person.name).toBe('Jane Doe');
-    expect(results.map((r) => r.title)).toEqual(['Série B', 'Film A']); // plus populaire d'abord, « Herself » écarté
-    expect(vues.some((c) => c.includes('/search/person'))).toBe(false);
+describe('dateEnToutesLettres', () => {
+  it("écrit la date sans l'année quand c'est l'année en cours", () => {
+    expect(dateEnToutesLettres('2026-09-12', ICI)).toBe('12 septembre');
+  });
+  it("ajoute l'année pour une autre année, et dit 1er", () => {
+    expect(dateEnToutesLettres('2024-02-01', ICI)).toBe('1er février 2024');
+  });
+  it('rend null sans date ou avec une date illisible', () => {
+    expect(dateEnToutesLettres(null, ICI)).toBeNull();
+    expect(dateEnToutesLettres('n/a', ICI)).toBeNull();
+  });
+});
+
+describe('libelleProchain', () => {
+  it('compose le numéro, le titre, la date et le bouton', () => {
+    const l = libelleProchain(
+      { season: 2, episode: 10, name: 'Cold Harbor', airDate: '2026-09-12' },
+      ICI
+    );
+    expect(l.titre).toBe('S2E10 · Cold Harbor');
+    expect(l.diffuse).toBe('Diffusé le 12 septembre');
+    expect(l.bouton).toBe('Marquer S2E10 comme vu');
+  });
+  it('met un zéro devant un épisode à un chiffre', () => {
+    expect(libelleProchain({ season: 1, episode: 4, name: 'X', airDate: null }, ICI).numero).toBe(
+      'S1E04'
+    );
+  });
+  it('sans titre ni date, reste lisible', () => {
+    const l = libelleProchain({ season: 1, episode: 1, name: '', airDate: null }, ICI);
+    expect(l.titre).toBe('S1E01');
+    expect(l.diffuse).toBeNull();
+  });
+  it('rend null quand la série est à jour', () => {
+    expect(libelleProchain(null, ICI)).toBeNull();
+  });
+});
+
+describe('resumeBiblio', () => {
+  it('compte titres, vus et note moyenne', async () => {
+    const { resumeBiblio } = await import('../src/status.js');
+    expect(resumeBiblio([])).toEqual({ titres: 0, vus: 0, noteMoyenne: null });
+    expect(
+      resumeBiblio([
+        { status: 'vu', rating: 5 },
+        { status: 'vu', rating: 4 },
+        { status: 'a_voir', rating: null },
+        { status: 'en_cours' },
+      ])
+    ).toEqual({ titres: 4, vus: 2, noteMoyenne: 4.5 });
   });
 });

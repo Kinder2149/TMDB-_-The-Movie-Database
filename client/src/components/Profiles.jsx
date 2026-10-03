@@ -75,11 +75,11 @@ export default function Profiles({
         </header>
 
         <div className="detail-pad">
-          <p className="hint">
+          <p className="panel__note">
             Chaque profil a son propre suivi : ses titres, ses épisodes vus, ses
             listes et ses notes.
           </p>
-          {erreur && <p className="error">{erreur}</p>}
+          {erreur && <p className="message message--erreur">{erreur}</p>}
         </div>
 
         <ul className="profil-list">
@@ -91,7 +91,14 @@ export default function Profiles({
                 aria-label={`Utiliser le profil ${p.name}`}
               >
                 <Avatar name={p.name} value={p.avatar} size={44} />
-                <span className="profil__nom">{p.name}</span>
+                <span className="profil__id">
+                  <span className="profil__nom">{p.name}</span>
+                  {p.titres != null && (
+                    <span className="profil__n">
+                      {p.titres} titre{p.titres > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </span>
                 {p.id === activeId && (
                   <span className="profil__actif">
                     <Icon name="check" size={14} />

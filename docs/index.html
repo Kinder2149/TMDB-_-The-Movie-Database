@@ -43,13 +43,15 @@
 <body>
 <main>
   <h1>Politique de confidentialité</h1>
-  <p class="date">Application « Vault Watch » — mise à jour le 27 août 2026</p>
+  <p class="date">Application « Vault Watch » — mise à jour le 3 octobre 2026</p>
 
   <p class="clef">
-    Cette application <strong>n'a pas de serveur</strong>. L'éditeur ne collecte, ne
-    stocke et ne consulte <strong>aucune de vos données</strong>. Vos informations
-    restent sur votre appareil — et, si vous le demandez explicitement, dans
-    <strong>votre propre Google Drive</strong>.
+    <strong>Par défaut, tout reste sur votre appareil.</strong> L'éditeur ne consulte
+    aucune de vos données et ne dispose d'aucune copie de votre suivi. Vos informations
+    ne quittent votre appareil que si vous le demandez explicitement : dans
+    <strong>votre propre Google Drive</strong> (sauvegarde) ou, dans les versions qui
+    proposent cette fonction, sous forme d'une <strong>fiche limitée</strong> si vous
+    activez le « Profil partagé » (voir plus bas).
   </p>
 
   <h2>Les données que vous créez</h2>
@@ -121,6 +123,42 @@
     les données qu'elle a stockées.
   </p>
 
+  <h2 id="partage">Profil partagé et amis (facultatif)</h2>
+  <p>
+    Dans les versions de l'application qui proposent le « Profil partagé », vous pouvez
+    publier une fiche pour que vos proches voient vos listes grâce à un <strong>code
+    ami</strong>. Cette fonction est <strong>désactivée par défaut</strong> : tant que
+    vous ne l'avez pas activée, rien n'est envoyé. Aucun compte n'est à créer.
+  </p>
+  <p><strong>Ce qui est publié lorsque vous l'activez :</strong></p>
+  <ul>
+    <li>le pseudo que vous choisissez, et votre avatar : sa couleur et son symbole, ou, si vous avez choisi une photo, <strong>une miniature minuscule de 48 pixels</strong> tirée de cette photo (quelques kilo-octets) — jamais la photo d'origine ;</li>
+    <li>des identifiants de films et de séries, avec vos étoiles (de 1 à 5) ;</li>
+    <li>le nom de vos listes et leur contenu, <strong>sauf celles que vous marquez « privées »</strong> ; vos statuts (À voir, En cours, Vu, Abandonné) peuvent aussi être rendus privés ;</li>
+    <li>un identifiant anonyme et technique, créé automatiquement par le service, et une clé secrète qui prouve que la fiche est la vôtre.</li>
+  </ul>
+  <p>
+    <strong>Jamais publiés :</strong> vos avis écrits, vos dates de visionnage, votre photo en taille réelle,
+    votre adresse e-mail, votre nom, votre position, vos contacts.
+  </p>
+  <p><strong>Qui peut la voir :</strong> uniquement les personnes à qui vous donnez votre
+    code ami (12 caractères tirés au hasard). Il n'existe aucune liste publique de fiches :
+    on ne peut pas les parcourir, seulement ouvrir celle dont on connaît le code. Vous
+    pouvez couper tous les accès en arrêtant le partage. De votre côté, la liste des amis
+    que vous suivez reste sur votre appareil (et dans votre sauvegarde Drive) : l'éditeur
+    ne sait pas qui suit qui, et la personne suivie n'est pas prévenue.</p>
+  <p><strong>Où :</strong> la fiche est hébergée par <strong>Google (Firebase / Cloud
+    Firestore)</strong>, dans l'Union européenne, qui agit comme sous-traitant technique.
+    L'éditeur ne l'exploite à aucune autre fin, n'en tire aucun profit, et ne la partage
+    avec aucun tiers.</p>
+  <p id="suppression"><strong>Conserver et supprimer :</strong> la fiche est conservée tant
+    que vous ne l'avez pas supprimée. Pour la supprimer, ouvrez <em>Réglages › Profil
+    partagé › « Arrêter le partage et supprimer ma fiche »</em> : elle est effacée du serveur
+    immédiatement. <strong>Désinstaller l'application ne supprime pas la fiche</strong> :
+    pensez à arrêter le partage avant. Si vous n'avez plus l'application, écrivez à
+    <a href="mailto:vcoutry@gmail.com">vcoutry@gmail.com</a> en indiquant votre code ami :
+    la fiche sera supprimée sous 30 jours.</p>
+
   <h2>Connexion à Internet</h2>
   <p>
     L'application interroge le service <strong>TMDB</strong> (themoviedb.org) pour
@@ -139,22 +177,27 @@
   <ul>
     <li>Aucun mot de passe : l'application n'en demande ni n'en voit jamais.</li>
     <li>Aucune publicité, aucun traceur, aucune mesure d'audience.</li>
-    <li>Aucun partage ni vente de données à des tiers.</li>
+    <li>Aucune vente de données, aucun partage avec des tiers à des fins commerciales ou publicitaires.</li>
     <li>
       Aucun accès à vos contacts, à votre position ni à votre micro. Aucun accès non
       plus à votre galerie de photos : lorsque vous choisissez une photo d'avatar,
       c'est Android qui affiche le sélecteur et ne transmet à l'application que
       l'image que vous avez désignée. Elle est réduite, conservée sur votre appareil,
-      et incluse dans votre sauvegarde Drive si vous en avez activé une.
+      et incluse dans votre sauvegarde Drive si vous en avez activé une. Si vous activez le
+      profil partagé, seule une miniature de 48 pixels est publiée sur votre fiche (voir plus haut).
     </li>
     <li>Aucun accès à vos fichiers Google Drive personnels.</li>
-    <li>Aucun serveur, aucune base de données, aucune copie de vos données chez l'éditeur.</li>
+    <li>
+      Aucune copie de votre suivi chez l'éditeur. Seule exception, uniquement si vous
+      l'activez : la fiche limitée du « Profil partagé » décrite plus haut.
+    </li>
   </ul>
 
   <h2>Enfants</h2>
   <p>
     L'application ne s'adresse pas spécifiquement aux enfants et ne collecte
-    sciemment aucune donnée les concernant — puisque l'éditeur n'en collecte aucune.
+    sciemment aucune donnée les concernant. Le « Profil partagé » repose sur un pseudo
+    libre : il n'est visible que de ceux à qui l'on donne son code ami.
   </p>
 
   <h2>Modifications</h2>

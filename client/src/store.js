@@ -15,8 +15,10 @@ import {
   getRecommendations,
   getCardInfo,
   getRuntime,
+  getNotifInfo,
 } from './tmdb.js';
 import { TMDB_LANG, getCatalogLanguage, getCatalogRegion } from './lang.js';
+import { classifyNotif } from './status.js';
 
 // --- Profils ---
 
@@ -24,8 +26,9 @@ import { TMDB_LANG, getCatalogLanguage, getCatalogRegion } from './lang.js';
 // n'est jamais vide, même sur une installation neuve.
 export function listProfiles() {
   return query(
-    `SELECT id, name, avatar, created_at AS createdAt
-     FROM profiles ORDER BY created_at`
+    `SELECT p.id, p.name, p.avatar, p.created_at AS createdAt,
+            (SELECT COUNT(*) FROM suivi s WHERE s.profile_id = p.id) AS titres
+     FROM profiles p ORDER BY p.created_at`
   );
 }
 
@@ -81,6 +84,8 @@ export async function deleteProfile(id) {
     [id]
   );
   await run('DELETE FROM listes WHERE profile_id = ?', [id]);
+  await run('DELETE FROM partage WHERE profile_id = ?', [id]);
+  await run('DELETE FROM amis WHERE profile_id = ?', [id]);
   await run('DELETE FROM episodes_vus WHERE profile_id = ?', [id]);
   await run('DELETE FROM suivi WHERE profile_id = ?', [id]);
   await run('DELETE FROM profiles WHERE id = ?', [id]);
@@ -95,7 +100,7 @@ export function listSuivi(profileId) {
   return query(
     `SELECT s.tmdb_id AS id, s.media_type AS mediaType, s.title, s.year,
             s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status,
-            s.note, s.rating
+            s.note, s.rating, s.genres, s.added_at AS addedAt
      FROM suivi s
      WHERE s.profile_id = ?
      ORDER BY s.added_at DESC`,
@@ -138,8 +143,8 @@ export async function addToSuivi(profileId, item) {
   }
   await run(
     `INSERT OR IGNORE INTO suivi
-       (profile_id, tmdb_id, media_type, title, year, release_date, poster_url, lang)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (profile_id, tmdb_id, media_type, title, year, release_date, poster_url, lang, genres)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       profileId,
       item.id,
@@ -149,6 +154,7 @@ export async function addToSuivi(profileId, item) {
       item.releaseDate ?? null,
       item.posterUrl ?? null,
       getCatalogLanguage(),
+      item.genreKeys ? item.genreKeys.join(',') : null,
     ]
   );
 }
@@ -177,6 +183,15 @@ export async function setStatus(profileId, mediaType, id, status) {
   if (changes === 0) throw new Error('Titre absent du suivi.');
   if (mediaType === 'movie' && status === 'vu' && avant?.status !== 'vu') {
     await addVisionnage(profileId, mediaType, id, {});
+  }
+  // Terminé ou abandonné : plus la peine de surveiller une sortie ou un
+  // prochain épisode pour un titre que l'utilisateur ne suit plus vraiment.
+  if (status === 'vu' || status === 'abandonne') {
+    await run(
+      `UPDATE suivi SET notif_en_attente = 0
+       WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?`,
+      [profileId, id, mediaType]
+    );
   }
 }
 
@@ -208,6 +223,39 @@ export function listVisionnages(profileId, mediaType, tmdbId) {
 
 export async function deleteVisionnage(profileId, id) {
   await run('DELETE FROM visionnages WHERE id = ? AND profile_id = ?', [id, profileId]);
+}
+
+// Corrige la date d'un visionnage (« en fait, c'était en 2019 »). Une date
+// invalide est refusée : la colonne ne doit jamais contenir autre chose
+// qu'AAAA-MM-JJ, les tris et la sauvegarde s'y fient.
+export async function updateVisionnageDate(profileId, id, date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || Number.isNaN(Date.parse(date))) {
+    throw new Error('Date invalide.');
+  }
+  await run('UPDATE visionnages SET date = ? WHERE id = ? AND profile_id = ?', [
+    date,
+    id,
+    profileId,
+  ]);
+}
+
+// « J'ai revu toute la saison » : un visionnage de plus pour chaque épisode
+// déjà vu de la saison. Les épisodes pas cochés ne sont pas touchés — revoir
+// n'est pas voir. Renvoie le nombre d'épisodes concernés.
+export async function rewatchSeason(profileId, seriesId, season, date) {
+  const vus = (await listWatchedEpisodes(profileId, seriesId)).filter(
+    (e) => e.season === season
+  );
+  const jour = date || today();
+  await runMany(
+    vus.map((e) => ({
+      sql: `INSERT INTO visionnages
+              (profile_id, tmdb_id, media_type, season_number, episode_number, date)
+            VALUES (?, ?, 'tv', ?, ?, ?)`,
+      params: [profileId, seriesId, season, e.episode, jour],
+    }))
+  );
+  return vus.length;
 }
 
 function today() {
@@ -427,6 +475,7 @@ export async function getProgress(profileId, seriesId) {
           season: s.seasonNumber,
           episode: firstUnwatched.episodeNumber,
           name: firstUnwatched.name,
+          airDate: firstUnwatched.airDate,
         };
       }
       break; // premier non-vu trouvé (diffusé → next ; à venir → à jour)
@@ -438,15 +487,26 @@ export async function getProgress(profileId, seriesId) {
 
 // --- Listes personnalisées ---
 
-export function listListes(profileId) {
-  return query(
-    `SELECT l.id, l.name,
-            (SELECT COUNT(*) FROM liste_items li WHERE li.liste_id = l.id) AS count
+// `covers` : les affiches des 4 derniers titres ajoutés, pour la mosaïque de la carte.
+export async function listListes(profileId) {
+  const lignes = await query(
+    `SELECT l.id, l.name, l.prive,
+            (SELECT COUNT(*) FROM liste_items li WHERE li.liste_id = l.id) AS count,
+            (SELECT group_concat(p.poster_url, '|') FROM
+               (SELECT s.poster_url AS poster_url
+                FROM liste_items li2
+                JOIN suivi s ON s.profile_id = li2.profile_id
+                            AND s.tmdb_id = li2.tmdb_id
+                            AND s.media_type = li2.media_type
+                WHERE li2.liste_id = l.id AND s.poster_url IS NOT NULL AND s.poster_url != ''
+                ORDER BY li2.added_at DESC, li2.rowid DESC
+                LIMIT 4) p) AS covers
      FROM listes l
      WHERE l.profile_id = ?
      ORDER BY l.created_at`,
     [profileId]
   );
+  return lignes.map((l) => ({ ...l, covers: l.covers ? l.covers.split('|') : [] }));
 }
 
 export async function createListe(profileId, name) {
@@ -457,6 +517,16 @@ export async function createListe(profileId, name) {
   return { id: lastId, name, count: 0 };
 }
 
+// Une liste privée n'est jamais envoyée dans la fiche partagée.
+export async function setListePrive(profileId, id, prive) {
+  const { changes } = await run('UPDATE listes SET prive = ? WHERE id = ? AND profile_id = ?', [
+    prive ? 1 : 0,
+    id,
+    profileId,
+  ]);
+  if (changes === 0) throw new Error('Liste introuvable.');
+}
+
 export async function deleteListe(profileId, id) {
   await run('DELETE FROM listes WHERE id = ? AND profile_id = ?', [id, profileId]);
 }
@@ -465,7 +535,7 @@ export function getListeItems(profileId, listeId) {
   return query(
     `SELECT s.tmdb_id AS id, s.media_type AS mediaType, s.title, s.year,
             s.release_date AS releaseDate, s.poster_url AS posterUrl, s.status,
-            s.note, s.rating
+            s.note, s.rating, s.genres
      FROM liste_items li
      JOIN suivi s
        ON s.profile_id = li.profile_id
@@ -614,6 +684,7 @@ export async function backfillReleaseDates(region = getCatalogRegion()) {
     `SELECT DISTINCT tmdb_id AS id, media_type AS mediaType
      FROM suivi
      WHERE release_region IS NULL
+        OR genres IS NULL
         OR (media_type = 'movie' AND release_region <> ?)`,
     [region]
   );
@@ -640,22 +711,101 @@ export async function backfillReleaseDates(region = getCatalogRegion()) {
         `UPDATE suivi
             SET release_date = COALESCE(?, release_date),
                 year = COALESCE(year, ?),
+                genres = COALESCE(NULLIF(?, ''), genres, ''),
                 release_region = ?
           WHERE tmdb_id = ? AND media_type = ?`,
         [
           info.releaseDate ?? null,
           info.year ?? null,
+          // Jamais NULL ici : une fiche obtenue sans genre connu est marquée
+          // '' pour ne pas être redemandée sans fin (même logique que la région).
+          (info.genreKeys ?? []).join(','),
           regionAttendue(t.mediaType, region),
           t.id,
           t.mediaType,
         ]
       );
-      if (info.releaseDate) completes += 1;
+      if (info.releaseDate || info.genreKeys?.length) completes += 1;
     }
   }
   return completes;
 }
 
+// --- Notifications de sortie : cycle de vérification (figé le 2026-09-27) ---
+//
+// Ne traite que les éléments « en attente » (`notif_en_attente = 1`) — jamais
+// toute la bibliothèque. Un élément le reste tant qu'il n'a pas été notifié
+// (étape ultérieure) : une date trouvée aujourd'hui peut encore être reportée
+// demain, donc on continue de la vérifier plutôt que de la figer.
+// Appelé au plus une fois par lancement — le rythme « une fois par jour » de
+// la décision figée est imposé par l'appelant (App.jsx), pas ici : cette
+// fonction, elle, retraite sans condition tout ce qui lui est donné.
+export async function checkNotifications(profileId, region = getCatalogRegion()) {
+  const aVerifier = await query(
+    `SELECT tmdb_id AS id, media_type AS mediaType
+     FROM suivi WHERE profile_id = ? AND notif_en_attente = 1`,
+    [profileId]
+  );
+  if (aVerifier.length === 0) return 0;
+
+  const langue = TMDB_LANG[getCatalogLanguage()];
+  let verifies = 0;
+  const BATCH = 5;
+  for (let i = 0; i < aVerifier.length; i += BATCH) {
+    const infos = await Promise.all(
+      aVerifier.slice(i, i + BATCH).map((t) =>
+        getNotifInfo(t.mediaType, t.id, langue, region)
+          .then((info) => ({ t, info }))
+          .catch(() => ({ t, info: null }))
+      )
+    );
+    for (const { t, info } of infos) {
+      // Échec réseau : rien ne change, ce sera retenté au prochain cycle.
+      if (!info) continue;
+      const { date, enAttente } = classifyNotif({
+        isSeries: t.mediaType === 'tv',
+        releaseDate: info.releaseDate,
+        status: info.status,
+        nextEpisodeDate: info.nextEpisodeDate,
+        seriesEnded: info.seriesEnded,
+      });
+      await run(
+        `UPDATE suivi SET notif_date = ?, notif_en_attente = ?
+         WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?`,
+        [date, enAttente ? 1 : 0, profileId, t.id, t.mediaType]
+      );
+      verifies += 1;
+    }
+  }
+  return verifies;
+}
+
+// --- Notifications de sortie : titres dus (figé le 2026-09-27) ---
+//
+// À chaque lancement (pas seulement une fois par jour : c'est une lecture
+// locale, sans appel réseau, rien ne justifie de l'espacer) — les titres
+// « en attente » dont la date est aujourd'hui ou déjà passée. Les fait sortir
+// du cycle dans le même mouvement (décision 5 : un titre notifié n'est plus
+// jamais revérifié) ; à l'appelant de les notifier réellement, ce module ne
+// connaît que la base.
+export async function takeDueNotifications(profileId, aujourdhui = today()) {
+  const dus = await query(
+    `SELECT tmdb_id AS id, media_type AS mediaType, title
+     FROM suivi
+     WHERE profile_id = ? AND notif_en_attente = 1
+       AND notif_date IS NOT NULL AND notif_date <= ?`,
+    [profileId, aujourdhui]
+  );
+  if (dus.length === 0) return [];
+  await runMany(
+    dus.map((t) => ({
+      sql: `UPDATE suivi SET notif_en_attente = 0
+            WHERE profile_id = ? AND tmdb_id = ? AND media_type = ?`,
+      params: [profileId, t.id, t.mediaType],
+    }))
+  );
+  return dus;
+}
 
 // --- Statistiques ---
 //
@@ -700,9 +850,24 @@ export async function backfillRuntimes(onProgress) {
   return { total, done };
 }
 
+// [{ key, n }] : les `max` genres les plus fréquents (ex æquo : ordre alphabétique).
+// Le champ `genres` est une liste séparée par des virgules, vide ou NULL si inconnue.
+export function compterGenres(titres, max = 5) {
+  const n = new Map();
+  for (const t of titres) {
+    for (const g of new Set((t.genres || '').split(',').filter(Boolean))) {
+      n.set(g, (n.get(g) || 0) + 1);
+    }
+  }
+  return [...n]
+    .map(([key, nb]) => ({ key, n: nb }))
+    .sort((a, b) => b.n - a.n || (a.key < b.key ? -1 : 1))
+    .slice(0, max);
+}
+
 export async function getStats(profileId) {
   const suivi = await query(
-    `SELECT tmdb_id AS id, media_type AS mediaType, status, runtime, rating
+    `SELECT tmdb_id AS id, media_type AS mediaType, status, runtime, rating, genres
      FROM suivi WHERE profile_id = ?`,
     [profileId]
   );
@@ -745,8 +910,12 @@ export async function getStats(profileId) {
     ? Math.round((notes.reduce((a, b) => a + b, 0) / notes.length) * 10) / 10
     : null;
 
+  // Genres les plus regardés : parmi les titres vus ou en cours, ceux dont le genre est connu.
+  const parGenre = compterGenres(suivi.filter((t) => t.status === 'vu' || t.status === 'en_cours'), 5);
+
   return {
     titres: suivi.length,
+    parGenre,
     films: films.length,
     series: series.length,
     filmsVus: filmsVus.length,
