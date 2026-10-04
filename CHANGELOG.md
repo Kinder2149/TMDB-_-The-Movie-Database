@@ -10,6 +10,8 @@
   Marche à suivre : `PLAN_ANDROID.md`, « Publication de la 2.3 ».
 
 ## Retours d'essai de la refonte (2026-10-03)
+- **Clic sur une notification** : toucher une notification de sortie ouvre maintenant la fiche du titre notifié
+  (avant, l'application s'ouvrait sans y mener).
 - **Notifications** : le test (et les vraies notifications de sortie) n'apparaissaient pas, car Android retardait
   l'alarme programmée. Elles s'affichent maintenant tout de suite.
 - **Avatar des amis** : une photo d'avatar part dans la fiche en miniature de 48 px (au lieu de rien : les amis

@@ -56,6 +56,7 @@ import {
   mettreAJourDatesDeSortie,
   verifierNotifications,
   notifierSortiesDues,
+  ecouterClicsNotification,
   createListe as apiCreateListe,
   deleteListe as apiDeleteListe,
   setListePrive as apiSetListePrive,
@@ -171,6 +172,9 @@ export default function App() {
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
+  const suiviRef = useRef(new Map());
+  suiviRef.current = suivi;
+
   function loadSuivi() {
     getSuivi()
       .then((items) => setSuivi(new Map(items.map((i) => [keyOf(i), i]))))
@@ -252,6 +256,19 @@ export default function App() {
             .catch(() => {});
     cycle.then(() => notifierSortiesDues()).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile]);
+
+  // Un clic sur une notification de sortie ouvre la fiche du titre notifié.
+  // Branché une fois le profil actif (la fiche en dépend), ce qui couvre aussi
+  // le lancement à froid : le clic en attente est livré à l'enregistrement.
+  useEffect(() => {
+    if (!activeProfile) return undefined;
+    return ecouterClicsNotification((titre) => {
+      setShowNotifications(false);
+      // Le titre notifié est suivi : on reprend sa fiche complète si elle est chargée.
+      const connu = suiviRef.current.get(keyOf(titre));
+      setOpenDetail(connu || { id: titre.id, mediaType: titre.mediaType, title: titre.title });
+    });
   }, [activeProfile]);
 
   // Genres chargés une fois (indépendants du profil).

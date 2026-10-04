@@ -65,7 +65,22 @@ export async function notifierSortie({ id, mediaType, title }) {
         id: idNotification(mediaType, id),
         title: 'Vault Watch',
         body,
+        // Relu au clic (`ecouterClics`) pour ouvrir la fiche du titre.
+        extra: { id, mediaType, title },
       },
     ],
   });
+}
+
+// Au clic sur une notification de sortie, appelle `onClic({ id, mediaType, title })`.
+// À brancher une fois au démarrage : si l'application était fermée, le plugin
+// livre le clic dès que l'écouteur est enregistré. Renvoie une fonction d'arrêt.
+export function ecouterClics(onClic) {
+  const handle = LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    const extra = action?.notification?.extra;
+    if (extra && extra.id && extra.mediaType) onClic(extra);
+  });
+  return () => {
+    handle.then((h) => h.remove()).catch(() => {});
+  };
 }

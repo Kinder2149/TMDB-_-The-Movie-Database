@@ -269,6 +269,8 @@ export async function notifierSortiesDues() {
   return dus.length;
 }
 
+export const ecouterClicsNotification = notif.ecouterClics;
+
 // --- Statistiques ---
 
 // Complète les durées manquantes (appels TMDB) : appelé par l'écran des
